@@ -1,0 +1,3 @@
+# GP contact data and draft/send logs contain personal data (GDPR) —
+# keep them out of git history. They live only in data/ locally.
+/data/
