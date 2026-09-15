@@ -5,11 +5,11 @@ description: Run the mental-health-to-GP outreach workflow — research Prague G
 
 # Prague GP mental-health outreach
 
-This skill coordinates three agents to run one batch of a B2B outreach
+This skill coordinates four agents to run one batch of a B2B outreach
 campaign: a mental-health company proposing a partnership/referral
 relationship to general practitioners (GPs) in Prague. It never sends
-email itself — every batch stops for explicit user approval before
-anything leaves a draft.
+email on its own judgment — every batch stops for explicit user approval
+before `email-sender` is allowed to run.
 
 ## Before the first run
 
@@ -22,14 +22,23 @@ company details, pricing, or claims to fill gaps:
 - Legal basis for contact + opt-out text + retention/DSR contact
 - Max emails per batch/day
 
+Also check `config/resend.env` exists (copied from
+`config/resend.env.example` and filled in with a real Resend API key and a
+sending domain the user has verified in Resend). If it's missing, you can
+still run steps 1–4 (research/draft/compliance/review), but tell the user
+this needs to be done before step 5 can actually send anything.
+
 ## Workflow
 
 1. **Research** — invoke the `gp-researcher` subagent to build or extend
    `data/gp-contacts.csv`. Skip this step if the user says the list is
    already sufficient for this batch.
 2. **Draft** — invoke the `proposal-drafter` subagent to turn unsent
-   contacts into a batch of Gmail drafts (`data/draft-batch-<date>.csv`),
-   respecting the batch size limit in the company profile.
+   contacts into a batch: one `.txt` file per email under
+   `data/drafts/<date>/` (the authoritative content) plus, best-effort, a
+   matching Gmail draft for easy inline review, logged in
+   `data/draft-batch-<date>.csv`. Respect the batch size limit in the
+   company profile.
 3. **Compliance check** — invoke the `compliance-reviewer` subagent on that
    batch. If it returns FIX REQUIRED, surface the exact fixes to the user
    and stop — do not proceed to review/send until it's resolved (either by
@@ -38,14 +47,14 @@ company details, pricing, or claims to fill gaps:
 4. **Present the batch for approval** — summarize to the user: how many
    drafts, recipients (name + clinic), and the compliance verdict. Show 1–2
    full example drafts so they can sanity-check tone/content, and point to
-   the Gmail drafts folder for the rest. Wait for explicit approval — do
-   not send anything on your own judgment call.
-5. **Send** — only after the user explicitly approves the batch, send each
-   drafted email via the Gmail tools (send the existing draft rather than
-   composing a new one, so what sends matches exactly what was reviewed).
-   Update `data/draft-batch-<date>.csv` status column as each one sends.
-   If anything fails to send, report which ones and why rather than
-   silently retrying.
+   the Gmail drafts folder (or the `.txt` files) for the rest. Wait for
+   explicit approval — do not send anything on your own judgment call.
+5. **Send** — only after the user explicitly approves the batch, invoke the
+   `email-sender` subagent, telling it plainly that this specific batch
+   file has been approved. It dry-runs, then sends via Resend, and updates
+   `data/draft-batch-<date>.csv` status column as each one sends. If
+   anything fails to send, report which ones and why rather than silently
+   retrying.
 
 ## Re-running / expanding
 

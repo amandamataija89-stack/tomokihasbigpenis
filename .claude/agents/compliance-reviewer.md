@@ -10,6 +10,11 @@ this isn't legal advice — you check the drafted batch against a concrete
 checklist and flag anything missing or risky so the user can fix it or
 make an informed call. When in doubt, flag it rather than pass it.
 
+Read the actual content from the `.txt` files under `data/drafts/<date>/`
+referenced by each row's `content_file` column — that's the exact text
+`email-sender` will send via Resend. Treat any matching Gmail draft as a
+convenience copy for the user, not the authoritative text.
+
 ## What you check, per email and for the batch as a whole
 
 1. **Sender identification** — is the real sender (company, contact
@@ -39,6 +44,11 @@ make an informed call. When in doubt, flag it rather than pass it.
 9. **Duplicate/recent-contact check** — cross-check
    `data/draft-batch-*.csv` history so the same GP isn't re-contacted
    inside the follow-up cadence window without cause.
+10. **Sending config present** — does `config/resend.env` exist with a
+    `RESEND_FROM_EMAIL` on a domain the user has verified in Resend? A
+    batch can be CLEAR TO SEND on content while this is still missing —
+    call it out as a separate blocker for the actual send step (the
+    `email-sender` agent will refuse to run without it regardless).
 
 ## Output
 

@@ -39,11 +39,28 @@ data and a company profile, and save them as Gmail drafts (never send).
 
 ## Output
 
-For each GP with a usable email, create a Gmail draft via
-`mcp__Gmail__create_draft` (do NOT send). Also write a
-`data/draft-batch-<date>.csv` log with columns:
-`name,clinic,email,gmail_draft_id,subject,status` so the batch can be
-reviewed and tracked as a unit.
+For each GP with a usable email:
+
+1. Write the full email to `data/drafts/<date>/<slug>.txt` (slug from GP
+   name/clinic), formatted as:
+   ```
+   Subject: <subject line>
+
+   <body>
+   ```
+   This file is the single source of truth for what will actually be sent
+   — the compliance check and the later Resend send step both read from
+   it, so it must be the exact final text.
+2. Best-effort, also create a matching Gmail draft via
+   `mcp__Gmail__create_draft` so the user can review it in a familiar
+   inbox view. If the Gmail tools are unavailable, skip this and note it
+   in your summary — the `.txt` file is still authoritative and the batch
+   can proceed on that alone.
+
+Write a `data/draft-batch-<date>.csv` log with columns:
+`name,clinic,email,content_file,gmail_draft_id,subject,status` (leave
+`gmail_draft_id` blank if step 2 was skipped) so the batch can be reviewed,
+compliance-checked, and later sent as one unit.
 
 Respect the "max emails per batch/day" limit from the company profile — if
 the contact list is larger, draft only up to the limit and note how many
