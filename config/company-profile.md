@@ -44,10 +44,9 @@ publicly and must be filled in before the first batch can go out.
 
 ## Branding (for the newsletter-style email template)
 
-- **Logo image:** NEEDS YOU — a hosted image URL (e.g. a link to the logo
-  on your website or a file you upload somewhere public), so it can be
-  referenced in the email header. I couldn't reach the site to pull it
-  directly.
+- **Logo image:** PENDING — you said you'll send a URL or file. Until
+  then, `marketer` uses a text-based header (company name styled in the
+  brand color) instead of failing.
 - **Primary brand color (hex):** NEEDS YOU
 - **Secondary/accent color (hex), if any:** NEEDS YOU
 - **Font preference, if any (otherwise a clean system font is used):**
@@ -55,19 +54,24 @@ publicly and must be filled in before the first batch can go out.
 ## What you're proposing to GPs, clinics, doctors, and other relevant
 professionals
 
-- **Service/program name:** NEEDS YOU (which specific service is this
-  campaign about — e.g. a referral partnership around one of the corporate
-  programs above, individual therapy referrals, or something else?)
-- **One-paragraph description (what it is, who it's for):** NEEDS YOU
-- **The specific ask** — this matters a lot and isn't on the website:
-  are you asking recipients to refer patients/clients to you, to co-host
-  or attend something, to partner on a program, or something else?
+- **Service/program name:** Referral partnership with Prague Integration
+- **The ask (confirmed):** A referral partnership — when the recipient has
+  a patient/client who needs mental health support, they refer them to
+  Prague Integration.
+- **One-paragraph description (what it is, who it's for):** NEEDS YOU —
+  e.g. what happens after a referral (how do they refer someone — a form,
+  a phone number, an email? what's the intake process? is there a
+  dedicated contact for referring clinicians?), and which of your
+  services/languages/formats (see list above) are most relevant to
+  mention for a referral context.
+- **Why a recipient would want this** (patient benefit, faster access to
+  care, multilingual coverage, no cost/admin burden to them, etc.):
   NEEDS YOU
-- **Why a recipient would want this** (patient benefit, revenue/time
-  savings, professional development, etc.): NEEDS YOU
 - **Evidence/credentials to cite** (licenses, clinical backing,
   partnerships, outcomes data — only real, verifiable claims): NEEDS YOU
-- **Pricing or cost to the recipient, if any:** NEEDS YOU
+- **Pricing or cost to the recipient, if any:** presumably free to refer
+  (confirm) — NEEDS YOU to confirm whether there's any cost/commitment on
+  the referring clinician's side
 
 ## Language & tone
 
