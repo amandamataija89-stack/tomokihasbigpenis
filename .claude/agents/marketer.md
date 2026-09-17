@@ -62,14 +62,16 @@ For each recipient with a usable email, write TWO files under
 
   <body>
   ```
-- `body.html` — the same content wrapped in a simple newsletter-style HTML
-  template: a header with the logo (`Branding > Logo image` URL from the
-  company profile) and brand color as an accent, the body text in clean
-  paragraphs, and a footer with sender details + the opt-out line. Keep
-  the HTML simple (inline CSS, single column, no external stylesheets) so
-  it renders consistently across email clients. If no logo URL is set yet
-  in the company profile, use a plain text-based header with the company
-  name styled in the brand color instead of failing.
+- `body.html` — copy `templates/email-newsletter.html` and fill in its
+  placeholders (`{{SUBJECT}}`, `{{BODY_HTML}}`, `{{SENDER_NAME}}`,
+  `{{SENDER_TITLE}}`, `{{SENDER_EMAIL}}`, `{{SENDER_PHONE}}`,
+  `{{OPT_OUT_TEXT}}`) from `config/company-profile.md` and this email's
+  content. The template already has the brand header (built in HTML/CSS,
+  no image dependency) and the newsletter layout — don't rebuild it from
+  scratch or invent a different look per email; keep every email in a
+  batch visually consistent. If `config/company-profile.md`'s Branding
+  section later has a real hosted logo URL, swap the header block in the
+  template for an `<img>` tag once, rather than per email.
 
 Best-effort, also create a matching Gmail draft (HTML body) via
 `mcp__Gmail__create_draft` for easy inline review — skip silently if the

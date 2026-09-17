@@ -44,11 +44,20 @@ publicly and must be filled in before the first batch can go out.
 
 ## Branding (for the newsletter-style email template)
 
-- **Logo image:** PENDING — you said you'll send a URL or file. Until
-  then, `marketer` uses a text-based header (company name styled in the
-  brand color) instead of failing.
-- **Primary brand color (hex):** NEEDS YOU
-- **Secondary/accent color (hex), if any:** NEEDS YOU
+- **Logo image:** No hosted URL yet. You shared the logo as an image in
+  chat, but this session has no file-upload path to save it from — there's
+  nothing on disk to host. `templates/email-newsletter.html` instead
+  rebuilds the mark in HTML/CSS (bold "Prague" + two rose dots, green "+"
+  + "Integration" + two navy triangles), which also has the benefit of
+  rendering even in clients that block remote images by default. If you
+  get me a public URL to the real logo file later, swap the header block
+  in the template for an `<img>` tag.
+- **Colors (approximated from the logo you shared — please confirm/correct
+  exact hex codes if you have brand guidelines):**
+  - Text/black: `#0a0a0a`
+  - Accent green (the "+"): `#4e9c77`
+  - Accent rose (the dots): `#d98aa0`
+  - Accent navy (the triangles): `#33416b`
 - **Font preference, if any (otherwise a clean system font is used):**
 
 ## What you're proposing to GPs, clinics, doctors, and other relevant

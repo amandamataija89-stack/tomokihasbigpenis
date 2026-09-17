@@ -1,0 +1,83 @@
+<!--
+Base template for Prague Integration outreach emails.
+
+marketer copies this file per email and fills in the placeholders below.
+The brand header is built with plain HTML/CSS (no image) so it always
+renders, even in clients that block remote images by default — a real
+logo image can replace it later if a hosted URL becomes available (swap
+the header block for an <img> tag pointing at it).
+
+Placeholders to replace:
+  {{SUBJECT}}       - same text as the Subject: line in body.txt
+  {{BODY_HTML}}      - the email body, as HTML paragraphs (<p>...</p>)
+  {{SENDER_NAME}}    - from config/company-profile.md
+  {{SENDER_TITLE}}   - from config/company-profile.md
+  {{SENDER_EMAIL}}   - from config/company-profile.md
+  {{SENDER_PHONE}}   - from config/company-profile.md
+  {{OPT_OUT_TEXT}}   - from config/company-profile.md
+-->
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{SUBJECT}}</title>
+</head>
+<body style="margin:0; padding:0; background-color:#f5f5f3; font-family:Arial, Helvetica, sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f5f3; padding:24px 0;">
+<tr><td align="center">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff; max-width:600px; width:100%;">
+
+<!-- Brand header -->
+<tr><td style="padding:32px 32px 16px 32px;">
+  <table role="presentation" cellpadding="0" cellspacing="0">
+    <tr>
+      <td style="font-size:26px; font-weight:800; color:#0a0a0a; font-family:Arial, Helvetica, sans-serif; padding-right:6px;">Prague</td>
+      <td style="padding-right:4px;">
+        <span style="display:inline-block; width:14px; height:14px; border-radius:50%; background-color:#d98aa0;"></span>
+      </td>
+      <td>
+        <span style="display:inline-block; width:14px; height:14px; border-radius:50%; background-color:#d98aa0;"></span>
+      </td>
+    </tr>
+    <tr>
+      <td style="font-size:26px; font-weight:800; color:#4e9c77; font-family:Arial, Helvetica, sans-serif; padding-right:2px;">+</td>
+      <td colspan="2" style="font-size:26px; font-weight:800; color:#0a0a0a; font-family:Arial, Helvetica, sans-serif; padding-right:8px;">Integration</td>
+      <td style="padding:0 3px;">
+        <span style="display:inline-block; width:0; height:0; border-left:7px solid transparent; border-right:7px solid transparent; border-bottom:11px solid #33416b;"></span>
+      </td>
+      <td>
+        <span style="display:inline-block; width:0; height:0; border-left:7px solid transparent; border-right:7px solid transparent; border-top:11px solid #33416b;"></span>
+      </td>
+    </tr>
+  </table>
+</td></tr>
+
+<!-- Divider -->
+<tr><td style="padding:0 32px;"><hr style="border:none; border-top:1px solid #eceae7; margin:0;"></td></tr>
+
+<!-- Body -->
+<tr><td style="padding:24px 32px; font-size:15px; line-height:1.6; color:#1a1a1a;">
+{{BODY_HTML}}
+</td></tr>
+
+<!-- Signature -->
+<tr><td style="padding:0 32px 24px 32px; font-size:14px; line-height:1.5; color:#1a1a1a;">
+  <p style="margin:0;">
+    <strong>{{SENDER_NAME}}</strong><br>
+    {{SENDER_TITLE}}<br>
+    Prague Integration<br>
+    {{SENDER_EMAIL}} · {{SENDER_PHONE}}
+  </p>
+</td></tr>
+
+<!-- Footer -->
+<tr><td style="padding:16px 32px; background-color:#f5f5f3; font-size:12px; line-height:1.5; color:#6b6b6b;">
+  {{OPT_OUT_TEXT}}
+</td></tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>
