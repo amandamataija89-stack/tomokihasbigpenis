@@ -3,29 +3,18 @@
 An AI agent team — `marketer` and `editor` — for researching Prague GPs,
 clinics, doctors, and other relevant contacts, and sending them
 newsletter-style branded proposal emails on behalf of Prague Integration.
-Sending is a separate, explicit step gated by an editor review and your
-approval.
+Sending is a separate, explicit step: `marketer` only ever sends the exact
+Gmail draft `editor` reviewed and you approved, never a freshly composed
+message.
 
 ## Setup
 
-1. Fill in **`config/company-profile.md`**. It's pre-filled with public
-   info about Prague Integration found via web search (the site itself is
-   blocked by this environment's network policy, so double-check it), but
-   several fields are marked "NEEDS YOU" — in particular the *specific ask*
-   for this campaign, your logo URL/brand color, and legal/compliance
-   basics. `marketer` won't draft anything until these are filled in.
-2. Make sure the Gmail connection this session uses is the account you
-   want draft copies to show up in (optional — used only for easy inline
-   review, not for sending).
-3. Set up Resend for actual sending:
-   - Create a Resend account and a verified sending domain (Domains ->
-     Add Domain -> add the SPF/DKIM/DMARC records it gives you to your
-     DNS).
-   - Create an API key at resend.com/api-keys.
-   - Copy `config/resend.env.example` to `config/resend.env` and fill in
-     your API key, from name/email, and reply-to address.
-     `config/resend.env` is gitignored — it holds a real secret and must
-     never be committed.
+1. Fill in **`config/company-profile.md`**. `marketer` won't draft
+   anything until the required fields are filled in — in particular the
+   specific ask, sender identity, branding, and legal/compliance basics.
+2. That's it. Sending uses the Gmail account already connected to this
+   session (`contact@pragueintegration.cz`) — no API keys or domain setup
+   needed.
 
 ## Running it
 
@@ -38,18 +27,18 @@ Invoke the skill:
 This runs, in order:
 
 1. **`marketer`** (research + draft) — finds Prague GPs/clinics/doctors/
-   other relevant contacts (`data/contacts.csv`), then writes each
-   proposal as a newsletter-style email: `data/drafts/<date>/<slug>/body.txt`
-   (plain text, authoritative) and `body.html` (branded HTML version with
-   your logo/color), best-effort mirrored as a Gmail draft. Logged in
-   `data/draft-batch-<date>.csv`. Never sends at this stage.
+   other relevant contacts (`data/contacts.csv`), then for each one writes
+   a newsletter-style email (`data/drafts/<date>/<slug>/body.txt` +
+   `body.html`, branded via `templates/email-newsletter.html`) and creates
+   a real Gmail draft from that exact content. Logged in
+   `data/draft-batch-<date>.csv`. Nothing sends at this stage.
 2. **`editor`** — reviews the batch for tone, brand consistency, and Czech
    e-marketing/GDPR compliance, writing `data/compliance-report-<date>.md`.
 3. A summary is presented to you for approval — nothing sends until you
-   say so explicitly.
-4. **`marketer`** (send) — only once you've approved, dry-runs then sends
-   the batch via the Resend API, updating each row's status in
-   `data/draft-batch-<date>.csv`.
+   explicitly say so.
+4. **`marketer`** (send) — only once you've approved, sends each row's
+   existing Gmail draft by ID (so what sends is exactly what was
+   reviewed), updating `data/draft-batch-<date>.csv` status per row.
 
 To expand an existing campaign ("find more contacts", "send another
 batch"), just invoke the skill again — it dedupes against previous runs.
@@ -59,12 +48,10 @@ batch"), just invoke the skill again — it dedupes against previous runs.
 - `.claude/skills/prague-gp-outreach/SKILL.md` — the workflow orchestration
 - `.claude/agents/marketer.md` — research, drafting, and sending
 - `.claude/agents/editor.md` — quality + compliance review before sending
-- `scripts/send_via_resend.py` — the actual Resend API call, run by
-  `marketer`; safe to run manually too (`--dry-run` first)
+- `templates/email-newsletter.html` — the branded HTML template
+  (logo/colors rebuilt in HTML/CSS from the shared logo image)
 - `config/company-profile.md` — your company/proposal/branding/compliance
   inputs
-- `config/resend.env.example` — template for Resend credentials (copy to
-  `config/resend.env`, which is gitignored)
 - `data/` — generated contact lists, drafts, and reports (gitignored —
   this is personal data and shouldn't live in git history)
 

@@ -44,7 +44,7 @@ user says otherwise; keep them out of the draft content.
 
 - **Name:** Amanda Mataija
 - **Role/title:** CEO
-- **Email (must match the RESEND_FROM_EMAIL in config/resend.env):**
+- **Email (sends via the Gmail account connected to this session):**
   contact@pragueintegration.cz
 - **Phone:** +420 608 573 256
 

@@ -1,7 +1,3 @@
 # GP contact data and draft/send logs contain personal data (GDPR) —
 # keep them out of git history. They live only in data/ locally.
 /data/
-
-# Real Resend API key and sending config — never commit secrets.
-# Only config/resend.env.example (the template) is tracked.
-/config/resend.env
