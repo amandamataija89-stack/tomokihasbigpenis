@@ -15,6 +15,16 @@ Placeholders to replace:
   {{SENDER_EMAIL}}   - from config/company-profile.md
   {{SENDER_PHONE}}   - from config/company-profile.md
   {{OPT_OUT_TEXT}}   - from config/company-profile.md
+
+Optional photo block: the commented-out <!-- PHOTO_BLOCK_START/END --> section
+below shows an office/room photo between the body and signature. AS OF
+2026-09-17 THIS DOESN'T WORK: inline cid: attachments via the Gmail MCP
+tools got silently stripped from the saved draft (see marketer.md Part 2
+for what was tried). Don't uncomment this block for real batches until
+that's been re-tested and confirmed working — right now, always delete
+it rather than leaving a broken image reference in a sent email. The
+`cid:` value, if this is ever fixed, must match the Content-ID of an
+inline attachment with that same filename on the actual Gmail draft.
 -->
 <!DOCTYPE html>
 <html lang="cs">
@@ -30,24 +40,24 @@ Placeholders to replace:
 
 <!-- Brand header -->
 <tr><td style="padding:32px 32px 16px 32px;">
-  <table role="presentation" cellpadding="0" cellspacing="0">
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
     <tr>
-      <td style="font-size:26px; font-weight:800; color:#0a0a0a; font-family:Arial, Helvetica, sans-serif; padding-right:6px;">Prague</td>
-      <td style="padding-right:4px;">
-        <span style="display:inline-block; width:14px; height:14px; border-radius:50%; background-color:#d98aa0;"></span>
+      <td valign="top">
+        <div style="font-size:26px; font-weight:800; line-height:1.15; color:#0a0a0a; font-family:Arial, Helvetica, sans-serif;">Prague</div>
+        <div style="font-size:26px; font-weight:800; line-height:1.15; color:#0a0a0a; font-family:Arial, Helvetica, sans-serif;">Integration</div>
+        <div style="font-size:22px; font-weight:800; line-height:1; color:#4e9c77; font-family:Arial, Helvetica, sans-serif; margin-top:4px;">+</div>
       </td>
-      <td>
-        <span style="display:inline-block; width:14px; height:14px; border-radius:50%; background-color:#d98aa0;"></span>
-      </td>
-    </tr>
-    <tr>
-      <td style="font-size:26px; font-weight:800; color:#4e9c77; font-family:Arial, Helvetica, sans-serif; padding-right:2px;">+</td>
-      <td colspan="2" style="font-size:26px; font-weight:800; color:#0a0a0a; font-family:Arial, Helvetica, sans-serif; padding-right:8px;">Integration</td>
-      <td style="padding:0 3px;">
-        <span style="display:inline-block; width:0; height:0; border-left:7px solid transparent; border-right:7px solid transparent; border-bottom:11px solid #33416b;"></span>
-      </td>
-      <td>
-        <span style="display:inline-block; width:0; height:0; border-left:7px solid transparent; border-right:7px solid transparent; border-top:11px solid #33416b;"></span>
+      <td valign="top" align="right">
+        <table role="presentation" cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="padding-right:4px;"><span style="display:inline-block; width:14px; height:14px; border-radius:50%; background-color:#d98aa0;"></span></td>
+            <td><span style="display:inline-block; width:14px; height:14px; border-radius:50%; background-color:#d98aa0;"></span></td>
+          </tr>
+          <tr>
+            <td style="padding:6px 4px 0 0;"><span style="display:inline-block; width:0; height:0; border-left:7px solid transparent; border-right:7px solid transparent; border-bottom:11px solid #33416b;"></span></td>
+            <td style="padding-top:6px;"><span style="display:inline-block; width:0; height:0; border-left:7px solid transparent; border-right:7px solid transparent; border-top:11px solid #33416b;"></span></td>
+          </tr>
+        </table>
       </td>
     </tr>
   </table>
@@ -60,6 +70,12 @@ Placeholders to replace:
 <tr><td style="padding:24px 32px; font-size:15px; line-height:1.6; color:#1a1a1a;">
 {{BODY_HTML}}
 </td></tr>
+
+<!-- PHOTO_BLOCK_START (uncomment + set cid/alt when a photo is attached inline; delete this whole block otherwise)
+<tr><td style="padding:0 32px 8px 32px;">
+  <img src="cid:{{PHOTO_CID}}" alt="{{PHOTO_ALT}}" width="536" style="display:block; width:100%; max-width:536px; height:auto; border-radius:6px;">
+</td></tr>
+PHOTO_BLOCK_END -->
 
 <!-- Signature -->
 <tr><td style="padding:0 32px 24px 32px; font-size:14px; line-height:1.5; color:#1a1a1a;">

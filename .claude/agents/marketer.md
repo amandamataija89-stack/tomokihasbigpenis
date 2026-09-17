@@ -81,11 +81,39 @@ For each recipient with a usable email:
    `data/drafts/<date>/<slug>/body.html`. Don't rebuild the template from
    scratch or invent a different look per email — keep every email in a
    batch visually consistent.
+
+   Optional photo — CURRENTLY NOT WORKING, don't attempt without testing
+   first: inline `cid:` photo attachments via `mcp__Gmail__create_draft`/
+   `update_draft` were tried and the `<img>` tag was silently stripped
+   from the saved draft (verified by reading the draft back) even though
+   the call itself returned success and no error — the attachment wasn't
+   actually persisted (`get_draft` showed none). Root cause unconfirmed.
+   If you want to retry this in a future session: build one throwaway
+   test draft with a tiny inline image first, then use `get_draft` to
+   confirm the `<img>` survives AND an attachment is actually listed,
+   before using it in any real batch. Until that's confirmed, ship emails
+   as text + the CSS brand header only — no photos.
 3. Create the actual Gmail draft via `mcp__Gmail__create_draft` with `to`,
    `subject`, `body` (the plain text), and `htmlBody` (the filled
    template) set from the two files above — this draft IS what gets sent
    later, not just a preview, so it must exactly match the `.txt`/`.html`
-   files. Record the returned draft `id`.
+   files. If you used a photo, pass it in `attachments` with
+   `inline: true` and a `filename` matching the `{{PHOTO_CID}}` value used
+   in the HTML (read the file from `assets/photos/`, base64-encode it as
+   the attachment `content`). Record the returned draft `id`.
+
+   Getting a photo from Google Drive into `assets/photos/`: search with
+   `mcp__Google_Drive__search_files`, then `download_file_content`. Files
+   large enough to exceed the inline response limit auto-save to a
+   tool-results file on disk — read and decode THAT file
+   programmatically (`json.load` + `base64.b64decode` in a Bash/Python
+   call), never by retyping the base64 content into a new tool call by
+   hand. Manually reproducing more than a page or so of raw base64 is
+   unreliable (verified: it silently truncates/corrupts) — only rely on
+   this for files too small to trigger the auto-save, and verify the
+   decoded length before trusting it. Resize with Pillow to a sensible
+   email width (~500–650px) and moderate JPEG quality before saving into
+   `assets/photos/`, so the file stays well under email attachment limits.
 
 Write `data/draft-batch-<date>.csv`:
 ```

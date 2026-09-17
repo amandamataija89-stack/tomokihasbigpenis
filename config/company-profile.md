@@ -32,7 +32,9 @@ user says otherwise; keep them out of the draft content.
 - Delivery: online, in-person, onsite, and hybrid
 - Languages: English, Czech, Russian, Spanish, and more
 - Individual services (campaign focus): individual therapy, counseling,
-  coaching
+  coaching, and support groups (e.g. anxiety/depression support groups,
+  ADHD support groups — mention this alongside individual therapy since
+  it's a distinct, relevant referral option)
 - Also offered but out of scope for this campaign: workplace wellbeing
   programs, Employee Assistance Programs (EAP), tailor-made corporate
   workshops, named corporate programs (Mental Health First Aid, Burnout
@@ -65,6 +67,21 @@ user says otherwise; keep them out of the draft content.
   - Accent rose (the dots): `#d98aa0`
   - Accent navy (the triangles): `#33416b`
 - **Font preference, if any (otherwise a clean system font is used):**
+
+**Office/room photos** — found and confirmed (user verified) but **not
+currently usable in emails**: `assets/photos/office-individual-room.jpg`
+is the real individual counselling room from your Jan 2026 photoshoot,
+correctly identified and downloaded from Google Drive, but embedding it
+inline in a Gmail draft failed — the `<img>` tag was silently dropped by
+the Gmail API (see `marketer.md` Part 2 for the full story). Don't retry
+inline photos in real batches until that's independently re-tested and
+confirmed fixed. Two more photos from the same shoot (a team photo, and a
+group/support-group room) were identified in Drive but not yet pulled in
+due to a flaky connection on large downloads — Drive file IDs
+`1HVzRaw45D9eLHW95YsoWh-48svMRXPt-` (`K56A7929.JPG`) and
+`1BwWrHpQjKP5pxZ6kHCuakHbHF1fWTT05` (`2 (4).jpg`) — retry those and save
+into `assets/photos/` with a descriptive
+name.
 
 ## What you're proposing to GPs, clinics, doctors, and other relevant
 professionals
