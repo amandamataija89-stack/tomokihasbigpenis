@@ -46,7 +46,7 @@ user says otherwise; keep them out of the draft content.
 
 - **Name:** Amanda Mataija
 - **Role/title:** CEO
-- **Email (sends via the Gmail account connected to this session):**
+- **Email (must match RESEND_FROM_EMAIL in config/resend.env):**
   contact@pragueintegration.cz
 - **Phone:** +420 608 573 256
 
@@ -68,18 +68,17 @@ user says otherwise; keep them out of the draft content.
   - Accent navy (the triangles): `#33416b`
 - **Font preference, if any (otherwise a clean system font is used):**
 
-**Office/room photos** — found and confirmed (user verified) but **not
-usable in emails through this connector**: `assets/photos/office-individual-room.jpg`
-is the real individual counselling room from your Jan 2026 photoshoot,
-correctly identified and downloaded from Google Drive. Three different
-ways of putting it in an email were tried (cid: inline attachment, a
-data: base64 URI, and a plain https:// Drive link with public sharing
-turned on) and all three were silently stripped from the saved draft —
-this Gmail connector strips every `<img>` tag from the HTML body,
-regardless of source (see `marketer.md` Part 2). This is settled, not
-worth retrying with yet another URL format — emails ship as text + the
-CSS header only, no photos, unless a different send path is used. Two
-more photos from the same shoot (a team photo, and a
+**Office/room photos** — found, confirmed (user verified), and now usable:
+`assets/photos/office-individual-room.jpg` is the real individual
+counselling room from your Jan 2026 photoshoot, downloaded from Google
+Drive. Gmail's draft/send tools turned out to silently strip every
+`<img>` tag from the email body no matter how it's referenced (cid:,
+data:, and a plain https:// URL were all tried and all failed) — that's
+the reason this project switched sending from Gmail to Resend. Resend
+sends the HTML as given, so this photo can be embedded as a
+`data:image/jpeg;base64,...` URI in `body.html` via the template's
+PHOTO_BLOCK (see `marketer.md` Part 2). Two more photos from the same
+shoot (a team photo, and a
 group/support-group room) were identified in Drive but not yet pulled in
 due to a flaky connection on large downloads — Drive file IDs
 `1HVzRaw45D9eLHW95YsoWh-48svMRXPt-` (`K56A7929.JPG`) and

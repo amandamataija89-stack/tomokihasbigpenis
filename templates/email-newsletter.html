@@ -17,13 +17,14 @@ Placeholders to replace:
   {{OPT_OUT_TEXT}}   - from config/company-profile.md
 
 Optional photo block: the commented-out <!-- PHOTO_BLOCK_START/END --> section
-below shows an office/room photo between the body and signature. AS OF
-2026-09-17 THIS IS DEAD, DON'T UNCOMMENT: cid: attachments, data: URIs,
-and plain https:// Drive URLs were all tried and every single one was
-silently stripped from the saved Gmail draft (see marketer.md Part 2) —
-this connector strips all <img> tags from the HTML body, not just one
-src type. This whole block stays deleted from real emails until a
-working send path for images is found.
+below shows an office/room photo between the body and signature. Sending
+goes through Resend (scripts/send_via_resend.py), which sends this HTML
+exactly as given — no stripping like the Gmail draft/send tools had (that
+was the whole reason this project switched off Gmail for sending; see
+marketer.md Part 2). Uncomment and use it per email when a relevant real
+photo from assets/photos/ is available, embedded as
+data:image/jpeg;base64,... — delete the block entirely for emails
+without a photo rather than leaving a broken reference.
 -->
 <!DOCTYPE html>
 <html lang="cs">
@@ -70,9 +71,9 @@ working send path for images is found.
 {{BODY_HTML}}
 </td></tr>
 
-<!-- PHOTO_BLOCK_START (uncomment + set an https:// URL and alt text when a real public photo URL is available; delete this whole block otherwise)
+<!-- PHOTO_BLOCK_START (uncomment + set a data:image/...;base64,... src and alt text when a real photo from assets/photos/ fits this email; delete this whole block otherwise)
 <tr><td style="padding:0 32px 8px 32px;">
-  <img src="{{PHOTO_URL}}" alt="{{PHOTO_ALT}}" width="536" style="display:block; width:100%; max-width:536px; height:auto; border-radius:6px;">
+  <img src="{{PHOTO_DATA_URI}}" alt="{{PHOTO_ALT}}" width="536" style="display:block; width:100%; max-width:536px; height:auto; border-radius:6px;">
 </td></tr>
 PHOTO_BLOCK_END -->
 

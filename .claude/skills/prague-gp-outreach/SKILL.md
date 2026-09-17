@@ -1,6 +1,6 @@
 ---
 name: prague-gp-outreach
-description: Run the Prague Integration mental-health outreach workflow — a marketer agent researches Prague GPs/clinics/doctors/relevant contacts and drafts newsletter-style branded proposal emails as Gmail drafts, an editor agent reviews for quality and compliance, then the user approves before those exact drafts send via Gmail. Use when the user asks to find contacts, draft proposals, run the outreach campaign, or continue/expand an existing batch.
+description: Run the Prague Integration mental-health outreach workflow — a marketer agent researches Prague GPs/clinics/doctors/relevant contacts and drafts newsletter-style branded proposal emails (photos embedded where relevant), an editor agent reviews for quality and compliance, then the user approves before marketer sends via Resend. Use when the user asks to find contacts, draft proposals, run the outreach campaign, or continue/expand an existing batch.
 ---
 
 # Prague Integration mental-health outreach
@@ -10,8 +10,13 @@ one batch of a B2B outreach campaign for Prague Integration, proposing a
 referral partnership to GPs, clinics, doctors, and other relevant
 professionals in Prague. It never sends email on its own judgment — every
 batch stops for explicit user approval before `marketer` is allowed to
-send, and even then it only ever sends the exact Gmail draft that was
-reviewed, never a freshly composed message.
+run the actual send.
+
+Sending goes through Resend (not Gmail) — this was switched deliberately:
+Gmail's draft/send tools were tested and confirmed to strip every `<img>`
+tag from the email body no matter how it's referenced, so photos couldn't
+be embedded. Resend sends the HTML exactly as given, so a real photo in
+the body actually renders.
 
 ## Before the first run
 
@@ -19,8 +24,10 @@ Check `config/company-profile.md`. Fields marked "NEEDS YOU" must be
 filled in before drafting — do not invent company details, the specific
 ask, pricing, or claims to fill gaps.
 
-Sending uses the Gmail account already connected to this session
-(`contact@pragueintegration.cz`) — no separate setup needed.
+Also check `config/resend.env` exists (copied from
+`config/resend.env.example`, filled in with a real API key and a verified
+sending domain). Steps 1–3 below (research/draft/review) can run without
+it, but tell the user it's needed before step 4 can actually send.
 
 ## Workflow
 
@@ -28,8 +35,9 @@ Sending uses the Gmail account already connected to this session
    `data/contacts.csv` (GPs, clinics, doctors, other relevant contacts —
    skip research if the user says the list is sufficient) and turn unsent
    contacts into a batch: for each recipient, `data/drafts/<date>/<slug>/
-   body.txt` + `body.html` (newsletter-style, with the brand header) AND a
-   real Gmail draft created from those exact files, all logged in
+   body.txt` + `body.html` (newsletter-style, brand header, real photo
+   embedded where one fits — see `marketer.md` Part 2), plus a best-effort
+   (non-authoritative) Gmail draft for easy browsing, all logged in
    `data/draft-batch-<date>.csv`. Respect the batch size limit.
 2. **Edit + compliance check** — invoke `editor` on that batch. If it
    returns FIX REQUIRED, surface the exact fixes to the user and stop — do
@@ -38,15 +46,15 @@ Sending uses the Gmail account already connected to this session
 3. **Present the batch for approval** — summarize to the user: how many
    emails, recipients (name + organization), and editor's verdict. Show
    1–2 full example emails (both plain-text and how the HTML/newsletter
-   version reads) so they can sanity-check tone/content/branding, and
-   point to the Gmail drafts folder for the rest. **Wait for explicit
-   approval before doing anything else — never send on your own judgment,
-   and never send just because a batch passed the editor check.**
+   version reads, photo included) so they can sanity-check tone/content/
+   branding. **Wait for explicit approval before doing anything else —
+   never send on your own judgment, and never send just because a batch
+   passed the editor check.**
 4. **Send** — only after the user has explicitly said to send this
-   specific batch, invoke `marketer` again to send it. It sends each
-   row's existing Gmail draft (by `draftId`, via `mcp__Gmail__send_message`)
-   exactly as reviewed, updating `data/draft-batch-<date>.csv` status per
-   row. Report failures rather than silently retrying.
+   specific batch, invoke `marketer` again to send it. It dry-runs then
+   sends via `scripts/send_via_resend.py`, updating
+   `data/draft-batch-<date>.csv` status per row. Report failures rather
+   than silently retrying.
 
 ## Re-running / expanding
 
