@@ -10,37 +10,46 @@ publicly and must be filled in before the first batch can go out.
 
 ## Company
 
-- **Legal name:** NEEDS YOU (full registered legal entity name)
-- **Trading/brand name:** Prague Integration *(from web search)*
+- **Legal name:** NEEDS YOU (full registered legal entity name incl. legal
+  form, e.g. "... s.r.o." — IČO and registered seat are confirmed below,
+  just need the exact legal name as it appears in the Czech commercial
+  register)
+- **Trading/brand name:** Prague Integration
 - **Website:** https://www.pragueintegration.cz
-- **Registered address (Czech Republic):** Nové Město, Prague *(from web
-  search — needs a full street address)* — NEEDS YOU
-- **Company registration / IČO:** NEEDS YOU
-- **Phone:** +420 608 573 256 *(from web search)*
+- **Registered seat (Czech Republic):** Olšanská 4E, 130 00 Prague, CZ
+- **Office / correspondence address:** Mezibranská 4, 110 00 Prague,
+  Prague 1
+- **Company registration / IČO:** 21048428
+- **Phone:** +420 608 573 256
 
 ## What Prague Integration does *(from web search — please correct/expand)*
+
+**For this campaign, the focus is individual clients — referring GPs/
+clinics to send individual patients for therapy/counseling, not corporate/
+workplace programs.** Corporate services exist (EAP, workshops, etc.) but
+`marketer` should not lead with them in this campaign's emails unless the
+user says otherwise; keep them out of the draft content.
 
 - International team of 30+ psychologists, counsellors, trainers, business
   coaches and advisors
 - Delivery: online, in-person, onsite, and hybrid
 - Languages: English, Czech, Russian, Spanish, and more
-- Services: individual therapy, coaching, workplace wellbeing programs,
-  Employee Assistance Programs (EAP), tailor-made workshops for companies/
-  organizations/schools/universities, Men's Mental Health Programs,
-  mentoring & entrepreneurial support
-- Named corporate programs: Mental Health First Aid, Burnout Prevention,
-  Neurodiversity in the Workplace, Mental Health in Times of Uncertainty,
-  Men's Mental Health & Emotional Wellbeing, Stress Management & Resilience
-  Training
+- Individual services (campaign focus): individual therapy, counseling,
+  coaching
+- Also offered but out of scope for this campaign: workplace wellbeing
+  programs, Employee Assistance Programs (EAP), tailor-made corporate
+  workshops, named corporate programs (Mental Health First Aid, Burnout
+  Prevention, Neurodiversity in the Workplace, Men's Mental Health &
+  Emotional Wellbeing, Stress Management & Resilience Training)
 - Audience served: expats and locals in Prague
 
 ## Sender / point of contact
 
-- **Name:** NEEDS YOU
-- **Role/title:** NEEDS YOU
-- **Email (must match the Gmail/Resend sending identity used):** NEEDS YOU
-- **Phone:** +420 608 573 256 (company line, from web search) — confirm or
-  replace with a direct line
+- **Name:** Amanda Mataija
+- **Role/title:** CEO
+- **Email (must match the RESEND_FROM_EMAIL in config/resend.env):**
+  contact@pragueintegration.cz
+- **Phone:** +420 608 573 256
 
 ## Branding (for the newsletter-style email template)
 
@@ -63,10 +72,12 @@ publicly and must be filled in before the first batch can go out.
 ## What you're proposing to GPs, clinics, doctors, and other relevant
 professionals
 
-- **Service/program name:** Referral partnership with Prague Integration
-- **The ask (confirmed):** A referral partnership — when the recipient has
-  a patient/client who needs mental health support, they refer them to
-  Prague Integration.
+- **Service/program name:** Individual client referral partnership with
+  Prague Integration
+- **The ask (confirmed):** A referral partnership focused on individuals —
+  when the recipient has a patient/client who needs mental health support
+  (therapy/counseling), they refer them to Prague Integration. Not a
+  corporate/workplace-program pitch.
 - **One-paragraph description (what it is, who it's for):** NEEDS YOU —
   e.g. what happens after a referral (how do they refer someone — a form,
   a phone number, an email? what's the intake process? is there a

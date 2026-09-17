@@ -40,6 +40,11 @@ company — if a fact isn't there, don't include it or invent it; if
 required fields are still marked "NEEDS YOU", stop and tell the user
 exactly which ones before drafting) and `data/contacts.csv`.
 
+This campaign is scoped to individual-client referrals. Pitch individual
+therapy/counseling referrals only — never lead with, or even mention,
+corporate/workplace programs (EAP, workshops, etc.) unless the company
+profile explicitly says the scope has changed.
+
 Style: plain-text-first, newsletter-style. That means:
 - The primary content is short, well-written plain text — like a good
   newsletter, not a sales brochure. No PDF attachment, no heavy design.
