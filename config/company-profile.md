@@ -10,10 +10,7 @@ publicly and must be filled in before the first batch can go out.
 
 ## Company
 
-- **Legal name:** NEEDS YOU (full registered legal entity name incl. legal
-  form, e.g. "... s.r.o." — IČO and registered seat are confirmed below,
-  just need the exact legal name as it appears in the Czech commercial
-  register)
+- **Legal name:** Prague Integration s.r.o.
 - **Trading/brand name:** Prague Integration
 - **Website:** https://www.pragueintegration.cz
 - **Registered seat (Czech Republic):** Olšanská 4E, 130 00 Prague, CZ
@@ -78,26 +75,39 @@ professionals
   when the recipient has a patient/client who needs mental health support
   (therapy/counseling), they refer them to Prague Integration. Not a
   corporate/workplace-program pitch.
-- **One-paragraph description (what it is, who it's for):** NEEDS YOU —
-  e.g. what happens after a referral (how do they refer someone — a form,
-  a phone number, an email? what's the intake process? is there a
-  dedicated contact for referring clinicians?), and which of your
-  services/languages/formats (see list above) are most relevant to
-  mention for a referral context.
-- **Why a recipient would want this** (patient benefit, faster access to
-  care, multilingual coverage, no cost/admin burden to them, etc.):
-  NEEDS YOU
+- **How a referral works:** The referring GP/clinic sends the patient a
+  registration link. The patient registers via that link, and Prague
+  Integration gets back to them within 24 hours. No paperwork or
+  follow-up required from the referring clinician beyond sharing the
+  link.
+- **Insurance / cost:** Prague Integration is a private practice, but
+  works with a few insurance providers — clients can request a claim
+  invoice to submit for reimbursement.
+- **Languages:** Bilingual — Czech and English (useful to mention for
+  expat/international patients).
+- **Why a recipient would want this:** fast response (24-hour turnaround
+  after registration), bilingual care (Czech + English), a simple
+  one-link referral with no admin burden on the clinician, and insurance
+  reimbursement is possible for some patients.
 - **Evidence/credentials to cite** (licenses, clinical backing,
-  partnerships, outcomes data — only real, verifiable claims): NEEDS YOU
-- **Pricing or cost to the recipient, if any:** presumably free to refer
-  (confirm) — NEEDS YOU to confirm whether there's any cost/commitment on
-  the referring clinician's side
+  partnerships, outcomes data — only real, verifiable claims): NEEDS YOU —
+  optional; the 30+ psychologist team size (from the website) can be
+  cited, but anything more specific (license numbers, named
+  partnerships, outcome stats) needs to come from you.
+- **Pricing or cost to the recipient (the referring clinician):** none —
+  it's free for them to refer; cost/insurance details above apply to the
+  patient, not the referrer.
+- **Referral link URL:** NEEDS YOU — the actual link patients register
+  through. The email's whole call-to-action depends on this; `marketer`
+  should not invent or placeholder a fake link.
 
 ## Language & tone
 
-- **Primary language for emails:** Czech / English / bilingual — NEEDS YOU
-  (the site itself appears to serve an international/expat audience, so
-  bilingual may make sense, but confirm)
+- **Primary language for emails:** Czech (recipients are Czech GPs/clinics)
+  — the body should mention Prague Integration serves patients in both
+  Czech and English, since that's a relevant selling point for referring
+  expat patients, but the email itself is written in Czech. Tell me if you
+  want a separate English version too.
 - **Formality:** formal (vykání) is the default and expected norm for
   professional Czech correspondence unless you say otherwise
 - **Format:** plain-text-first, newsletter-style HTML with your logo and
@@ -110,10 +120,21 @@ professionals
 - **Basis for contact:** e.g. "legitimate interest — publicly listed
   professional contact, relevant to their practice" (see
   `.claude/agents/editor.md` for the checklist this must satisfy)
-- **Opt-out/unsubscribe instructions to include in every email:** NEEDS YOU
-  (or say "use standard wording" and I'll draft it)
-- **Data retention period for collected contact data:** NEEDS YOU
-- **Who to contact with a data subject request (DPO/contact):** NEEDS YOU
+- **Opt-out/unsubscribe instructions to include in every email** (drafted
+  standard wording — edit freely):
+  > Pokud si nepřejete od nás dále dostávat podobné e-maily, odpovězte
+  > prosím na tento e-mail se slovem „ODHLÁSIT" a vyřadíme Vás ze seznamu
+  > kontaktů. / If you'd prefer not to receive further emails like this,
+  > reply with "UNSUBSCRIBE" and we'll remove you from our contact list.
+- **Data retention period for collected contact data:** 12 months from the
+  date of collection/last contact, or immediately upon an opt-out/objection
+  request, whichever is earlier. (This is a standard, defensible cap for
+  B2B legitimate-interest marketing data — re-verify/refresh the contact
+  list if a campaign resumes after that window rather than reusing stale
+  data.)
+- **Who to contact with a data subject request (DPO/contact):**
+  contact@pragueintegration.cz (Amanda Mataija) — update this if you want
+  a dedicated privacy/DPO contact instead.
 
 ## Sending limits
 
