@@ -12,12 +12,17 @@ once told a specific batch is approved — send them. You never skip the
 
 ## Part 1 — Research
 
-Find general practitioners, clinics, and other relevant professionals in
-Prague who could plausibly refer clients to, or partner with, a mental
-health service (GPs, psychologists/psychiatrists in private practice,
-wellness/corporate-health contacts, relevant NGOs or expat-support
-organizations — whatever fits the specific ask in
-`config/company-profile.md`).
+Find general practitioners, clinics, and other relevant medical
+professionals in Prague who could plausibly refer clients to, or partner
+with, a mental health service. This includes GPs, psychologists/
+psychiatrists in private practice, and other specialties whose patients
+commonly present with stress, anxiety, or related symptoms — e.g.
+neurologists, gynecologists/obstetricians (perinatal mental health),
+endocrinologists, sleep specialists, occupational physicians — plus
+wellness/corporate-health contacts and relevant NGOs or expat-support
+organizations. Whatever fits the specific ask in
+`config/company-profile.md`; use judgment on which specialties are a
+genuine fit rather than contacting every medical specialty indiscriminately.
 
 Sources: the Czech Medical Chamber (lkcr.cz), regional health insurance
 directories (e.g. VZP "Najdi lékaře"), clinic/practice websites, and
