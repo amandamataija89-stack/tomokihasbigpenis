@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """
-Send an approved batch of GP outreach emails via the Resend API.
+Send an approved batch of outreach emails via the Resend API.
 
 This script is deliberately the ONLY place that actually sends email in
 this project. It requires an explicit --yes flag so it can never fire by
-accident, reads content strictly from the .txt files the proposal-drafter
-agent produced (so what sends is exactly what was reviewed), and updates
-the batch CSV's status column as it goes so re-runs don't double-send.
+accident, reads content strictly from the body.txt/body.html files the
+marketer agent produced (so what sends is exactly what was reviewed), and
+updates the batch CSV's status column as it goes so re-runs don't
+double-send.
 
 Usage:
     python3 scripts/send_via_resend.py data/draft-batch-2026-09-15.csv --yes
@@ -42,7 +43,7 @@ def load_env(path):
     return values
 
 
-def load_content(path):
+def load_text_content(path):
     with open(path, "r", encoding="utf-8") as f:
         text = f.read()
     if not text.startswith("Subject:"):
@@ -55,14 +56,30 @@ def load_content(path):
     return subject, body
 
 
-def send_one(api_key, from_name, from_email, reply_to, to_email, subject, body):
+def load_content_dir(content_dir):
+    """Load subject/text/html from a data/drafts/<date>/<slug>/ directory."""
+    txt_path = os.path.join(content_dir, "body.txt")
+    html_path = os.path.join(content_dir, "body.html")
+    subject, text_body = load_text_content(txt_path)
+    html_body = None
+    if os.path.exists(html_path):
+        with open(html_path, "r", encoding="utf-8") as f:
+            html_body = f.read()
+        if not html_body.strip():
+            raise ValueError(f"{html_path} is empty — refusing to send")
+    return subject, text_body, html_body
+
+
+def send_one(api_key, from_name, from_email, reply_to, to_email, subject, text_body, html_body):
     payload = {
         "from": f"{from_name} <{from_email}>",
         "to": [to_email],
         "reply_to": reply_to,
         "subject": subject,
-        "text": body,
+        "text": text_body,
     }
+    if html_body:
+        payload["html"] = html_body
     req = urllib.request.Request(
         "https://api.resend.com/emails",
         data=json.dumps(payload).encode("utf-8"),
@@ -115,28 +132,29 @@ def main():
         if row.get("status", "").strip().lower() == "sent":
             skipped += 1
             continue
-        content_file = row.get("content_file", "").strip()
+        content_dir = row.get("content_dir", "").strip()
         to_email = row.get("email", "").strip()
-        if not content_file or not to_email:
-            row["status"] = "skipped: missing content_file or email"
+        if not content_dir or not to_email:
+            row["status"] = "skipped: missing content_dir or email"
             skipped += 1
             continue
 
-        content_path = content_file if os.path.isabs(content_file) else os.path.join(REPO_ROOT, content_file)
+        content_path = content_dir if os.path.isabs(content_dir) else os.path.join(REPO_ROOT, content_dir)
         try:
-            subject, body = load_content(content_path)
+            subject, text_body, html_body = load_content_dir(content_path)
         except (OSError, ValueError) as e:
             row["status"] = f"failed: {e}"
             failed += 1
             continue
 
         if args.dry_run:
-            print(f"[dry-run] would send to {to_email} <{row.get('name', '')}> subject={subject!r}")
+            has_html = "with HTML" if html_body else "text-only"
+            print(f"[dry-run] would send to {to_email} <{row.get('name', '')}> subject={subject!r} ({has_html})")
             continue
 
         ok, info = send_one(
             env["RESEND_API_KEY"], env["RESEND_FROM_NAME"], env["RESEND_FROM_EMAIL"],
-            env["RESEND_REPLY_TO"], to_email, subject, body,
+            env["RESEND_REPLY_TO"], to_email, subject, text_body, html_body,
         )
         if ok:
             row["status"] = "sent"

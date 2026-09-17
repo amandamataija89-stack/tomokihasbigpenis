@@ -1,54 +1,99 @@
 # Company Profile & Proposal Inputs
 
-Fill this in before running the outreach skill. The drafting agent uses this
-file as its only source of truth about your company — it will not invent
-claims, credentials, or services that aren't listed here.
+The `marketer` agent uses this file as its only source of truth about your
+company — it will not invent claims, credentials, or services that aren't
+listed here. Fields marked **(from web search)** were pulled from public
+sources about pragueintegration.cz (the site itself is blocked by this
+environment's network policy, so this could be incomplete or stale —
+please correct anything wrong). Fields marked **NEEDS YOU** can't be found
+publicly and must be filled in before the first batch can go out.
 
 ## Company
 
-- **Legal name:**
-- **Trading/brand name (if different):**
-- **Website:**
-- **Registered address (Czech Republic, if applicable):**
-- **Company registration / IČO (if applicable):**
+- **Legal name:** NEEDS YOU (full registered legal entity name)
+- **Trading/brand name:** Prague Integration *(from web search)*
+- **Website:** https://www.pragueintegration.cz
+- **Registered address (Czech Republic):** Nové Město, Prague *(from web
+  search — needs a full street address)* — NEEDS YOU
+- **Company registration / IČO:** NEEDS YOU
+- **Phone:** +420 608 573 256 *(from web search)*
+
+## What Prague Integration does *(from web search — please correct/expand)*
+
+- International team of 30+ psychologists, counsellors, trainers, business
+  coaches and advisors
+- Delivery: online, in-person, onsite, and hybrid
+- Languages: English, Czech, Russian, Spanish, and more
+- Services: individual therapy, coaching, workplace wellbeing programs,
+  Employee Assistance Programs (EAP), tailor-made workshops for companies/
+  organizations/schools/universities, Men's Mental Health Programs,
+  mentoring & entrepreneurial support
+- Named corporate programs: Mental Health First Aid, Burnout Prevention,
+  Neurodiversity in the Workplace, Mental Health in Times of Uncertainty,
+  Men's Mental Health & Emotional Wellbeing, Stress Management & Resilience
+  Training
+- Audience served: expats and locals in Prague
 
 ## Sender / point of contact
 
-- **Name:**
-- **Role/title:**
-- **Email (must match the Gmail account used to send):**
-- **Phone (optional):**
+- **Name:** NEEDS YOU
+- **Role/title:** NEEDS YOU
+- **Email (must match the Gmail/Resend sending identity used):** NEEDS YOU
+- **Phone:** +420 608 573 256 (company line, from web search) — confirm or
+  replace with a direct line
 
-## What you're proposing to GPs
+## Branding (for the newsletter-style email template)
 
-- **Service/program name:**
-- **One-paragraph description (what it is, who it's for):**
-- **Why a GP would want this** (referral pathway, patient benefit, revenue/time
-  savings, CME credit, etc.):
-- **What you're asking the GP to do** (book a call, refer patients, attend a
-  demo, sign a partnership, etc.):
-- **Evidence/credentials to cite** (licenses, clinical backing, partnerships,
-  outcomes data — only include what's real and verifiable):
-- **Pricing or cost to the GP, if any:**
+- **Logo image:** NEEDS YOU — a hosted image URL (e.g. a link to the logo
+  on your website or a file you upload somewhere public), so it can be
+  referenced in the email header. I couldn't reach the site to pull it
+  directly.
+- **Primary brand color (hex):** NEEDS YOU
+- **Secondary/accent color (hex), if any:** NEEDS YOU
+- **Font preference, if any (otherwise a clean system font is used):**
+
+## What you're proposing to GPs, clinics, doctors, and other relevant
+professionals
+
+- **Service/program name:** NEEDS YOU (which specific service is this
+  campaign about — e.g. a referral partnership around one of the corporate
+  programs above, individual therapy referrals, or something else?)
+- **One-paragraph description (what it is, who it's for):** NEEDS YOU
+- **The specific ask** — this matters a lot and isn't on the website:
+  are you asking recipients to refer patients/clients to you, to co-host
+  or attend something, to partner on a program, or something else?
+  NEEDS YOU
+- **Why a recipient would want this** (patient benefit, revenue/time
+  savings, professional development, etc.): NEEDS YOU
+- **Evidence/credentials to cite** (licenses, clinical backing,
+  partnerships, outcomes data — only real, verifiable claims): NEEDS YOU
+- **Pricing or cost to the recipient, if any:** NEEDS YOU
 
 ## Language & tone
 
-- **Primary language for emails:** Czech / English / bilingual (pick one)
+- **Primary language for emails:** Czech / English / bilingual — NEEDS YOU
+  (the site itself appears to serve an international/expat audience, so
+  bilingual may make sense, but confirm)
 - **Formality:** formal (vykání) is the default and expected norm for
   professional Czech correspondence unless you say otherwise
-- **Length target:** short (120–180 words) is recommended for cold B2B outreach
+- **Format:** plain-text-first, newsletter-style HTML with your logo and
+  brand color in the header/footer — no PDF brochure or heavy design
+- **Length target:** short (120–180 words) is recommended for cold B2B
+  outreach
 
-## Legal basis for contacting GPs (compliance agent will check this)
+## Legal basis for contacting recipients (editor agent will check this)
 
 - **Basis for contact:** e.g. "legitimate interest — publicly listed
   professional contact, relevant to their practice" (see
-  `.claude/agents/compliance-reviewer.md` for the checklist this must satisfy)
-- **Opt-out/unsubscribe instructions to include in every email:**
-- **Data retention period for collected GP contact data:**
-- **Who to contact with a data subject request (DPO/contact):**
+  `.claude/agents/editor.md` for the checklist this must satisfy)
+- **Opt-out/unsubscribe instructions to include in every email:** NEEDS YOU
+  (or say "use standard wording" and I'll draft it)
+- **Data retention period for collected contact data:** NEEDS YOU
+- **Who to contact with a data subject request (DPO/contact):** NEEDS YOU
 
 ## Sending limits
 
 - **Max emails to send per batch/day (recommended: start low, e.g. 20–30/day,
-  to protect sender reputation and allow manageable follow-up):**
-- **Follow-up cadence (e.g. one follow-up after 7 days, then stop):**
+  to protect sender reputation and allow manageable follow-up):** NEEDS YOU
+- **Follow-up cadence (e.g. one follow-up after 7 days, then stop):** NEEDS
+  YOU
