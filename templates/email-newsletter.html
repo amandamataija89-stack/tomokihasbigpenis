@@ -17,13 +17,13 @@ Placeholders to replace:
   {{OPT_OUT_TEXT}}   - from config/company-profile.md
 
 Optional photo block: the commented-out <!-- PHOTO_BLOCK_START/END --> section
-below shows an office/room photo between the body and signature. As of
-2026-09-17, `cid:` inline attachments AND `data:` base64 URIs both get
-silently stripped by Gmail's own compose sanitizer (see marketer.md
-Part 2) — don't use either. Use a real external `https://` URL instead
-(the photo's Google Drive file needs "Anyone with the link" sharing
-turned on first — ask the user). Delete this whole block for any email
-without a working photo URL, rather than leaving a broken reference.
+below shows an office/room photo between the body and signature. AS OF
+2026-09-17 THIS IS DEAD, DON'T UNCOMMENT: cid: attachments, data: URIs,
+and plain https:// Drive URLs were all tried and every single one was
+silently stripped from the saved Gmail draft (see marketer.md Part 2) —
+this connector strips all <img> tags from the HTML body, not just one
+src type. This whole block stays deleted from real emails until a
+working send path for images is found.
 -->
 <!DOCTYPE html>
 <html lang="cs">

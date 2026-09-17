@@ -82,26 +82,20 @@ For each recipient with a usable email:
    scratch or invent a different look per email — keep every email in a
    batch visually consistent.
 
-   Optional photo — inline embedding does NOT work in this Gmail
-   connector; use an external URL instead:
-   - `cid:` inline attachments: tried via `create_draft`/`update_draft`
-     `attachments` (`inline: true`) — the `<img>` tag was silently
-     stripped from the saved draft (verified by re-reading it), no
-     attachment was actually persisted.
-   - `data:` base64 URIs directly in the `<img src>`: also silently
-     stripped on save. This is standard Gmail compose sanitization
-     (Gmail blocks both inline attachment refs and data URIs in
-     composed mail) — not a bug to keep retrying, don't try either
-     approach again.
-   - What DOES work: a normal external `<img src="https://...">` URL.
-     Photos live in the company's Google Drive, but need "Anyone with
-     the link" viewer sharing turned on — the `share_file` tool here only
-     grants access to specific email addresses, not public link sharing,
-     so the user has to toggle that themselves in the Drive UI. Once a
-     photo's sharing is public, use
-     `https://drive.google.com/uc?export=view&id=<fileId>` (or ask the
-     user for their own hosted URL) as the `src`. Never use `cid:` or
-     `data:` again for this.
+   Photos in emails DO NOT WORK through this Gmail connector — settled,
+   don't retry: three approaches were tested and ALL got silently
+   stripped from the saved draft (verified each time by reading it back
+   with `get_draft`), even though every `create_draft`/`update_draft`
+   call itself reported success with no error:
+   - `cid:` inline attachment reference + `attachments` (`inline: true`)
+   - `data:image/...;base64,...` URI directly in `<img src>`
+   - a plain external `<img src="https://drive.google.com/uc?...">` URL,
+     from a file with "Anyone with the link" sharing turned on
+   Since all three failed identically regardless of the `src` type, this
+   connector strips every `<img>` tag from the HTML body outright — not a
+   quirk of one technique. Don't spend more time on new `src` variants;
+   ship emails as text + the CSS brand header only, no photos, until this
+   connector (or a different send path) is confirmed to allow `<img>`.
 3. Create the actual Gmail draft via `mcp__Gmail__create_draft` with `to`,
    `subject`, `body` (the plain text), and `htmlBody` (the filled
    template) set from the two files above — this draft IS what gets sent

@@ -69,13 +69,17 @@ user says otherwise; keep them out of the draft content.
 - **Font preference, if any (otherwise a clean system font is used):**
 
 **Office/room photos** — found and confirmed (user verified) but **not
-currently usable in emails**: `assets/photos/office-individual-room.jpg`
+usable in emails through this connector**: `assets/photos/office-individual-room.jpg`
 is the real individual counselling room from your Jan 2026 photoshoot,
-correctly identified and downloaded from Google Drive, but embedding it
-inline in a Gmail draft failed — the `<img>` tag was silently dropped by
-the Gmail API (see `marketer.md` Part 2 for the full story). Don't retry
-inline photos in real batches until that's independently re-tested and
-confirmed fixed. Two more photos from the same shoot (a team photo, and a
+correctly identified and downloaded from Google Drive. Three different
+ways of putting it in an email were tried (cid: inline attachment, a
+data: base64 URI, and a plain https:// Drive link with public sharing
+turned on) and all three were silently stripped from the saved draft —
+this Gmail connector strips every `<img>` tag from the HTML body,
+regardless of source (see `marketer.md` Part 2). This is settled, not
+worth retrying with yet another URL format — emails ship as text + the
+CSS header only, no photos, unless a different send path is used. Two
+more photos from the same shoot (a team photo, and a
 group/support-group room) were identified in Drive but not yet pulled in
 due to a flaky connection on large downloads — Drive file IDs
 `1HVzRaw45D9eLHW95YsoWh-48svMRXPt-` (`K56A7929.JPG`) and
