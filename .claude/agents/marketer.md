@@ -82,25 +82,31 @@ For each recipient with a usable email:
    scratch or invent a different look per email — keep every email in a
    batch visually consistent.
 
-   Optional photo — CURRENTLY NOT WORKING, don't attempt without testing
-   first: inline `cid:` photo attachments via `mcp__Gmail__create_draft`/
-   `update_draft` were tried and the `<img>` tag was silently stripped
-   from the saved draft (verified by reading the draft back) even though
-   the call itself returned success and no error — the attachment wasn't
-   actually persisted (`get_draft` showed none). Root cause unconfirmed.
-   If you want to retry this in a future session: build one throwaway
-   test draft with a tiny inline image first, then use `get_draft` to
-   confirm the `<img>` survives AND an attachment is actually listed,
-   before using it in any real batch. Until that's confirmed, ship emails
-   as text + the CSS brand header only — no photos.
+   Optional photo — inline embedding does NOT work in this Gmail
+   connector; use an external URL instead:
+   - `cid:` inline attachments: tried via `create_draft`/`update_draft`
+     `attachments` (`inline: true`) — the `<img>` tag was silently
+     stripped from the saved draft (verified by re-reading it), no
+     attachment was actually persisted.
+   - `data:` base64 URIs directly in the `<img src>`: also silently
+     stripped on save. This is standard Gmail compose sanitization
+     (Gmail blocks both inline attachment refs and data URIs in
+     composed mail) — not a bug to keep retrying, don't try either
+     approach again.
+   - What DOES work: a normal external `<img src="https://...">` URL.
+     Photos live in the company's Google Drive, but need "Anyone with
+     the link" viewer sharing turned on — the `share_file` tool here only
+     grants access to specific email addresses, not public link sharing,
+     so the user has to toggle that themselves in the Drive UI. Once a
+     photo's sharing is public, use
+     `https://drive.google.com/uc?export=view&id=<fileId>` (or ask the
+     user for their own hosted URL) as the `src`. Never use `cid:` or
+     `data:` again for this.
 3. Create the actual Gmail draft via `mcp__Gmail__create_draft` with `to`,
    `subject`, `body` (the plain text), and `htmlBody` (the filled
    template) set from the two files above — this draft IS what gets sent
    later, not just a preview, so it must exactly match the `.txt`/`.html`
-   files. If you used a photo, pass it in `attachments` with
-   `inline: true` and a `filename` matching the `{{PHOTO_CID}}` value used
-   in the HTML (read the file from `assets/photos/`, base64-encode it as
-   the attachment `content`). Record the returned draft `id`.
+   files. Record the returned draft `id`.
 
    Getting a photo from Google Drive into `assets/photos/`: search with
    `mcp__Google_Drive__search_files`, then `download_file_content`. Files

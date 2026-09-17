@@ -17,14 +17,13 @@ Placeholders to replace:
   {{OPT_OUT_TEXT}}   - from config/company-profile.md
 
 Optional photo block: the commented-out <!-- PHOTO_BLOCK_START/END --> section
-below shows an office/room photo between the body and signature. AS OF
-2026-09-17 THIS DOESN'T WORK: inline cid: attachments via the Gmail MCP
-tools got silently stripped from the saved draft (see marketer.md Part 2
-for what was tried). Don't uncomment this block for real batches until
-that's been re-tested and confirmed working — right now, always delete
-it rather than leaving a broken image reference in a sent email. The
-`cid:` value, if this is ever fixed, must match the Content-ID of an
-inline attachment with that same filename on the actual Gmail draft.
+below shows an office/room photo between the body and signature. As of
+2026-09-17, `cid:` inline attachments AND `data:` base64 URIs both get
+silently stripped by Gmail's own compose sanitizer (see marketer.md
+Part 2) — don't use either. Use a real external `https://` URL instead
+(the photo's Google Drive file needs "Anyone with the link" sharing
+turned on first — ask the user). Delete this whole block for any email
+without a working photo URL, rather than leaving a broken reference.
 -->
 <!DOCTYPE html>
 <html lang="cs">
@@ -71,9 +70,9 @@ inline attachment with that same filename on the actual Gmail draft.
 {{BODY_HTML}}
 </td></tr>
 
-<!-- PHOTO_BLOCK_START (uncomment + set cid/alt when a photo is attached inline; delete this whole block otherwise)
+<!-- PHOTO_BLOCK_START (uncomment + set an https:// URL and alt text when a real public photo URL is available; delete this whole block otherwise)
 <tr><td style="padding:0 32px 8px 32px;">
-  <img src="cid:{{PHOTO_CID}}" alt="{{PHOTO_ALT}}" width="536" style="display:block; width:100%; max-width:536px; height:auto; border-radius:6px;">
+  <img src="{{PHOTO_URL}}" alt="{{PHOTO_ALT}}" width="536" style="display:block; width:100%; max-width:536px; height:auto; border-radius:6px;">
 </td></tr>
 PHOTO_BLOCK_END -->
 
