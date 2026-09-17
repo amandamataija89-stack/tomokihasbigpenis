@@ -97,9 +97,7 @@ professionals
 - **Pricing or cost to the recipient (the referring clinician):** none —
   it's free for them to refer; cost/insurance details above apply to the
   patient, not the referrer.
-- **Referral link URL:** NEEDS YOU — the actual link patients register
-  through. The email's whole call-to-action depends on this; `marketer`
-  should not invent or placeholder a fake link.
+- **Referral link URL:** https://pragueintegration.cz/individual-counselling/
 
 ## Language & tone
 
@@ -138,7 +136,6 @@ professionals
 
 ## Sending limits
 
-- **Max emails to send per batch/day (recommended: start low, e.g. 20–30/day,
-  to protect sender reputation and allow manageable follow-up):** NEEDS YOU
-- **Follow-up cadence (e.g. one follow-up after 7 days, then stop):** NEEDS
-  YOU
+- **Max emails to send per batch/day:** 20–30/day
+- **Follow-up cadence:** one follow-up after 7 days, then stop (default —
+  tell me if you want something different)
