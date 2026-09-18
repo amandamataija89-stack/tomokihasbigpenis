@@ -135,9 +135,9 @@ professionals
 
 ## Legal basis for contacting recipients (editor agent will check this)
 
-- **Basis for contact:** e.g. "legitimate interest — publicly listed
-  professional contact, relevant to their practice" (see
-  `.claude/agents/editor.md` for the checklist this must satisfy)
+- **Basis for contact:** CONFIRMED by Amanda Mataija (2026-09-18):
+  "legitimate interest — publicly listed professional contact, relevant
+  to their practice."
 - **Opt-out/unsubscribe instructions to include in every email** (drafted
   standard wording — edit freely):
   > Pokud si nepřejete od nás dále dostávat podobné e-maily, odpovězte
