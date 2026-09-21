@@ -123,6 +123,17 @@ professionals
   patient, not the referrer.
 - **Referral link URL:** https://pragueintegration.cz/individual-counselling/
 
+## Student pricing (ISIC) — for university outreach specifically
+
+- **CONFIRMED by Amanda Mataija (2026-09-21):** Prague Integration offers
+  discounted pricing for students who present a valid ISIC (International
+  Student Identity Card). This is a distinct offer for a distinct
+  audience (university student services / international offices) from
+  the GP/clinic individual-referral campaign above — don't mix the two
+  pitches. Exact discount percentage/amount NEEDS YOU if a specific
+  figure should be quoted; otherwise keep the claim general ("discounted
+  pricing for ISIC holders") rather than inventing a number.
+
 ## Language & tone
 
 - **Primary language for emails:** Czech (recipients are Czech GPs/clinics)
