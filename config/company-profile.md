@@ -32,9 +32,13 @@ user says otherwise; keep them out of the draft content.
 - Delivery: online, in-person, onsite, and hybrid
 - Languages: English, Czech, Russian, Spanish, and more
 - Individual services (campaign focus): individual therapy, counseling,
-  coaching, and support groups (e.g. anxiety/depression support groups,
+  coaching, support groups (e.g. anxiety/depression support groups,
   ADHD support groups — mention this alongside individual therapy since
-  it's a distinct, relevant referral option)
+  it's a distinct, relevant referral option), and ADHD testing/diagnostic
+  assessment (CONFIRMED by Amanda Mataija, 2026-09-21 — a distinct
+  referral angle for peer psychologists/psychotherapists specifically,
+  since testing/assessment is a service some solo practitioners don't
+  offer in-house and may want to refer out for)
 - Also offered but out of scope for this campaign: workplace wellbeing
   programs, Employee Assistance Programs (EAP), tailor-made corporate
   workshops, named corporate programs (Mental Health First Aid, Burnout
