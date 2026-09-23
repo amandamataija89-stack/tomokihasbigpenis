@@ -134,6 +134,17 @@ professionals
   figure should be quoted; otherwise keep the claim general ("discounted
   pricing for ISIC holders") rather than inventing a number.
 
+## International schools outreach — scope note
+
+- **CONFIRMED by Amanda Mataija (2026-09-23):** For outreach to international
+  schools (student support / counselling offices), Prague Integration should
+  be pitched as a referral resource for **parents/families**, not for
+  students/children directly — there is no confirmed pediatric/adolescent
+  therapy specialty on file, so do not claim one. The school's student
+  support office would refer expat parents/families (relocation stress,
+  parenting, couples/family issues) to Prague Integration, not the student
+  themselves.
+
 ## Language & tone
 
 - **Primary language for emails:** Czech (recipients are Czech GPs/clinics)
