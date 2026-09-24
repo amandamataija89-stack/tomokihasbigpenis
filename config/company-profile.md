@@ -185,3 +185,48 @@ professionals
 - **Max emails to send per batch/day:** 20–30/day
 - **Follow-up cadence:** one follow-up after 7 days, then stop (default —
   tell me if you want something different)
+
+## Corporate campaign: Men's Mental Health workshop (November 2026)
+
+**Campaign scope (CONFIRMED by Amanda Mataija, 2026-09-24):** a separate
+campaign aimed at **companies** (HR / People & Culture / wellbeing leads),
+offering the Men's Mental Health workshop for November (Men's Mental Health
+Month). Emails go out in **both English and Czech**. The individual-referral
+rules above ("keep corporate services out of the drafts") apply only to the
+GP/clinic campaign, not to this one. The EAP offer is **on hold**, so don't
+pitch it yet.
+
+**Workshop facts** *(from Amanda's Drive documents "Men's MH Offer_Panel_Talk"
+and the Hellenic Bottling Company proposal. Everything marked NEEDS YOU
+must be confirmed before drafting)*:
+
+- **Title (proposed):** "Still Standing: How Men Can Thrive Without Burning
+  Out". Alternatives: "The Weight of the World: Men, Meaning & the Modern
+  World" and "From Provider to Person: Redefining What It Means to Be a Man
+  Today"
+- **Format:** online panel discussion / workshop, 60 minutes (at most 20 min
+  intro + panel, then 40 min live Q&A), opening with a live audience poll.
+  On-site delivery possible? NEEDS YOU
+- **Audience:** men and women, with partners and allies welcome
+- **Presenters (English):** Fredrik L. (Men's Coach and Leadership Trainer)
+  and Jamie M. (Psychologist, Mental Health Counsellor and Trainer).
+  Alternatives: Benedikt Ričny or Daniel Espitia. **Who delivers the
+  Czech-language version?** NEEDS YOU
+- **Content:**
+  1. The Shifting Provider Role: the provider instinct as both strength and
+     trap, and the changing definition of "a good father"
+  2. Work, Worth & Running on Empty: always-on culture, why men push through
+     instead of signalling distress, tired vs. depleted, micro-recovery
+  3. Loneliness in Plain Sight: how unexpressed stress shows up
+     (irritability, withdrawal, overwork), and "you're not broken, you're
+     under-resourced"
+- **Participant bonus:** support-materials voucher plus a counselling
+  voucher for every attendee
+- **Price:** the source documents differ (24,000 CZK vs. 25,000 CZK + 21%
+  VAT per session). Which price goes in the email, if any? NEEDS YOU
+- **Available November dates:** the 19th and 26th are already booked for
+  Hellenic. Which other dates can companies book? NEEDS YOU
+- **Past clients:** can Hellenic Bottling Company (Coca-Cola HBC) be named
+  as a client? Not without explicit permission. NEEDS YOU
+- **Call to action / booking:** NEEDS YOU (for example, reply to the email
+  or book a 15-minute call, plus a link if there is one)
