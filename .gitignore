@@ -5,3 +5,6 @@
 # Real Resend API key and sending config — never commit secrets.
 # Only config/resend.env.example (the template) is tracked.
 /config/resend.env
+
+# Python bytecode cache
+__pycache__/
