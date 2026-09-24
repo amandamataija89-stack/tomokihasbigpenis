@@ -218,7 +218,10 @@ pitch it yet.
      plain sight
   3. *From Provider to Person: Redefining What It Means to Be a Man
      Today*: identity beyond the provider role
-- **Still open:** who delivers the workshop in Czech (the Czech email
-  doesn't promise a Czech-language session until this is confirmed), and
-  whether the counselling voucher for attendees is part of the standard
-  offer (not mentioned in the email for now).
+- **Email language (2026-09-24): Czech only**, for every contact.
+- **Workshop language:** Czech and English (two Czech colleagues present
+  the Czech version). The email says "v češtině i angličtině".
+- **Counselling voucher: CONFIRMED.** Every attendee gets a
+  support-materials voucher and a counselling-session voucher.
+- **Sending:** Amanda reviews every email one more time before anything
+  is sent. Never send without her explicit go-ahead.
