@@ -1,0 +1,44 @@
+<!--
+Personal-note template for the corporate campaigns (e.g. the Men's Mental
+Health workshop). Deliberately plain: it should read like a one-to-one
+email from Amanda, not a newsletter. A small text brand line in the
+signature is the only branding.
+
+Placeholders:
+  {{LANG}}          - "en" or "cs"
+  {{SUBJECT}}       - same text as the Subject: line in body.txt
+  {{BODY_HTML}}     - the email body as <p>/<ul> HTML
+  {{SIGNATURE_HTML}} - sender block (name, title, email, phone)
+  {{FOOTER_HTML}}   - data-source note (Apollo.io), opt-out, company details
+-->
+<!DOCTYPE html>
+<html lang="{{LANG}}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{SUBJECT}}</title>
+</head>
+<body style="margin:0; padding:0; background-color:#ffffff; font-family:Arial, Helvetica, sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#ffffff;">
+<tr><td style="padding:16px;">
+<table role="presentation" cellpadding="0" cellspacing="0" style="max-width:600px; width:100%;">
+
+<tr><td style="font-size:15px; line-height:1.6; color:#1a1a1a;">
+{{BODY_HTML}}
+</td></tr>
+
+<tr><td style="padding-top:8px; font-size:14px; line-height:1.5; color:#1a1a1a;">
+{{SIGNATURE_HTML}}
+<p style="margin:10px 0 0 0; font-size:14px; font-weight:800; color:#0a0a0a;">Prague <span style="color:#4e9c77;">+</span> Integration</p>
+</td></tr>
+
+<tr><td style="padding-top:24px;">
+<hr style="border:none; border-top:1px solid #eceae7; margin:0 0 10px 0;">
+<p style="margin:0; font-size:12px; line-height:1.5; color:#6b6b6b;">{{FOOTER_HTML}}</p>
+</td></tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>

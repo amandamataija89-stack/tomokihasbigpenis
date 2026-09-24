@@ -196,37 +196,29 @@ rules above ("keep corporate services out of the drafts") apply only to the
 GP/clinic campaign, not to this one. The EAP offer is **on hold**, so don't
 pitch it yet.
 
-**Workshop facts** *(from Amanda's Drive documents "Men's MH Offer_Panel_Talk"
-and the Hellenic Bottling Company proposal. Everything marked NEEDS YOU
-must be confirmed before drafting)*:
-
-- **Title (proposed):** "Still Standing: How Men Can Thrive Without Burning
-  Out". Alternatives: "The Weight of the World: Men, Meaning & the Modern
-  World" and "From Provider to Person: Redefining What It Means to Be a Man
-  Today"
-- **Format:** online panel discussion / workshop, 60 minutes (at most 20 min
-  intro + panel, then 40 min live Q&A), opening with a live audience poll.
-  On-site delivery possible? NEEDS YOU
-- **Audience:** men and women, with partners and allies welcome
-- **Presenters (English):** Fredrik L. (Men's Coach and Leadership Trainer)
-  and Jamie M. (Psychologist, Mental Health Counsellor and Trainer).
-  Alternatives: Benedikt Ričny or Daniel Espitia. **Who delivers the
-  Czech-language version?** NEEDS YOU
-- **Content:**
-  1. The Shifting Provider Role: the provider instinct as both strength and
-     trap, and the changing definition of "a good father"
-  2. Work, Worth & Running on Empty: always-on culture, why men push through
-     instead of signalling distress, tired vs. depleted, micro-recovery
-  3. Loneliness in Plain Sight: how unexpressed stress shows up
-     (irritability, withdrawal, overwork), and "you're not broken, you're
-     under-resourced"
-- **Participant bonus:** support-materials voucher plus a counselling
-  voucher for every attendee
-- **Price:** the source documents differ (24,000 CZK vs. 25,000 CZK + 21%
-  VAT per session). Which price goes in the email, if any? NEEDS YOU
-- **Available November dates:** the 19th and 26th are already booked for
-  Hellenic. Which other dates can companies book? NEEDS YOU
-- **Past clients:** can Hellenic Bottling Company (Coca-Cola HBC) be named
-  as a client? Not without explicit permission. NEEDS YOU
-- **Call to action / booking:** NEEDS YOU (for example, reply to the email
-  or book a 15-minute call, plus a link if there is one)
+**CONFIRMED by Amanda Mataija (2026-09-24):**
+- **Contacts:** Apollo.io business database export. Every email must say
+  so in its footer and include the opt-out.
+- **Style:** a short personal note from Amanda, not a newsletter. Uses
+  `templates/email-personal-note.html`.
+- **Price:** on request. Never quote a number in the email.
+- **Dates:** flexible, any date through November 2026.
+- **Format:** online or in person at the client's office. 60–90 minutes:
+  a short talk followed by a panel discussion and live Q&A. Relevant to
+  men and women, with partners and allies welcome.
+- **Hellenic Bottling / Coca-Cola:** do NOT name them as a client.
+- **Booking:** reply to contact@pragueintegration.cz.
+- **The company chooses one of three themes** (from
+  "Hellenic_Bottling_Three_Workshop_Options.pdf"):
+  1. *The Weight of the World: Men, Meaning & the Modern World*: what men
+     carry as providers, partners and professionals, and how to set some
+     of it down
+  2. *Still Standing: How Men Can Thrive Without Depleting*: recognising
+     depletion early, micro-recovery, tired vs. depleted, loneliness in
+     plain sight
+  3. *From Provider to Person: Redefining What It Means to Be a Man
+     Today*: identity beyond the provider role
+- **Still open:** who delivers the workshop in Czech (the Czech email
+  doesn't promise a Czech-language session until this is confirmed), and
+  whether the counselling voucher for attendees is part of the standard
+  offer (not mentioned in the email for now).
