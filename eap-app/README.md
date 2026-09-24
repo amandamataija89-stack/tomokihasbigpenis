@@ -5,11 +5,38 @@ A web app for Prague Integration's Employee Assistance Programme. It has two sid
 - **Employees** open their company's link (or enter its code at the home page),
   fill in a short confidential request, and get an email confirming that the
   team will contact them within 24 hours.
-- **Prague Integration staff** sign in at `/admin` to see new requests, assign
-  them, track status (New → Contacted → Session booked → Closed), keep notes,
+- **Prague Integration staff** sign in at `/admin` to see new requests,
+  track status (New → Contacted → Session booked → Closed), keep notes,
   and delete a request when someone asks for their data to be erased. Staff
   also add client companies there, which creates each company's code and
   registration link.
+
+Employees also say whether they need help urgently, what they need help
+with (topics and/or their own words), their age range, gender, where they're
+based, and whether they want online or in-person sessions.
+
+## Sharing out clients
+
+Each therapist has a limit of new clients per calendar month (5 by default;
+10 therapists × 5 = 50 places a month). Set the team up under **Team**.
+
+- Each new request goes to the therapist with the fewest new clients this
+  month, then whoever has waited longest since their last one.
+- Anyone at their limit is skipped and the case passes to the next therapist.
+- Therapists who work in the person's language come first. If they're all
+  full, the case goes to another therapist with space, with a note to check
+  the language. A therapist with no languages ticked takes any language.
+- If every therapist is full, the request waits, marked "Needs assigning".
+  It's assigned automatically as soon as a place opens: a new month, a raised
+  limit, or a therapist added or back to taking clients.
+- **Crisis cases never wait.** If everyone is full, they go to the least-busy
+  therapist over their limit. They're flagged in red, sorted to the top, and
+  their alert emails say URGENT. Staff can mark or unmark a crisis on the case.
+- Staff can always reassign a case by hand. The dropdown shows each person's
+  count for the month. Reassigning counts towards the new therapist's month.
+- The assigned therapist is emailed a link to the case (no details in the
+  email). Therapists added on the Team page can't sign in until given a
+  password with `npm run staff:create -- <their email> "<name>"`.
 
 Employers never see who registered. The Companies page shows request counts
 only, which is what you can report back to a client.
@@ -22,6 +49,7 @@ only, which is what you can report back to a client.
 | `/join/ABCD-EFGH` | Employee | Request form for that company |
 | `/admin` | Staff | Requests, filterable by status; new ones older than 24 h show in red |
 | `/admin/requests/<id>` | Staff | Full request, status, assignee, notes, delete |
+| `/admin/team` | Staff | Therapists, their languages, monthly limit and this month's count |
 | `/admin/companies` | Staff | Add a company, copy its link, pause it, see request counts |
 
 When a request comes in, the team gets an email at `TEAM_NOTIFY_EMAIL` with a
@@ -85,6 +113,10 @@ passwords and form validation).
   a data processing agreement with your database and hosting providers.
 - **Crisis numbers.** The pages list 112 and Linka první psychické pomoci
   (116 123).
+- **Crisis response time.** The staff list turns a crisis case red after 2
+  hours without contact. Adjust `isOverdue` in `src/app/admin/format.ts` to
+  your own protocol, and decide who covers crisis cases out of hours: the app
+  only emails, it doesn't phone anyone.
 
 ## Not included yet
 

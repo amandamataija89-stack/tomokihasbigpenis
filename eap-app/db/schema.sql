@@ -54,3 +54,17 @@ CREATE TABLE IF NOT EXISTS request_notes (
   body       text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now()
 );
+
+-- Automatic assignment: therapists take up to monthly_capacity new clients per calendar month.
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS takes_clients boolean NOT NULL DEFAULT false;
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS monthly_capacity integer NOT NULL DEFAULT 5 CHECK (monthly_capacity >= 0);
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS languages text[] NOT NULL DEFAULT '{}';
+ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS assigned_at timestamptz;
+UPDATE support_requests SET assigned_at = updated_at WHERE assigned_to IS NOT NULL AND assigned_at IS NULL;
+CREATE INDEX IF NOT EXISTS support_requests_assigned_idx ON support_requests (assigned_to, assigned_at);
+
+-- Triage details from the request form.
+ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS crisis boolean NOT NULL DEFAULT false;
+ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS age_range text NOT NULL DEFAULT '';
+ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS gender text NOT NULL DEFAULT '';
+ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS location text NOT NULL DEFAULT '';

@@ -14,6 +14,10 @@ const valid = {
   language: "Czech",
   format: "Online",
   topics: ["Anxiety", "Not a real topic"],
+  crisis: "no",
+  ageRange: "25–34",
+  gender: "Woman",
+  location: "Prague 3",
   consent: "yes",
 };
 
@@ -44,5 +48,23 @@ describe("validateRequest", () => {
     const r = validateRequest(form({ ...valid, language: "Klingon", format: "" }));
     expect(r.ok).toBe(false);
     if (!r.ok) expect(Object.keys(r.errors).sort()).toEqual(["format", "language"]);
+  });
+
+  it("records a crisis answer and requires one", () => {
+    const r = validateRequest(form({ ...valid, crisis: "yes" }));
+    expect(r.ok && r.data.crisis).toBe(true);
+    const missing = validateRequest(form({ ...valid, crisis: "" }));
+    expect(!missing.ok && missing.errors.crisis).toBeTruthy();
+  });
+
+  it("needs a topic or a message", () => {
+    const none = validateRequest(form({ ...valid, topics: [] }));
+    expect(!none.ok && none.errors.topics).toBeTruthy();
+    expect(validateRequest(form({ ...valid, topics: [], message: "Trouble sleeping" })).ok).toBe(true);
+  });
+
+  it("requires age range, gender and location", () => {
+    const r = validateRequest(form({ ...valid, ageRange: "", gender: "", location: " " }));
+    expect(!r.ok && Object.keys(r.errors).sort()).toEqual(["ageRange", "gender", "location"]);
   });
 });

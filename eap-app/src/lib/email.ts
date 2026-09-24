@@ -21,11 +21,25 @@ export async function sendEmail({ to, subject, text }: Mail): Promise<void> {
 const appUrl = () => process.env.APP_URL ?? "http://localhost:3000";
 
 // Deliberately contains nothing the person wrote: email is not where health information should travel.
-export function teamAlert(companyName: string, requestId: string): Mail {
+export function teamAlert(companyName: string, requestId: string, assignedName: string | null, crisis: boolean): Mail {
+  const who = assignedName ? `Assigned automatically to: ${assignedName}` : "Not assigned: someone needs to pick this up.";
+  const urgent = crisis ? "URGENT: the person says they need help urgently. Contact them as soon as possible.\n\n" : "";
   return {
     to: process.env.TEAM_NOTIFY_EMAIL ?? "contact@pragueintegration.cz",
-    subject: `New EAP request (${companyName})`,
-    text: `A new support request has come in.\n\nCompany: ${companyName}\n\nOpen it here to see the details and make contact within 24 hours:\n${appUrl()}/admin/requests/${requestId}\n`,
+    subject: `${crisis ? "URGENT – " : ""}New EAP request (${companyName})${assignedName ? "" : " – needs assigning"}`,
+    text: `${urgent}A new support request has come in.\n\nCompany: ${companyName}\n${who}\n\nOpen it here to see the details and make contact within 24 hours:\n${appUrl()}/admin/requests/${requestId}\n`,
+  };
+}
+
+export function therapistAlert(to: string, therapistName: string, requestId: string, crisis = false): Mail {
+  return {
+    to,
+    subject: `${crisis ? "URGENT – " : ""}New EAP client assigned to you`,
+    text: `Hi ${therapistName},\n\nA new EAP client has been assigned to you. ${
+      crisis
+        ? "They say they need help urgently: please contact them as soon as possible today."
+        : "Please make first contact within 24 hours."
+    }\n\nThe details are here (staff sign-in needed):\n${appUrl()}/admin/requests/${requestId}\n`,
   };
 }
 

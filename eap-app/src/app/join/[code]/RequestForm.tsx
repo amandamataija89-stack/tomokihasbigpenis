@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { CONTACT_METHODS, FORMATS, LANGUAGES, TOPICS } from "@/lib/request-form";
+import { AGE_RANGES, CONTACT_METHODS, FORMATS, GENDERS, LANGUAGES, TOPICS } from "@/lib/request-form";
 import { submitRequest, type SubmitState } from "./actions";
 
 export function RequestForm({ code }: { code: string }) {
@@ -20,8 +20,23 @@ export function RequestForm({ code }: { code: string }) {
   const invalid = (name: keyof typeof e) =>
     e[name] ? { "aria-invalid": true as const, "aria-describedby": `${name}-err` } : {};
 
+  const select = (name: "language" | "format" | "ageRange" | "gender", label: string, options: readonly string[]) => (
+    <div className="field">
+      <label htmlFor={name}>{label}</label>
+      <select id={name} name={name} defaultValue={v[name] ?? ""} {...invalid(name)}>
+        <option value="" disabled>
+          Choose one
+        </option>
+        {options.map((o) => (
+          <option key={o}>{o}</option>
+        ))}
+      </select>
+      {err(name)}
+    </div>
+  );
+
   return (
-    <form action={action} className="card form" noValidate key={key}>
+    <form action={action} className="card form sections" noValidate key={key}>
       {state.formError && <p className="err" role="alert">{state.formError}</p>}
       {Object.keys(e).length > 0 && (
         <p className="err" role="alert">
@@ -29,22 +44,110 @@ export function RequestForm({ code }: { code: string }) {
         </p>
       )}
 
-      <div className="row">
-        <div className="field">
-          <label htmlFor="firstName">First name</label>
-          <input id="firstName" name="firstName" type="text" autoComplete="given-name" defaultValue={v.firstName} {...invalid("firstName")} />
-          <span className="small">Or any name you&apos;d like us to use.</span>
-          {err("firstName")}
-        </div>
-        <div className="field">
-          <label htmlFor="email">Email</label>
-          <input id="email" name="email" type="email" autoComplete="email" defaultValue={v.email} {...invalid("email")} />
-          <span className="small">A personal address is fine if you prefer.</span>
-          {err("email")}
-        </div>
-      </div>
+      <section className="form-section">
+        <h2>What&apos;s going on</h2>
+        <fieldset className="urgent-q" {...invalid("crisis")}>
+          <legend>Do you need help urgently?</legend>
+          <div className="choices">
+            <label className="choice">
+              <input type="radio" name="crisis" value="yes" defaultChecked={v.crisis === "yes"} />
+              <span>Yes, I&apos;m struggling to cope right now</span>
+            </label>
+            <label className="choice">
+              <input type="radio" name="crisis" value="no" defaultChecked={v.crisis === "no"} />
+              <span>No, it&apos;s not urgent</span>
+            </label>
+          </div>
+          <p className="small">
+            If you are in danger or thinking about harming yourself, please call <b>112</b> or <b>116 123</b> now
+            rather than waiting for us.
+          </p>
+          {err("crisis")}
+        </fieldset>
 
-      <div className="row">
+        <fieldset {...invalid("topics")}>
+          <legend>
+            What would you like support with?<span className="opt">choose any, or write below</span>
+          </legend>
+          <div className="choices">
+            {TOPICS.map((t) => (
+              <label className="choice" key={t}>
+                <input type="checkbox" name="topics" value={t} defaultChecked={v.topics?.includes(t)} />
+                <span>{t}</span>
+              </label>
+            ))}
+          </div>
+          {err("topics")}
+        </fieldset>
+
+        <div className="field">
+          <label htmlFor="message">
+            In your own words<span className="opt">optional if you chose a topic</span>
+          </label>
+          <textarea
+            id="message"
+            name="message"
+            maxLength={2000}
+            defaultValue={v.message}
+            placeholder="e.g. I haven't been sleeping since my move, and work feels overwhelming"
+          />
+        </div>
+      </section>
+
+      <section className="form-section">
+        <h2>About you</h2>
+        <div className="row">
+          <div className="field">
+            <label htmlFor="firstName">First name</label>
+            <input id="firstName" name="firstName" type="text" autoComplete="given-name" defaultValue={v.firstName} {...invalid("firstName")} />
+            <span className="small">Or any name you&apos;d like us to use.</span>
+            {err("firstName")}
+          </div>
+          {select("ageRange", "Age", AGE_RANGES)}
+        </div>
+        <div className="row">
+          {select("gender", "Gender", GENDERS)}
+          <div className="field">
+            <label htmlFor="location">Where are you based?</label>
+            <input
+              id="location"
+              name="location"
+              type="text"
+              autoComplete="address-level2"
+              placeholder="e.g. Prague 3, Brno, working remotely from Spain"
+              defaultValue={v.location}
+              {...invalid("location")}
+            />
+            {err("location")}
+          </div>
+        </div>
+      </section>
+
+      <section className="form-section">
+        <h2>Your sessions</h2>
+        <div className="row">
+          {select("format", "Online or in person?", FORMATS)}
+          {select("language", "Language", LANGUAGES)}
+        </div>
+      </section>
+
+      <section className="form-section">
+        <h2>How we reach you</h2>
+        <div className="row">
+          <div className="field">
+            <label htmlFor="email">Email</label>
+            <input id="email" name="email" type="email" autoComplete="email" defaultValue={v.email} {...invalid("email")} />
+            <span className="small">A personal address is fine if you prefer.</span>
+            {err("email")}
+          </div>
+          <div className="field">
+            <label htmlFor="phone">
+              Phone<span className="opt">needed for calls and texts</span>
+            </label>
+            <input id="phone" name="phone" type="tel" autoComplete="tel" placeholder="+420" defaultValue={v.phone} {...invalid("phone")} />
+            {err("phone")}
+          </div>
+        </div>
         <fieldset>
           <legend>How should we contact you?</legend>
           <div className="choices">
@@ -57,68 +160,7 @@ export function RequestForm({ code }: { code: string }) {
           </div>
           {err("contactMethod")}
         </fieldset>
-        <div className="field">
-          <label htmlFor="phone">
-            Phone<span className="opt">needed for calls and texts</span>
-          </label>
-          <input id="phone" name="phone" type="tel" autoComplete="tel" placeholder="+420" defaultValue={v.phone} {...invalid("phone")} />
-          {err("phone")}
-        </div>
-      </div>
-
-      <div className="row">
-        <div className="field">
-          <label htmlFor="language">Language for your sessions</label>
-          <select id="language" name="language" defaultValue={v.language ?? ""} {...invalid("language")}>
-            <option value="" disabled>
-              Choose one
-            </option>
-            {LANGUAGES.map((l) => (
-              <option key={l}>{l}</option>
-            ))}
-          </select>
-          {err("language")}
-        </div>
-        <div className="field">
-          <label htmlFor="format">How would you like to meet?</label>
-          <select id="format" name="format" defaultValue={v.format ?? ""} {...invalid("format")}>
-            <option value="" disabled>
-              Choose one
-            </option>
-            {FORMATS.map((f) => (
-              <option key={f}>{f}</option>
-            ))}
-          </select>
-          {err("format")}
-        </div>
-      </div>
-
-      <fieldset>
-        <legend>
-          What would you like support with?<span className="opt">optional, choose any</span>
-        </legend>
-        <div className="choices">
-          {TOPICS.map((t) => (
-            <label className="choice" key={t}>
-              <input type="checkbox" name="topics" value={t} defaultChecked={v.topics?.includes(t)} />
-              <span>{t}</span>
-            </label>
-          ))}
-        </div>
-      </fieldset>
-
-      <div className="field">
-        <label htmlFor="message">
-          Anything you&apos;d like us to know<span className="opt">optional</span>
-        </label>
-        <textarea
-          id="message"
-          name="message"
-          maxLength={2000}
-          defaultValue={v.message}
-          placeholder="e.g. best times to reach you, or whether you'd prefer a female or male counsellor"
-        />
-      </div>
+      </section>
 
       <div className="hp" aria-hidden="true">
         <label htmlFor="website">Leave this empty</label>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { assignWaitingAndNotify } from "@/lib/assign";
 import { listRequests, statusCounts, STATUSES, STATUS_LABELS, type Status } from "@/lib/data";
 import { age, formatDate, isOverdue } from "../format";
 
@@ -13,6 +14,11 @@ export default async function RequestsPage({
 }) {
   const sp = await searchParams;
   const filter: Filter = FILTERS.includes(sp.status as Filter) ? (sp.status as Filter) : "open";
+  // Picks up requests that were waiting for a free place (e.g. a new month has started).
+  const newlyAssigned = await assignWaitingAndNotify().catch((err) => {
+    console.error("EAP assign waiting failed:", err);
+    return [];
+  });
   const [requests, counts] = await Promise.all([listRequests(filter), statusCounts()]);
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   const countFor = (f: Filter) => (f === "all" ? total : f === "open" ? total - counts.closed : counts[f]);
@@ -25,10 +31,16 @@ export default async function RequestsPage({
         <p className="lede">
           {counts.new === 0
             ? "No new requests waiting."
-            : `${counts.new} new ${counts.new === 1 ? "request is" : "requests are"} waiting for first contact. Aim to reach each person within 24 hours.`}
+            : `${counts.new} new ${counts.new === 1 ? "request is" : "requests are"} waiting for first contact. Aim to reach each person within 24 hours, and crisis cases within 2.`}
         </p>
       </div>
       {sp.deleted && <p className="flash" role="status">Request deleted.</p>}
+      {newlyAssigned.length > 0 && (
+        <p className="flash" role="status">
+          {newlyAssigned.length} waiting {newlyAssigned.length === 1 ? "request was" : "requests were"} just assigned now
+          that places have opened.
+        </p>
+      )}
 
       <nav className="tabs" aria-label="Filter by status">
         {FILTERS.map((f) => (
@@ -57,19 +69,20 @@ export default async function RequestsPage({
             </thead>
             <tbody>
               {requests.map((r) => (
-                <tr key={r.id}>
+                <tr key={r.id} className={r.crisis && r.status !== "closed" ? "crisis-row" : undefined}>
                   <td>
                     <Link className="rowlink" href={`/admin/requests/${r.id}`}>{r.first_name}</Link>
+                    {r.crisis && <> <span className="pill pill-crisis">Crisis</span></>}
                   </td>
                   <td>{r.company_name}</td>
                   <td>{r.contact_method}</td>
                   <td>{r.language}</td>
                   <td><span className={`pill pill-${r.status}`}>{STATUS_LABELS[r.status]}</span></td>
-                  <td>{r.assigned_name ?? <span className="small">Unassigned</span>}</td>
+                  <td>{r.assigned_name ?? <span className={r.status === "closed" ? "small" : "overdue"}>Needs assigning</span>}</td>
                   <td className="age">
                     {formatDate(r.created_at)}
                     {r.status === "new" && (
-                      <div className={isOverdue(r.created_at, now) ? "overdue" : "small"}>
+                      <div className={isOverdue(r.created_at, now, r.crisis) ? "overdue" : "small"}>
                         waiting {age(r.created_at, now)}
                       </div>
                     )}

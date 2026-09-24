@@ -28,9 +28,13 @@ export async function findCompanyByCode(code: string): Promise<Company | null> {
 export async function insertRequest(companyId: string, r: RequestInput): Promise<string> {
   const { rows } = await pool.query<{ id: string }>(
     `INSERT INTO support_requests
-       (company_id, first_name, email, phone, contact_method, language, format, topics, message, consent_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now()) RETURNING id`,
-    [companyId, r.firstName, r.email, r.phone, r.contactMethod, r.language, r.format, r.topics, r.message],
+       (company_id, first_name, email, phone, contact_method, language, format, topics, message,
+        crisis, age_range, gender, location, consent_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, now()) RETURNING id`,
+    [
+      companyId, r.firstName, r.email, r.phone, r.contactMethod, r.language, r.format, r.topics, r.message,
+      r.crisis, r.ageRange, r.gender, r.location,
+    ],
   );
   return rows[0].id;
 }
@@ -45,6 +49,10 @@ export type RequestRow = {
   format: string;
   topics: string[];
   message: string;
+  crisis: boolean;
+  age_range: string;
+  gender: string;
+  location: string;
   consent_at: Date;
   status: Status;
   assigned_to: string | null;
@@ -66,7 +74,7 @@ export async function listRequests(status: Status | "open" | "all"): Promise<Req
     status === "all" ? "" : status === "open" ? "WHERE r.status <> 'closed'" : "WHERE r.status = $1";
   const params = status === "all" || status === "open" ? [] : [status];
   const { rows } = await pool.query<RequestRow>(
-    `${REQUEST_SELECT} ${where} ORDER BY (r.status = 'new') DESC, r.created_at DESC LIMIT 500`,
+    `${REQUEST_SELECT} ${where} ORDER BY (r.crisis AND r.status <> 'closed') DESC, (r.status = 'new') DESC, r.created_at DESC LIMIT 500`,
     params,
   );
   return rows;
@@ -99,10 +107,7 @@ export async function listNotes(requestId: string): Promise<Note[]> {
   return rows;
 }
 
-export async function listStaff(): Promise<{ id: string; name: string }[]> {
-  const { rows } = await pool.query<{ id: string; name: string }>("SELECT id, name FROM staff ORDER BY name");
-  return rows;
-}
+export { therapistLoads as listStaffWithLoad } from "./assign";
 
 export type CompanyWithCounts = Company & { total: number; last_30_days: number };
 

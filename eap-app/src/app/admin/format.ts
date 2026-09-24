@@ -16,4 +16,6 @@ export function age(d: Date, now = Date.now()): string {
   return `${Math.floor(hours / 24)} d`;
 }
 
-export const isOverdue = (d: Date, now = Date.now()) => now - d.getTime() > 24 * 3600_000;
+// First contact is due within 24 hours, or 2 hours for someone who said they need help urgently.
+export const isOverdue = (d: Date, now = Date.now(), crisis = false) =>
+  now - d.getTime() > (crisis ? 2 : 24) * 3600_000;

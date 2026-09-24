@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getRequest, listNotes, listStaff, STATUSES, STATUS_LABELS } from "@/lib/data";
+import { speaks } from "@/lib/assign";
+import { getRequest, listNotes, listStaffWithLoad, STATUSES, STATUS_LABELS } from "@/lib/data";
 import { addNote, deleteRequest, updateRequest } from "../../../actions";
 import { formatDate } from "../../../format";
 
@@ -15,14 +16,23 @@ export default async function RequestPage({
   const sp = await searchParams;
   const r = await getRequest(id);
   if (!r) notFound();
-  const [notes, staff] = await Promise.all([listNotes(id), listStaff()]);
+  const [notes, staff] = await Promise.all([listNotes(id), listStaffWithLoad(undefined, false)]);
+  const label = (s: (typeof staff)[number]) => {
+    if (s.id === r.assigned_to) return `${s.name} (current)`;
+    const load = `${s.assignedThisMonth}/${s.capacity} this month`;
+    const warn = s.assignedThisMonth >= s.capacity ? ", full" : !speaks(s, r.language) ? `, no ${r.language}` : "";
+    return `${s.name} (${load}${warn})`;
+  };
 
   return (
     <main className="stack" style={{ gap: 20 }}>
       <p className="small"><Link href="/admin">← All requests</Link></p>
       <div className="actions" style={{ justifyContent: "space-between" }}>
         <h1 style={{ fontSize: 32 }}>{r.first_name}</h1>
-        <span className={`pill pill-${r.status}`}>{STATUS_LABELS[r.status]}</span>
+        <span className="actions" style={{ gap: 8 }}>
+          {r.crisis && <span className="pill pill-crisis">Crisis</span>}
+          <span className={`pill pill-${r.status}`}>{STATUS_LABELS[r.status]}</span>
+        </span>
       </div>
       {sp.saved && <p className="flash" role="status">Saved.</p>}
 
@@ -30,12 +40,16 @@ export default async function RequestPage({
         <section className="card stack">
           <h2>Request</h2>
           <dl className="facts">
+            <dt>Urgent?</dt><dd>{r.crisis ? <b className="overdue">Yes, crisis</b> : "No"}</dd>
             <dt>Company</dt><dd>{r.company_name}</dd>
+            <dt>Age</dt><dd>{r.age_range || "—"}</dd>
+            <dt>Gender</dt><dd>{r.gender || "—"}</dd>
+            <dt>Based in</dt><dd>{r.location || "—"}</dd>
             <dt>Email</dt><dd className="mono">{r.email}</dd>
             <dt>Phone</dt><dd className="mono">{r.phone || "—"}</dd>
             <dt>Contact by</dt><dd>{r.contact_method}</dd>
             <dt>Language</dt><dd>{r.language}</dd>
-            <dt>Meeting</dt><dd>{r.format}</dd>
+            <dt>Online / in person</dt><dd>{r.format}</dd>
             <dt>Support with</dt><dd>{r.topics.length ? r.topics.join(", ") : "Not said"}</dd>
             <dt>Received</dt><dd>{formatDate(r.created_at)}</dd>
             <dt>Consent</dt><dd>Given {formatDate(r.consent_at)}</dd>
@@ -61,9 +75,14 @@ export default async function RequestPage({
               <label htmlFor="assignedTo">Assigned to</label>
               <select id="assignedTo" name="assignedTo" defaultValue={r.assigned_to ?? ""}>
                 <option value="">Unassigned</option>
-                {staff.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                {staff.map((s) => <option key={s.id} value={s.id}>{label(s)}</option>)}
               </select>
+              <span className="small">You can assign anyone, including someone already at their monthly limit.</span>
             </div>
+            <label className="consent">
+              <input type="checkbox" name="crisis" value="yes" defaultChecked={r.crisis} />
+              <span>Crisis case (needs contact as soon as possible)</span>
+            </label>
             <div className="actions"><button type="submit">Save</button></div>
           </form>
 
