@@ -1,0 +1,137 @@
+<!--
+Source for assets/program-mens-mh-workshop-cs.pdf: the Czech program
+Amanda sends to companies that reply to the Men's Mental Health workshop
+email. Deliberately has no client name and no price (price on request).
+Re-render to PDF with Chromium/Playwright (A4, print backgrounds on).
+-->
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<title>Muži a duševní zdraví – program workshopu</title>
+<style>
+  @page { size: A4; margin: 13mm 14mm 13mm 14mm; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "DejaVu Sans", Arial, Helvetica, sans-serif; color: #1a1a1a; font-size: 9.5pt; line-height: 1.4; }
+  .brand { font-weight: 800; font-size: 13pt; color: #0a0a0a; }
+  .brand .plus { color: #4e9c77; }
+  .brand .dots { color: #d98aa0; letter-spacing: -2px; margin-left: 4px; }
+  .eyebrow { color: #33416b; font-size: 9pt; margin-top: 2px; }
+  h1 { font-size: 22pt; color: #33416b; margin: 14px 0 2px; line-height: 1.15; }
+  .sub { font-style: italic; color: #33416b; margin: 0 0 10px; }
+  hr.rule { border: none; border-top: 2px solid #4e9c77; margin: 0 0 12px; }
+  h2 { font-size: 12.5pt; color: #c56685; margin: 12px 0 5px; }
+  h3 { font-size: 11.5pt; color: #33416b; margin: 0 0 3px; }
+  p { margin: 0 0 7px; }
+  table.fmt { width: 100%; border-collapse: collapse; margin: 4px 0 4px; }
+  table.fmt td { padding: 4px 10px; vertical-align: top; border-bottom: 1px solid #eceae7; }
+  table.fmt td:first-child { width: 30%; background: #f3f2ef; font-weight: 700; color: #33416b; }
+  .theme { border: 1px solid #e4e2de; border-left: 4px solid #33416b; border-radius: 4px; padding: 9px 12px; margin: 0 0 9px; page-break-inside: avoid; }
+  .theme .num { font-size: 8.5pt; text-transform: uppercase; letter-spacing: .06em; color: #4e9c77; font-weight: 700; }
+  .theme .intro { font-style: italic; color: #444; margin-bottom: 5px; }
+  .theme ul { margin: 0 0 5px; padding-left: 16px; }
+  .theme li { margin-bottom: 2px; }
+  .key { background: #f8eef1; color: #7a2f47; padding: 4px 8px; border-radius: 3px; font-size: 9.5pt; }
+  ul.cols { columns: 2; margin: 0 0 6px; padding-left: 16px; }
+  .q { margin: 0; padding-left: 16px; }
+  .q li { margin-bottom: 2px; font-style: italic; }
+  .contact { background: #33416b; color: #fff; border-radius: 6px; padding: 12px 14px; margin-top: 14px; page-break-inside: avoid; }
+  .contact h2 { color: #fff; margin: 0 0 4px; }
+  .contact a { color: #fff; }
+  .foot { color: #8a8a8a; font-size: 8pt; font-style: italic; margin-top: 12px; border-top: 1px solid #ddd; padding-top: 6px; }
+  .break { page-break-before: always; }
+</style>
+</head>
+<body>
+
+<div class="brand">Prague <span class="plus">+</span> Integration<span class="dots">●●</span></div>
+<div class="eyebrow">Program workshopu · Měsíc mužského duševního zdraví · listopad 2026</div>
+
+<h1>Muži a duševní zdraví</h1>
+<p class="sub">Panelová diskuse a interaktivní workshop pro firmy</p>
+<hr class="rule">
+
+<h2>O workshopu</h2>
+<p>Od mužů se často čeká, že budou fungovat dál – v práci, doma, ve vztazích, jako živitelé a otcové – i ve chvíli, kdy jim docházejí síly. Workshop otevírá téma, o kterém muži v práci sami mluví jen zřídka: jaký tlak nesou, jak se u nich projevuje stres a vyčerpání a co jim skutečně pomáhá.</p>
+<p>Nejde o teoretickou přednášku, ale o upřímný a praktický rozhovor. Workshop je přínosný pro muže i ženy. Vítáni jsou i kolegyně, kolegové a partneři, kteří chtějí muže ve svém okolí lépe podpořit.</p>
+
+<h2>Formát</h2>
+<table class="fmt">
+  <tr><td>Forma</td><td>Online, nebo osobně u Vás ve firmě</td></tr>
+  <tr><td>Délka</td><td>60–90 minut</td></tr>
+  <tr><td>Struktura</td><td>15–20 min úvodní přednáška + 35–40 min panelová diskuse a otázky a odpovědi (Q&amp;A) naživo</td></tr>
+  <tr><td>Jazyk</td><td>Čeština nebo angličtina</td></tr>
+  <tr><td>Termín</td><td>Kdykoli v listopadu 2026, podle Vašich možností</td></tr>
+  <tr><td>Pro koho</td><td>Muži i ženy, vítáni jsou partneři a podporovatelé</td></tr>
+  <tr><td>Vedou</td><td>Dva lektoři z týmu Prague Integration: kouč a odborník na duševní zdraví</td></tr>
+  <tr><td>Bonus pro účastníky</td><td>Poukaz na podpůrné materiály a poukaz na poradenské sezení pro každého účastníka</td></tr>
+  <tr><td>Cena</td><td>Na vyžádání</td></tr>
+</table>
+
+<h2>Vyberte si jedno ze tří témat</h2>
+
+<div class="theme">
+  <div class="num">Téma 1</div>
+  <h3>Tíha světa: muži, smysl a moderní doba</h3>
+  <p class="intro">Muži dnes nesou víc než úkoly a termíny: nesou očekávání, odpovědnost a často nevyslovené hledání smyslu.</p>
+  <ul>
+    <li><strong>Zátěž, kterou neseme:</strong> role živitele jako identita i břemeno; kdy odpovědnost za druhé převáží odpovědnost za sebe; rozdíl mezi těžkým a neudržitelným nákladem</li>
+    <li><strong>Smysl, práce a moderní svět:</strong> jak kultura neustálé dostupnosti spojuje sebehodnotu s výkonem; smysl i mimo produktivitu; prakticky: malé kroky zpět k tomu, co dává smysl</li>
+    <li><strong>Nést to společně:</strong> proč tlak často zůstává nepojmenovaný; jak se projevuje podrážděností, stažením nebo přepracováním; jak sdílet zátěž, aniž by člověk ztratil pocit síly</li>
+  </ul>
+  <span class="key">Klíčové poselství: ta tíha je skutečná, ale nikdo ji nemusí nést sám.</span>
+</div>
+
+<div class="theme">
+  <div class="num">Téma 2</div>
+  <h3>Pořád na nohou: jak zvládat nároky bez vyčerpání</h3>
+  <p class="intro">Praktický a upřímný rozhovor o tom, co se stane, když se odolnost změní v neustálé vydržování.</p>
+  <ul>
+    <li><strong>Proměna role živitele:</strong> instinkt živitele jako síla i past; jak se mění představa „dobrého otce“; rozdíl mezi otcem, kterého muži sami měli, a otcem, jakým chtějí být</li>
+    <li><strong>Práce, hodnota a jízda na rezervu:</strong> proč muži stres spíš překousnou, než by dali najevo, že něco není v pořádku; rozdíl mezi únavou a vyčerpáním; prakticky: průběžná mikro-regenerace místo čekání na dovolenou nebo vyhoření</li>
+    <li><strong>Osamělost, která není vidět:</strong> vzorce osamělosti, které muži u sebe často nepoznají; jak se nevyjádřený stres projevuje přepracováním, podrážděností nebo uzavřením; jak vypadá zdravější a udržitelnější síla</li>
+  </ul>
+  <span class="key">Klíčové poselství: nejste „rozbitý“, možná Vám jen docházejí zdroje.</span>
+</div>
+
+<div class="theme">
+  <div class="num">Téma 3</div>
+  <h3>Od živitele k člověku: co dnes znamená být mužem</h3>
+  <p class="intro">Rozhovor o identitě, která je víc než funkce: o tom, být viděn a oceňován jako celý člověk, ne jen jako role.</p>
+  <ul>
+    <li><strong>Od živitele k člověku:</strong> role živitele jako zdroj hrdosti i její limity; co se ztrácí, když je „být užitečný“ hlavním měřítkem vlastní hodnoty</li>
+    <li><strong>Nová pravidla mužství:</strong> proč proměna očekávání může působit spíš jako tlak než jako svoboda; prakticky: malé kroky k tomu, jak definovat sílu a úspěch po svém</li>
+    <li><strong>Být viděn, mít oporu:</strong> jak se nevyslovená nejistota projevuje stažením, podrážděností nebo přehnaným výkonem; co znamená mít podporu jako celý člověk, ne jen jako ten, kdo zajišťuje ostatní</li>
+  </ul>
+  <span class="key">Klíčové poselství: smíte být víc než to, co děláte pro druhé.</span>
+</div>
+
+<h2>Panelová diskuse a otázky naživo</h2>
+<p>Po úvodní přednášce následuje otevřená diskuse s lektory zaměřená na skutečné situace z života:</p>
+<ul class="cols">
+  <li>práce a tlak</li>
+  <li>vztahy a komunikace</li>
+  <li>otcovství a rodinná očekávání</li>
+  <li>vyjadřování emocí</li>
+  <li>stres a vyhoření</li>
+  <li>jak si říct o podporu</li>
+  <li>budování udržitelné odolnosti</li>
+</ul>
+<p>Účastníci mohou posílat otázky předem i během workshopu. Například:</p>
+<ul class="q">
+  <li>„Jak se otevřít, když na tuhle moji stránku není můj protějšek zvyklý?“</li>
+  <li>„Jak ochránit děti před svým stresem, a přitom se úplně neuzavřít?“</li>
+  <li>„Jak vlastně vypadá ‚vyhledat pomoc‘ pro muže, který nechodí na terapii?“</li>
+  <li>„Jak poznám, jestli jsem jen unavený, nebo je něco opravdu špatně?“</li>
+</ul>
+
+<div class="contact">
+  <h2>Jak si workshop objednat</h2>
+  <p style="margin:0 0 6px;">Napište nám, které téma, formu (online / osobně), jazyk a termín preferujete, a připravíme Vám nabídku.</p>
+  <p style="margin:0;"><strong>Amanda Mataija</strong>, CEO · contact@pragueintegration.cz · +420 608 573 256 · www.pragueintegration.cz</p>
+</div>
+
+<div class="foot">© Prague Integration s.r.o., IČO 21048428, Olšanská 4E, 130 00 Praha 3. Duševní vlastnictví společnosti, bez svolení nekopírujte.</div>
+
+</body>
+</html>
