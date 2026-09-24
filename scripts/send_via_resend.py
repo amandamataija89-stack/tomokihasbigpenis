@@ -110,10 +110,19 @@ def main():
     action.add_argument("--dry-run", action="store_true", help="Print what would send, without sending")
     args = parser.parse_args()
 
-    env = load_env(ENV_PATH)
+    # Process environment variables (e.g. the cloud environment's settings)
+    # take precedence over config/resend.env, so the API key never has to
+    # be written to a file. From/reply-to fall back to the company address.
+    env = {
+        "RESEND_FROM_NAME": "Amanda Mataija | Prague Integration",
+        "RESEND_FROM_EMAIL": "contact@pragueintegration.cz",
+        "RESEND_REPLY_TO": "contact@pragueintegration.cz",
+    }
+    env.update(load_env(ENV_PATH))
+    env.update({k: v for k, v in os.environ.items() if k.startswith("RESEND_") and v})
     for key in ("RESEND_API_KEY", "RESEND_FROM_NAME", "RESEND_FROM_EMAIL", "RESEND_REPLY_TO"):
         if not env.get(key):
-            print(f"Missing {key} in config/resend.env (see config/resend.env.example)", file=sys.stderr)
+            print(f"Missing {key}: set it as an environment variable or in config/resend.env", file=sys.stderr)
             sys.exit(1)
     rate = float(env.get("RESEND_RATE_PER_SECOND", "1") or "1")
     delay = 1.0 / rate if rate > 0 else 1.0
