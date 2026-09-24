@@ -5,8 +5,9 @@ import { redirect } from "next/navigation";
 import { endSession, requireStaff, startSession } from "@/lib/auth";
 import { assignWaitingAndNotify, DEFAULT_MONTHLY_CAPACITY } from "@/lib/assign";
 import { generateCompanyCode } from "@/lib/codes";
-import { STATUSES, STATUS_LABELS, type Status } from "@/lib/data";
+import { SESSIONS_PER_CLIENT, STATUSES, STATUS_LABELS, type Status } from "@/lib/data";
 import { pool } from "@/lib/db";
+import { sendEmail, sessionConfirmation, type SessionEmail } from "@/lib/email";
 import { verifyPassword } from "@/lib/password";
 import { LANGUAGES } from "@/lib/request-form";
 
@@ -175,4 +176,188 @@ export async function updateTherapist(staffId: string, formData: FormData) {
   await assignWaitingAndNotify();
   revalidatePath("/admin/team");
   redirect("/admin/team?saved=1");
+}
+
+// ---- Sessions ----------------------------------------------------------------
+
+const LOCAL_DATETIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
+const sessionDate = (formData: FormData) => {
+  const v = String(formData.get("startsAt") ?? "");
+  return LOCAL_DATETIME.test(v) ? v : null;
+};
+const note = (requestId: string, staffId: string, body: string) =>
+  pool.query("INSERT INTO request_notes (request_id, staff_id, body) VALUES ($1, $2, $3)", [requestId, staffId, body]);
+const pragueLabel = (local: string) =>
+  new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(
+    new Date(`${local.slice(0, 10)}T00:00:00Z`),
+  ) +
+  `, ${local.slice(11)}`;
+
+// Keeps the case status in step with its sessions: booked once a date exists, completed once all are done.
+async function syncStatusWithSessions(requestId: string, staffId: string) {
+  const { rows } = await pool.query<{ status: Status; total: number; done: number }>(
+    `SELECT r.status,
+       (SELECT count(*)::int FROM client_sessions WHERE request_id = r.id) AS total,
+       (SELECT count(*)::int FROM client_sessions WHERE request_id = r.id AND done_at IS NOT NULL) AS done
+     FROM support_requests r WHERE r.id = $1`,
+    [requestId],
+  );
+  const r = rows[0];
+  if (!r) return;
+  let next: Status = r.status;
+  if (r.done >= SESSIONS_PER_CLIENT && r.status !== "closed") next = "completed";
+  else if (r.status === "completed") next = "scheduled";
+  else if (r.total > 0 && (r.status === "new" || r.status === "contacted")) next = "scheduled";
+  if (next === r.status) return;
+  await pool.query("UPDATE support_requests SET status = $2, updated_at = now() WHERE id = $1", [requestId, next]);
+  await note(
+    requestId,
+    staffId,
+    next === "completed"
+      ? `All ${SESSIONS_PER_CLIENT} sessions done. Case marked Completed.`
+      : `Status changed from ${STATUS_LABELS[r.status]} to ${STATUS_LABELS[next]}.`,
+  );
+}
+
+const whenFmt = new Intl.DateTimeFormat("en-GB", {
+  weekday: "long",
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+  timeZone: "Europe/Prague",
+});
+
+// Emails the client about a session when staff ticked "Email the client". Returns the note to add.
+async function emailClient(
+  formData: FormData,
+  sessionId: string,
+  kind: SessionEmail["kind"],
+): Promise<string> {
+  if (formData.get("notifyClient") !== "yes") return "";
+  const { rows } = await pool.query<{
+    email: string;
+    first_name: string;
+    format: string;
+    therapist: string | null;
+    starts_at: Date;
+    number: number;
+  }>(
+    `SELECT r.email, r.first_name, r.format, s.name AS therapist, cs.starts_at,
+       (SELECT count(*)::int FROM client_sessions o WHERE o.request_id = r.id AND o.starts_at <= cs.starts_at) AS number
+     FROM client_sessions cs
+     JOIN support_requests r ON r.id = cs.request_id
+     LEFT JOIN staff s ON s.id = r.assigned_to
+     WHERE cs.id = $1`,
+    [sessionId],
+  );
+  const r = rows[0];
+  if (!r) return "";
+  try {
+    await sendEmail(
+      sessionConfirmation({
+        to: r.email,
+        firstName: r.first_name,
+        kind,
+        when: whenFmt.format(r.starts_at),
+        number: r.number,
+        total: SESSIONS_PER_CLIENT,
+        format: r.format,
+        therapistName: r.therapist,
+      }),
+    );
+    return " Confirmation emailed to the client.";
+  } catch (err) {
+    console.error("EAP session email failed:", err);
+    return " The confirmation email to the client could not be sent.";
+  }
+}
+
+async function sessionRequest(sessionId: string): Promise<string> {
+  const { rows } = await pool.query<{ request_id: string }>("SELECT request_id FROM client_sessions WHERE id = $1", [sessionId]);
+  if (!rows[0]) redirect("/admin");
+  return rows[0].request_id;
+}
+
+export async function addSession(requestId: string, formData: FormData) {
+  const staff = await requireStaff();
+  const startsAt = sessionDate(formData);
+  if (!startsAt) redirect(`/admin/requests/${requestId}?session=date#sessions`);
+  const { rows } = await pool.query<{ n: number }>(
+    "SELECT count(*)::int AS n FROM client_sessions WHERE request_id = $1",
+    [requestId],
+  );
+  if (rows[0].n >= SESSIONS_PER_CLIENT) redirect(`/admin/requests/${requestId}?session=full#sessions`);
+  const { rows: created } = await pool.query<{ id: string }>(
+    "INSERT INTO client_sessions (request_id, starts_at) VALUES ($1, $2::timestamp AT TIME ZONE 'Europe/Prague') RETURNING id",
+    [requestId, startsAt],
+  );
+  const emailed = await emailClient(formData, created[0].id, "booked");
+  await note(requestId, staff.id, `Session booked for ${pragueLabel(startsAt)}.${emailed}`);
+  await syncStatusWithSessions(requestId, staff.id);
+  redirect(`/admin/requests/${requestId}#sessions`);
+}
+
+export async function moveSession(sessionId: string, formData: FormData) {
+  const staff = await requireStaff();
+  const requestId = await sessionRequest(sessionId);
+  const startsAt = sessionDate(formData);
+  if (!startsAt) redirect(`/admin/requests/${requestId}?session=date#sessions`);
+  await pool.query("UPDATE client_sessions SET starts_at = $2::timestamp AT TIME ZONE 'Europe/Prague' WHERE id = $1", [
+    sessionId,
+    startsAt,
+  ]);
+  const emailed = await emailClient(formData, sessionId, "moved");
+  await note(requestId, staff.id, `Session moved to ${pragueLabel(startsAt)}.${emailed}`);
+  redirect(`/admin/requests/${requestId}#sessions`);
+}
+
+export async function setSessionDone(sessionId: string, done: boolean) {
+  const staff = await requireStaff();
+  const requestId = await sessionRequest(sessionId);
+  // Only acts on a real change, so a double click can't count a session twice.
+  const { rowCount } = await pool.query(
+    done
+      ? "UPDATE client_sessions SET done_at = now() WHERE id = $1 AND done_at IS NULL"
+      : "UPDATE client_sessions SET done_at = NULL WHERE id = $1 AND done_at IS NOT NULL",
+    [sessionId],
+  );
+  if (!rowCount) redirect(`/admin/requests/${requestId}#sessions`);
+  const { rows } = await pool.query<{ done: number }>(
+    "SELECT count(*)::int AS done FROM client_sessions WHERE request_id = $1 AND done_at IS NOT NULL",
+    [requestId],
+  );
+  await note(
+    requestId,
+    staff.id,
+    done ? `Session marked done (${rows[0].done} of ${SESSIONS_PER_CLIENT}).` : "Session no longer marked done.",
+  );
+  await syncStatusWithSessions(requestId, staff.id);
+  redirect(`/admin/requests/${requestId}#sessions`);
+}
+
+export async function removeSession(sessionId: string, formData: FormData) {
+  const staff = await requireStaff();
+  const requestId = await sessionRequest(sessionId);
+  // Email before deleting, while the session's details still exist.
+  const emailed = await emailClient(formData, sessionId, "cancelled");
+  await pool.query("DELETE FROM client_sessions WHERE id = $1", [sessionId]);
+  await note(requestId, staff.id, `Session removed.${emailed}`);
+  await syncStatusWithSessions(requestId, staff.id);
+  redirect(`/admin/requests/${requestId}#sessions`);
+}
+
+export async function updateClientEmail(requestId: string, formData: FormData) {
+  const staff = await requireStaff();
+  const email = String(formData.get("clientEmail") ?? "").trim().toLowerCase().slice(0, 200);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) redirect(`/admin/requests/${requestId}?session=email#sessions`);
+  const { rows } = await pool.query<{ email: string }>("SELECT email FROM support_requests WHERE id = $1", [requestId]);
+  if (!rows[0]) redirect("/admin");
+  if (rows[0].email !== email) {
+    await pool.query("UPDATE support_requests SET email = $2, updated_at = now() WHERE id = $1", [requestId, email]);
+    await note(requestId, staff.id, `Client email changed from ${rows[0].email} to ${email}.`);
+  }
+  redirect(`/admin/requests/${requestId}?session=emailsaved#sessions`);
 }

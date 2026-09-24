@@ -1,14 +1,18 @@
 import { pool } from "./db";
 import type { RequestInput } from "./request-form";
 
-export const STATUSES = ["new", "contacted", "scheduled", "closed"] as const;
+export const STATUSES = ["new", "contacted", "scheduled", "completed", "closed"] as const;
 export type Status = (typeof STATUSES)[number];
 export const STATUS_LABELS: Record<Status, string> = {
   new: "New",
   contacted: "Contacted",
   scheduled: "Session booked",
+  completed: "Completed",
   closed: "Closed",
 };
+// Statuses where the case needs nothing more from the team.
+export const FINISHED: readonly Status[] = ["completed", "closed"];
+export const SESSIONS_PER_CLIENT = 5;
 
 export type Company = {
   id: string;
@@ -61,20 +65,26 @@ export type RequestRow = {
   company_name: string;
   created_at: Date;
   updated_at: Date;
+  sessions_done: number;
+  sessions_total: number;
+  next_session: Date | null;
 };
 
 const REQUEST_SELECT = `
-  SELECT r.*, c.name AS company_name, s.name AS assigned_name
+  SELECT r.*, c.name AS company_name, s.name AS assigned_name,
+    (SELECT count(*)::int FROM client_sessions cs WHERE cs.request_id = r.id AND cs.done_at IS NOT NULL) AS sessions_done,
+    (SELECT count(*)::int FROM client_sessions cs WHERE cs.request_id = r.id) AS sessions_total,
+    (SELECT min(starts_at) FROM client_sessions cs WHERE cs.request_id = r.id AND cs.done_at IS NULL) AS next_session
   FROM support_requests r
   JOIN companies c ON c.id = r.company_id
   LEFT JOIN staff s ON s.id = r.assigned_to`;
 
 export async function listRequests(status: Status | "open" | "all"): Promise<RequestRow[]> {
   const where =
-    status === "all" ? "" : status === "open" ? "WHERE r.status <> 'closed'" : "WHERE r.status = $1";
+    status === "all" ? "" : status === "open" ? "WHERE r.status NOT IN ('completed', 'closed')" : "WHERE r.status = $1";
   const params = status === "all" || status === "open" ? [] : [status];
   const { rows } = await pool.query<RequestRow>(
-    `${REQUEST_SELECT} ${where} ORDER BY (r.crisis AND r.status <> 'closed') DESC, (r.status = 'new') DESC, r.created_at DESC LIMIT 500`,
+    `${REQUEST_SELECT} ${where} ORDER BY (r.crisis AND r.status NOT IN ('completed', 'closed')) DESC, (r.status = 'new') DESC, r.created_at DESC LIMIT 500`,
     params,
   );
   return rows;
@@ -84,7 +94,7 @@ export async function statusCounts(): Promise<Record<Status, number>> {
   const { rows } = await pool.query<{ status: Status; n: number }>(
     "SELECT status, count(*)::int AS n FROM support_requests GROUP BY status",
   );
-  const counts = { new: 0, contacted: 0, scheduled: 0, closed: 0 };
+  const counts = { new: 0, contacted: 0, scheduled: 0, completed: 0, closed: 0 };
   for (const r of rows) counts[r.status] = r.n;
   return counts;
 }
@@ -119,6 +129,16 @@ export async function listCompanies(): Promise<CompanyWithCounts[]> {
        count(r.id) FILTER (WHERE r.created_at > now() - interval '30 days')::int AS last_30_days
      FROM companies c LEFT JOIN support_requests r ON r.company_id = c.id
      GROUP BY c.id ORDER BY c.active DESC, c.name`,
+  );
+  return rows;
+}
+
+export type ClientSession = { id: string; starts_at: Date; done_at: Date | null };
+
+export async function listSessions(requestId: string): Promise<ClientSession[]> {
+  const { rows } = await pool.query<ClientSession>(
+    "SELECT id, starts_at, done_at FROM client_sessions WHERE request_id = $1 ORDER BY starts_at",
+    [requestId],
   );
   return rows;
 }

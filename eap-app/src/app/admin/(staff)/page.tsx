@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { assignWaitingAndNotify } from "@/lib/assign";
-import { listRequests, statusCounts, STATUSES, STATUS_LABELS, type Status } from "@/lib/data";
+import { FINISHED, listRequests, SESSIONS_PER_CLIENT, statusCounts, STATUSES, STATUS_LABELS, type Status } from "@/lib/data";
 import { age, formatDate, isOverdue } from "../format";
 
 type Filter = Status | "open" | "all";
@@ -21,7 +21,7 @@ export default async function RequestsPage({
   });
   const [requests, counts] = await Promise.all([listRequests(filter), statusCounts()]);
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
-  const countFor = (f: Filter) => (f === "all" ? total : f === "open" ? total - counts.closed : counts[f]);
+  const countFor = (f: Filter) => (f === "all" ? total : f === "open" ? total - counts.closed - counts.completed : counts[f]);
   const now = Date.now();
 
   return (
@@ -63,13 +63,14 @@ export default async function RequestsPage({
                 <th>Contact by</th>
                 <th>Language</th>
                 <th>Status</th>
+                <th>Sessions</th>
                 <th>Assigned</th>
                 <th>Received</th>
               </tr>
             </thead>
             <tbody>
               {requests.map((r) => (
-                <tr key={r.id} className={r.crisis && r.status !== "closed" ? "crisis-row" : undefined}>
+                <tr key={r.id} className={r.crisis && !FINISHED.includes(r.status) ? "crisis-row" : undefined}>
                   <td>
                     <Link className="rowlink" href={`/admin/requests/${r.id}`}>{r.first_name}</Link>
                     {r.crisis && <> <span className="pill pill-crisis">Crisis</span></>}
@@ -78,7 +79,16 @@ export default async function RequestsPage({
                   <td>{r.contact_method}</td>
                   <td>{r.language}</td>
                   <td><span className={`pill pill-${r.status}`}>{STATUS_LABELS[r.status]}</span></td>
-                  <td>{r.assigned_name ?? <span className={r.status === "closed" ? "small" : "overdue"}>Needs assigning</span>}</td>
+                  <td className="age">
+                    {r.sessions_done} / {SESSIONS_PER_CLIENT} done
+                    {r.next_session &&
+                      (r.next_session.getTime() < now ? (
+                        <div className="overdue">{formatDate(r.next_session)} not marked done</div>
+                      ) : (
+                        <div className="small">next {formatDate(r.next_session)}</div>
+                      ))}
+                  </td>
+                  <td>{r.assigned_name ?? <span className={FINISHED.includes(r.status) ? "small" : "overdue"}>Needs assigning</span>}</td>
                   <td className="age">
                     {formatDate(r.created_at)}
                     {r.status === "new" && (

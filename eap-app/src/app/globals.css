@@ -205,3 +205,21 @@ form.sections { gap: 28px; }
 fieldset[aria-invalid="true"] .choice span { border-color: var(--error); }
 .pill-crisis { background: var(--error); color: var(--surface); }
 tr.crisis-row td:first-child { box-shadow: inset 4px 0 0 var(--error); }
+
+/* Sessions */
+.pill-completed { background: var(--green-soft); color: var(--green-strong); }
+.slot.booked { border-color: var(--green); border-style: dashed; }
+ol.sessions { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.session { border-top: 1px solid var(--line); padding: 12px 0; }
+.session-row { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; }
+.session-n { font-weight: 600; color: var(--ink); min-width: 78px; }
+.session.done .session-when { color: var(--muted); }
+.session-row input[type="datetime-local"], .add-session input[type="datetime-local"] {
+  font: inherit; font-size: 15px; color: var(--text); background: var(--field);
+  border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; max-width: 100%;
+}
+.small-consent { font-size: 13px; color: var(--muted); flex-basis: 100%; }
+.small-consent input { width: 15px; height: 15px; margin-top: 2px; }
+.add-session { gap: 8px; border-top: 1px solid var(--line); padding-top: 14px; }
+.client-email { display: grid; gap: 6px; background: var(--bg); border-radius: 8px; padding: 12px 14px; }
+.client-email input { max-width: 320px; }

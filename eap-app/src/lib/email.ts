@@ -50,3 +50,44 @@ export function employeeConfirmation(to: string, firstName: string): Mail {
     text: `Hi ${firstName},\n\nThank you for reaching out. We've received your request and someone from our team will contact you within 24 hours, in the way you asked.\n\nEverything you share with us is confidential. Your employer is not told who uses the programme.\n\nIf you need urgent help before we reach you, call 112 (emergency) or the Linka první psychické pomoci on 116 123 (free, 24/7).\n\nPrague Integration\n+420 608 573 256\ncontact@pragueintegration.cz\n`,
   };
 }
+
+export type SessionEmail = {
+  to: string;
+  firstName: string;
+  kind: "booked" | "moved" | "cancelled";
+  when: string; // e.g. "Tuesday 30 September 2026 at 14:00"
+  number: number;
+  total: number;
+  format: string;
+  therapistName: string | null;
+};
+
+// Contains only practical details, nothing about why the person is coming.
+export function sessionConfirmation(s: SessionEmail): Mail {
+  const where =
+    s.format === "In person in Prague"
+      ? "Where: Prague Integration, Mezibranská 4, 110 00 Prague 1"
+      : s.format === "Online"
+        ? "Where: online. Your therapist will send you the details for joining."
+        : "Your therapist will let you know whether you'll meet online or in person.";
+  const withWhom = s.therapistName ? ` with ${s.therapistName}` : "";
+  const subject = {
+    booked: `Your session is booked: ${s.when}`,
+    moved: `Your session has moved: ${s.when}`,
+    cancelled: `Your session on ${s.when} is cancelled`,
+  }[s.kind];
+  const lead = {
+    booked: `your session${withWhom} is booked for:`,
+    moved: `your session${withWhom} has moved to:`,
+    cancelled: `your session${withWhom} on the date below has been cancelled:`,
+  }[s.kind];
+  const body =
+    s.kind === "cancelled"
+      ? `\n\nWe'll be in touch to find a new time.`
+      : `\nSession ${s.number} of ${s.total}\n${where}`;
+  return {
+    to: s.to,
+    subject: `${subject} – Prague Integration`,
+    text: `Hi ${s.firstName},\n\n${lead[0].toUpperCase()}${lead.slice(1)}\n\n${s.when} (Prague time)${body}\n\nIf you need to change the time, reply to this email or call +420 608 573 256.\n\nPrague Integration\ncontact@pragueintegration.cz\n`,
+  };
+}

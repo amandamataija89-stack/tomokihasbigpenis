@@ -68,3 +68,17 @@ ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS crisis boolean NOT NULL DE
 ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS age_range text NOT NULL DEFAULT '';
 ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS gender text NOT NULL DEFAULT '';
 ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS location text NOT NULL DEFAULT '';
+
+-- Sessions: each client gets up to 5; the case is completed when all are done.
+ALTER TABLE support_requests DROP CONSTRAINT IF EXISTS support_requests_status_check;
+ALTER TABLE support_requests ADD CONSTRAINT support_requests_status_check
+  CHECK (status IN ('new', 'contacted', 'scheduled', 'completed', 'closed'));
+
+CREATE TABLE IF NOT EXISTS client_sessions (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  request_id uuid NOT NULL REFERENCES support_requests(id) ON DELETE CASCADE,
+  starts_at  timestamptz NOT NULL,
+  done_at    timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS client_sessions_request_idx ON client_sessions (request_id, starts_at);

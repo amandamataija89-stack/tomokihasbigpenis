@@ -19,3 +19,21 @@ export function age(d: Date, now = Date.now()): string {
 // First contact is due within 24 hours, or 2 hours for someone who said they need help urgently.
 export const isOverdue = (d: Date, now = Date.now(), crisis = false) =>
   now - d.getTime() > (crisis ? 2 : 24) * 3600_000;
+
+// Value for an <input type="datetime-local">, in Prague time: "2026-09-30T14:00".
+export function toPragueInput(d: Date): string {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Europe/Prague",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    })
+      .formatToParts(d)
+      .map((p) => [p.type, p.value]),
+  );
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
+}

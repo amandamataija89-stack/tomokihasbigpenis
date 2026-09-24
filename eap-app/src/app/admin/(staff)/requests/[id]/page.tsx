@@ -1,22 +1,27 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { speaks } from "@/lib/assign";
-import { getRequest, listNotes, listStaffWithLoad, STATUSES, STATUS_LABELS } from "@/lib/data";
+import { getRequest, listNotes, listSessions, listStaffWithLoad, STATUSES, STATUS_LABELS } from "@/lib/data";
 import { addNote, deleteRequest, updateRequest } from "../../../actions";
 import { formatDate } from "../../../format";
+import { Sessions } from "./Sessions";
 
 export default async function RequestPage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ saved?: string; confirmDelete?: string }>;
+  searchParams: Promise<{ saved?: string; confirmDelete?: string; session?: string }>;
 }) {
   const { id } = await params;
   const sp = await searchParams;
   const r = await getRequest(id);
   if (!r) notFound();
-  const [notes, staff] = await Promise.all([listNotes(id), listStaffWithLoad(undefined, false)]);
+  const [notes, staff, sessions] = await Promise.all([
+    listNotes(id),
+    listStaffWithLoad(undefined, false),
+    listSessions(id),
+  ]);
   const label = (s: (typeof staff)[number]) => {
     if (s.id === r.assigned_to) return `${s.name} (current)`;
     const load = `${s.assignedThisMonth}/${s.capacity} this month`;
@@ -37,30 +42,33 @@ export default async function RequestPage({
       {sp.saved && <p className="flash" role="status">Saved.</p>}
 
       <div className="detail">
-        <section className="card stack">
-          <h2>Request</h2>
-          <dl className="facts">
-            <dt>Urgent?</dt><dd>{r.crisis ? <b className="overdue">Yes, crisis</b> : "No"}</dd>
-            <dt>Company</dt><dd>{r.company_name}</dd>
-            <dt>Age</dt><dd>{r.age_range || "—"}</dd>
-            <dt>Gender</dt><dd>{r.gender || "—"}</dd>
-            <dt>Based in</dt><dd>{r.location || "—"}</dd>
-            <dt>Email</dt><dd className="mono">{r.email}</dd>
-            <dt>Phone</dt><dd className="mono">{r.phone || "—"}</dd>
-            <dt>Contact by</dt><dd>{r.contact_method}</dd>
-            <dt>Language</dt><dd>{r.language}</dd>
-            <dt>Online / in person</dt><dd>{r.format}</dd>
-            <dt>Support with</dt><dd>{r.topics.length ? r.topics.join(", ") : "Not said"}</dd>
-            <dt>Received</dt><dd>{formatDate(r.created_at)}</dd>
-            <dt>Consent</dt><dd>Given {formatDate(r.consent_at)}</dd>
-          </dl>
-          {r.message && (
-            <>
-              <h3 style={{ fontSize: 16 }}>Their message</h3>
-              <p className="message">{r.message}</p>
-            </>
-          )}
-        </section>
+        <div className="stack" style={{ gap: 20 }}>
+          <section className="card stack">
+            <h2>Request</h2>
+            <dl className="facts">
+              <dt>Urgent?</dt><dd>{r.crisis ? <b className="overdue">Yes, crisis</b> : "No"}</dd>
+              <dt>Company</dt><dd>{r.company_name}</dd>
+              <dt>Age</dt><dd>{r.age_range || "—"}</dd>
+              <dt>Gender</dt><dd>{r.gender || "—"}</dd>
+              <dt>Based in</dt><dd>{r.location || "—"}</dd>
+              <dt>Email</dt><dd className="mono">{r.email}</dd>
+              <dt>Phone</dt><dd className="mono">{r.phone || "—"}</dd>
+              <dt>Contact by</dt><dd>{r.contact_method}</dd>
+              <dt>Language</dt><dd>{r.language}</dd>
+              <dt>Online / in person</dt><dd>{r.format}</dd>
+              <dt>Support with</dt><dd>{r.topics.length ? r.topics.join(", ") : "Not said"}</dd>
+              <dt>Received</dt><dd>{formatDate(r.created_at)}</dd>
+              <dt>Consent</dt><dd>Given {formatDate(r.consent_at)}</dd>
+            </dl>
+            {r.message && (
+              <>
+                <h3 style={{ fontSize: 16 }}>Their message</h3>
+                <p className="message">{r.message}</p>
+              </>
+            )}
+          </section>
+          <Sessions requestId={r.id} sessions={sessions} clientEmail={r.email} error={sp.session} />
+        </div>
 
         <div className="stack" style={{ gap: 20 }}>
           <form action={updateRequest.bind(null, r.id)} className="card form">
@@ -95,7 +103,7 @@ export default async function RequestPage({
             </form>
             {notes.map((n) => (
               <div className="note" key={n.id}>
-                <span className="meta">{n.staff_name ?? "Former staff"} · {formatDate(n.created_at)}</span>
+                <span className="meta">{n.staff_name ?? "Automatic"} · {formatDate(n.created_at)}</span>
                 <span className="body">{n.body}</span>
               </div>
             ))}

@@ -38,6 +38,27 @@ Each therapist has a limit of new clients per calendar month (5 by default;
   email). Therapists added on the Team page can't sign in until given a
   password with `npm run staff:create -- <their email> "<name>"`.
 
+## Sessions
+
+Each client gets up to 5 sessions. On a case, under **Sessions**:
+
+- Book each session with its own date and time. Booking the first one moves
+  the case to "Session booked".
+- Move a session to a new time, or remove it.
+- Press **Mark done** after each session happens. When all 5 are done the
+  case becomes **Completed** (and leaves the Open list). Undo puts it back.
+- A session whose date has passed without being marked done shows in red,
+  on the case and in the requests list.
+- **The client is emailed automatically** when a session is booked, moved or
+  removed. Each form has a tick box (on by default) to skip the email. The
+  email gives the date and time (Prague time), the therapist's name,
+  session number (e.g. 2 of 5) and where to meet (the Mezibranská 4 address for
+  in-person sessions). It never mentions why the person is coming.
+- **Session emails go to** shows the client's address from their request.
+  Staff can change it there, for example to a personal address.
+
+The number of sessions is `SESSIONS_PER_CLIENT` in `src/lib/data.ts`.
+
 Employers never see who registered. The Companies page shows request counts
 only, which is what you can report back to a client.
 
@@ -48,7 +69,7 @@ only, which is what you can report back to a client.
 | `/` | Employee | Enter company code |
 | `/join/ABCD-EFGH` | Employee | Request form for that company |
 | `/admin` | Staff | Requests, filterable by status; new ones older than 24 h show in red |
-| `/admin/requests/<id>` | Staff | Full request, status, assignee, notes, delete |
+| `/admin/requests/<id>` | Staff | Full request, sessions, status, assignee, notes, delete |
 | `/admin/team` | Staff | Therapists, their languages, monthly limit and this month's count |
 | `/admin/companies` | Staff | Add a company, copy its link, pause it, see request counts |
 
@@ -119,6 +140,10 @@ passwords and form validation).
   only emails, it doesn't phone anyone.
 
 ## Not included yet
+
+- Video-call links in session emails (the email says the therapist will send
+  joining details)
+- Session emails in Czech (they're in English)
 
 - Czech-language version of the pages
 - Online booking of session times
