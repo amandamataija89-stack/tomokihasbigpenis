@@ -9,7 +9,7 @@ import { generateCompanyCode } from "@/lib/codes";
 import { SESSIONS_PER_CLIENT, STATUSES, STATUS_LABELS, type Status } from "@/lib/data";
 import { pool } from "@/lib/db";
 import { LATE_CANCEL_HOURS } from "@/lib/deadlines";
-import { sendEmail, sessionConfirmation, therapistAlert, type SessionEmail } from "@/lib/email";
+import { emailProblem, sendEmail, sessionConfirmation, therapistAlert, type SessionEmail } from "@/lib/email";
 import { clientMessageLink, MAX_MESSAGE_LENGTH, sendStaffMessage } from "@/lib/messages";
 import { acceptOffer, declineOffer, offerTo, takeFromPool } from "@/lib/offers";
 import { verifyPassword } from "@/lib/password";
@@ -213,16 +213,33 @@ export async function addStaff(_prev: { error?: string; done?: string }, formDat
     [email, name, role, role === "counsellor" || f.takesClients, f.capacity ?? DEFAULT_MONTHLY_CAPACITY, f.languages],
   );
   if (!rows[0]) return { error: `${email} already has a login. Use "Resend invitation" on their card instead.` };
-  await sendInvite(rows[0].id, me.name);
+  const problem = await inviteProblem(rows[0].id, me.name);
   await assignWaitingAndNotify();
   revalidatePath("/admin/team");
+  if (problem) return { error: `${name} is added, but no invitation was sent. ${problem} Then press "Resend invitation" on their card.` };
+  if (!process.env.RESEND_API_KEY)
+    return {
+      error: `${name} is added, but email isn't connected yet (RESEND_API_KEY is missing in Vercel), so no invitation was sent. Once it's connected, press "Resend invitation" on their card.`,
+    };
   return { done: `Invitation emailed to ${email}.` };
+}
+
+// Sends an invitation; returns why it couldn't be sent instead of crashing the page.
+async function inviteProblem(staffId: string, invitedBy: string): Promise<string | null> {
+  try {
+    await sendInvite(staffId, invitedBy);
+    return null;
+  } catch (err) {
+    console.error("EAP invite email failed:", err);
+    return emailProblem(err);
+  }
 }
 
 export async function resendInvite(staffId: string) {
   const me = await requireManager();
-  await sendInvite(staffId, me.name);
-  redirect("/admin/team?invited=1");
+  if (!process.env.RESEND_API_KEY) redirect("/admin/team?noemail=1");
+  const problem = await inviteProblem(staffId, me.name);
+  redirect(problem ? `/admin/team?emailerror=${encodeURIComponent(problem)}` : "/admin/team?invited=1");
 }
 
 export async function updateStaff(staffId: string, formData: FormData) {
@@ -558,8 +575,9 @@ type SetupState = { error?: string; name?: string; email?: string };
 export async function setupFirstAdmin(_prev: SetupState, formData: FormData): Promise<SetupState> {
   // Echoed back with any error, so the form keeps what was typed.
   const keep = { name: String(formData.get("name") ?? ""), email: String(formData.get("email") ?? "") };
-  const expected = process.env.SETUP_CODE ?? "";
-  const given = String(formData.get("setupCode") ?? "");
+  // Stray spaces around a pasted code shouldn't lock anyone out.
+  const expected = (process.env.SETUP_CODE ?? "").trim();
+  const given = String(formData.get("setupCode") ?? "").trim();
   const a = Buffer.from(given);
   const b = Buffer.from(expected);
   if (!expected) return { error: "Add a SETUP_CODE setting in Vercel first (any code you make up), then redeploy.", ...keep };

@@ -12,6 +12,10 @@ if (!/^postgres(ql)?:\/\//.test(url)) {
   console.error("DATABASE_URL doesn't look like a database address. It should start with postgresql:// (copy it from Neon → Connect).");
   process.exit(1);
 }
+if (/\/\/[^:/]+:\*+@/.test(url)) {
+  console.error("The password in DATABASE_URL is hidden with stars (****). In Neon → Connect, click 'Show password' first, then 'Copy snippet', and paste that into Vercel.");
+  process.exit(1);
+}
 const where = url.replace(/\/\/[^@]*@/, "//***@"); // never print the password
 try {
   const sql = await readFile(new URL("../db/schema.sql", import.meta.url), "utf8");

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { employeeConfirmation, newMessageForClient, newReplyForStaff, sessionConfirmation, sessionReminder } from "./email";
+import { emailProblem, employeeConfirmation, newMessageForClient, newReplyForStaff, sessionConfirmation, sessionReminder } from "./email";
 
 const base = {
   to: "jana@example.com",
@@ -63,5 +63,19 @@ describe("message notifications", () => {
     expect(employeeConfirmation("a@example.com", "Nela", false, "https://x/messages/t").text).toContain("https://x/messages/t");
     const booked = sessionConfirmation({ ...base, kind: "booked", format: "Online", messageLink: "https://x/messages/t" });
     expect(booked.text).toContain("message us on your private page (https://x/messages/t)");
+  });
+});
+
+describe("emailProblem", () => {
+  it("explains a rejected API key", () => {
+    expect(emailProblem(new Error('Resend returned 401: {"message":"API key is invalid"}'))).toMatch(/RESEND_API_KEY/);
+  });
+  it("explains an unverified domain", () => {
+    expect(emailProblem(new Error('Resend returned 403: {"message":"The pragueintegration.cz domain is not verified"}'))).toMatch(
+      /isn't verified/,
+    );
+  });
+  it("never shows a key", () => {
+    expect(emailProblem(new Error("Resend returned 500: bad re_abc123XYZ"))).not.toContain("re_abc123XYZ");
   });
 });
