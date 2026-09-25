@@ -1,5 +1,8 @@
 import { timingSafeEqual } from "node:crypto";
+import { assignWaitingAndNotify } from "@/lib/assign";
+import { releaseExpiredOffers, remindPendingOffers, sendDailyDigest } from "@/lib/offers";
 import { warnOverdue } from "@/lib/overdue";
+import { sendSessionReminders } from "@/lib/session-reminders";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +14,11 @@ export async function GET(request: Request) {
   if (!secret || given.length !== expected.length || !timingSafeEqual(given, expected)) {
     return new Response("Unauthorized", { status: 401 });
   }
-  const result = await warnOverdue();
-  return Response.json(result);
+  const offerReminders = await remindPendingOffers();
+  const released = await releaseExpiredOffers();
+  const assigned = (await assignWaitingAndNotify()).length; // e.g. places open at the start of a month
+  const reminders = await warnOverdue();
+  const digestSent = await sendDailyDigest();
+  const sessionReminders = await sendSessionReminders();
+  return Response.json({ offerReminders, released, assigned, reminders, digestSent, sessionReminders });
 }

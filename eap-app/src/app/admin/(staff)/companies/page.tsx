@@ -1,9 +1,11 @@
 import { headers } from "next/headers";
+import { requireManager } from "@/lib/auth";
 import { listCompanies } from "@/lib/data";
 import { setCompanyActive } from "../../actions";
 import { NewCompanyForm } from "./NewCompanyForm";
 
 export default async function CompaniesPage() {
+  await requireManager();
   const companies = await listCompanies();
   const h = await headers();
   const base = process.env.APP_URL ?? `${h.get("x-forwarded-proto") ?? "http"}://${h.get("host")}`;

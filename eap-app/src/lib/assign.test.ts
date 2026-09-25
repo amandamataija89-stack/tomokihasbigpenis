@@ -79,3 +79,11 @@ describe("crisis cases", () => {
     expect(chooseTherapist([t("Anna", 0, { capacity: 0 }), t("Boris", 4)], "English", true).therapist?.name).toBe("Boris");
   });
 });
+
+describe("declined offers", () => {
+  it("are not offered again to someone who declined", () => {
+    expect(chooseTherapist([t("Anna", 0), t("Boris", 3)], "English", false, ["Anna"]).therapist?.name).toBe("Boris");
+    expect(pick([t("Anna", 0)].filter(() => false))).toBe("no-therapists");
+    expect(chooseTherapist([t("Anna", 0)], "English", false, ["Anna"])).toMatchObject({ reason: "no-therapists" });
+  });
+});

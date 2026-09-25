@@ -33,12 +33,12 @@ export async function findCompanyByCode(code: string): Promise<Company | null> {
 export async function insertRequest(companyId: string, r: RequestInput): Promise<string> {
   const { rows } = await pool.query<{ id: string }>(
     `INSERT INTO support_requests
-       (company_id, first_name, email, phone, contact_method, language, format, topics, message,
-        crisis, age_range, gender, location, consent_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, now()) RETURNING id`,
+       (company_id, first_name, full_name, email, phone, contact_method, language, format, topics, message,
+        crisis, age_range, gender, location, consent_at, consent_contact_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, now(), now()) RETURNING id`,
     [
-      companyId, r.firstName, r.email, r.phone, r.contactMethod, r.language, r.format, r.topics, r.message,
-      r.crisis, r.ageRange, r.gender, r.location,
+      companyId, r.firstName, r.fullName, r.email, r.phone, r.contactMethod, r.language, r.format, r.topics,
+      r.message, r.crisis, r.ageRange, r.gender, r.location,
     ],
   );
   return rows[0].id;
@@ -46,7 +46,8 @@ export async function insertRequest(companyId: string, r: RequestInput): Promise
 
 export type RequestRow = {
   id: string;
-  first_name: string;
+  first_name: string; // the nickname the client gave
+  full_name: string;
   email: string;
   phone: string;
   contact_method: string;
@@ -59,7 +60,12 @@ export type RequestRow = {
   gender: string;
   location: string;
   consent_at: Date;
+  consent_contact_at: Date | null;
   status: Status;
+  accepted_at: Date | null;
+  respond_by: Date | null;
+  in_pool: boolean;
+  declined_by: string[];
   assigned_to: string | null;
   assigned_name: string | null;
   company_id: string;
@@ -80,24 +86,44 @@ const REQUEST_SELECT = `
   JOIN companies c ON c.id = r.company_id
   LEFT JOIN staff s ON s.id = r.assigned_to`;
 
-export async function listRequests(status: Status | "open" | "all"): Promise<RequestRow[]> {
-  const where =
-    status === "all" ? "" : status === "open" ? "WHERE r.status NOT IN ('completed', 'closed')" : "WHERE r.status = $1";
-  const params = status === "all" || status === "open" ? [] : [status];
+export type Filter = Status | "open" | "all" | "pool" | "awaiting";
+
+// SQL condition for each list filter. "pool" is cases waiting for someone to take or assign them.
+const FILTER_SQL: Record<"open" | "pool" | "awaiting", string> = {
+  open: "r.status NOT IN ('completed', 'closed')",
+  pool: "r.assigned_to IS NULL AND r.status = 'new'",
+  awaiting: "r.assigned_to IS NOT NULL AND r.accepted_at IS NULL AND r.status = 'new'",
+};
+
+/** Cases for a list. With `onlyFor`, just that counsellor's own cases (the pool is everyone's). */
+export async function listRequests(filter: Filter, onlyFor?: string): Promise<RequestRow[]> {
+  const params: unknown[] = [];
+  const where: string[] = [];
+  if (filter === "open" || filter === "pool" || filter === "awaiting") where.push(FILTER_SQL[filter]);
+  else if (filter !== "all") where.push(`r.status = $${params.push(filter)}`);
+  if (onlyFor && filter !== "pool") where.push(`r.assigned_to = $${params.push(onlyFor)}`);
   const { rows } = await pool.query<RequestRow>(
-    `${REQUEST_SELECT} ${where} ORDER BY (r.crisis AND r.status NOT IN ('completed', 'closed')) DESC, (r.status = 'new') DESC, r.created_at DESC LIMIT 500`,
+    `${REQUEST_SELECT} ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
+     ORDER BY (r.crisis AND r.status NOT IN ('completed', 'closed')) DESC, (r.status = 'new') DESC, r.created_at DESC
+     LIMIT 500`,
     params,
   );
   return rows;
 }
 
-export async function statusCounts(): Promise<Record<Status, number>> {
-  const { rows } = await pool.query<{ status: Status; n: number }>(
-    "SELECT status, count(*)::int AS n FROM support_requests GROUP BY status",
+export async function filterCounts(onlyFor?: string): Promise<Record<Filter, number>> {
+  const mine = onlyFor ? "AND assigned_to = $1" : "";
+  const { rows } = await pool.query<Record<string, number>>(
+    `SELECT
+       count(*) FILTER (WHERE TRUE ${mine})::int AS all,
+       count(*) FILTER (WHERE status NOT IN ('completed', 'closed') ${mine})::int AS open,
+       count(*) FILTER (WHERE assigned_to IS NULL AND status = 'new')::int AS pool,
+       count(*) FILTER (WHERE assigned_to IS NOT NULL AND accepted_at IS NULL AND status = 'new' ${mine})::int AS awaiting,
+       ${STATUSES.map((s) => `count(*) FILTER (WHERE status = '${s}' ${mine})::int AS ${s}`).join(", ")}
+     FROM support_requests`,
+    onlyFor ? [onlyFor] : [],
   );
-  const counts = { new: 0, contacted: 0, scheduled: 0, in_progress: 0, completed: 0, closed: 0 };
-  for (const r of rows) counts[r.status] = r.n;
-  return counts;
+  return rows[0] as Record<Filter, number>;
 }
 
 export async function getRequest(id: string): Promise<RequestRow | null> {
@@ -134,11 +160,12 @@ export async function listCompanies(): Promise<CompanyWithCounts[]> {
   return rows;
 }
 
-export type ClientSession = { id: string; starts_at: Date; done_at: Date | null };
+// done_at is set for sessions that happened and for late cancellations: both count towards the 5.
+export type ClientSession = { id: string; starts_at: Date; done_at: Date | null; late_cancelled: boolean };
 
 export async function listSessions(requestId: string): Promise<ClientSession[]> {
   const { rows } = await pool.query<ClientSession>(
-    "SELECT id, starts_at, done_at FROM client_sessions WHERE request_id = $1 ORDER BY starts_at",
+    "SELECT id, starts_at, done_at, late_cancelled FROM client_sessions WHERE request_id = $1 ORDER BY starts_at",
     [requestId],
   );
   return rows;

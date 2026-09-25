@@ -41,7 +41,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ e
           {error && (
             <span id="code-err" className="err">
               {error === "unknown"
-                ? "We couldn't find that code. Check it with your HR team, or call us on +420 608 573 256."
+                ? "We couldn't find that code, or it's no longer active. Check it with your HR team, or contact us on +420 608 573 256 or contact@pragueintegration.cz and we'll help you."
                 : "Company codes have 8 letters and numbers, like ABCD-EFGH."}
             </span>
           )}

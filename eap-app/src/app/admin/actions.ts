@@ -2,17 +2,39 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { endSession, requireStaff, startSession } from "@/lib/auth";
+import { endSession, isManager, requireManager, requireStaff, ROLES, startSession, type Role, type Staff } from "@/lib/auth";
 import { inviteFeedback } from "@/lib/feedback";
 import { assignWaitingAndNotify, DEFAULT_MONTHLY_CAPACITY } from "@/lib/assign";
 import { generateCompanyCode } from "@/lib/codes";
 import { SESSIONS_PER_CLIENT, STATUSES, STATUS_LABELS, type Status } from "@/lib/data";
 import { pool } from "@/lib/db";
+import { LATE_CANCEL_HOURS } from "@/lib/deadlines";
 import { sendEmail, sessionConfirmation, type SessionEmail } from "@/lib/email";
+import { acceptOffer, declineOffer, offerTo, takeFromPool } from "@/lib/offers";
 import { verifyPassword } from "@/lib/password";
+import { MIN_PASSWORD_LENGTH, sendInvite, sendPasswordReset, setPasswordWithToken } from "@/lib/staff-accounts";
 import { LANGUAGES } from "@/lib/request-form";
 
 // Every action checks the session itself: server actions are reachable without the page.
+
+/**
+ * The signed-in staff member, if they may work on this case: admins and coordinators on any case,
+ * counsellors only on their own. Anyone else is sent back to their list.
+ */
+async function requireCase(requestId: string): Promise<{ staff: Staff; assignedTo: string | null; acceptedAt: Date | null }> {
+  const staff = await requireStaff();
+  const { rows } = await pool.query<{ assigned_to: string | null; accepted_at: Date | null }>(
+    "SELECT assigned_to, accepted_at FROM support_requests WHERE id = $1",
+    [requestId],
+  );
+  if (!rows[0] || (!isManager(staff) && rows[0].assigned_to !== staff.id)) redirect("/admin");
+  return { staff, assignedTo: rows[0].assigned_to, acceptedAt: rows[0].accepted_at };
+}
+
+// A counsellor who starts working on an offered case (books a session, changes status) has accepted it.
+async function acceptIfPending(requestId: string, c: Awaited<ReturnType<typeof requireCase>>) {
+  if (c.assignedTo === c.staff.id && !c.acceptedAt) await acceptOffer(requestId, c.staff.id);
+}
 
 export async function login(
   _prev: { error?: string; email?: string },
@@ -24,6 +46,12 @@ export async function login(
     "SELECT id, password_hash FROM staff WHERE email = $1",
     [email],
   );
+  if (rows[0]?.password_hash === "!") {
+    return {
+      error: "You haven't set a password yet. Use the link in your invitation email, or \"Forgot your password?\" below.",
+      email,
+    };
+  }
   const ok = rows[0] ? verifyPassword(password, rows[0].password_hash) : false;
   if (!ok) {
     await new Promise((r) => setTimeout(r, 400));
@@ -39,11 +67,14 @@ export async function logout() {
 }
 
 export async function updateRequest(requestId: string, formData: FormData) {
-  const staff = await requireStaff();
+  const c = await requireCase(requestId);
+  const staff = c.staff;
   const status = String(formData.get("status") ?? "") as Status;
   const assignedRaw = String(formData.get("assignedTo") ?? "");
-  const assignedTo = /^[0-9a-f-]{36}$/i.test(assignedRaw) ? assignedRaw : null;
+  // Only admins and coordinators assign; a counsellor's form has no assignment field.
+  const assignedTo = !isManager(staff) ? c.assignedTo : /^[0-9a-f-]{36}$/i.test(assignedRaw) ? assignedRaw : null;
   if (!STATUSES.includes(status)) throw new Error("Unknown status");
+  await acceptIfPending(requestId, c);
 
   const crisis = formData.get("crisis") === "yes";
   const { rows } = await pool.query<{ status: Status; assigned_to: string | null; crisis: boolean }>(
@@ -51,16 +82,11 @@ export async function updateRequest(requestId: string, formData: FormData) {
     [requestId],
   );
   if (!rows[0]) redirect("/admin");
-  // A reassignment counts towards the new therapist's monthly total from today.
-  await pool.query(
-    `UPDATE support_requests SET status = $2, assigned_to = $3, crisis = $4, updated_at = now(),
-       overdue_warned_at = CASE WHEN assigned_to IS DISTINCT FROM $3::uuid THEN NULL ELSE overdue_warned_at END,
-       assigned_at = CASE WHEN $3::uuid IS NULL THEN NULL
-                          WHEN assigned_to IS DISTINCT FROM $3::uuid THEN now()
-                          ELSE assigned_at END
-     WHERE id = $1`,
-    [requestId, status, assignedTo, crisis],
-  );
+  await pool.query("UPDATE support_requests SET status = $2, crisis = $3, updated_at = now() WHERE id = $1", [
+    requestId,
+    status,
+    crisis,
+  ]);
   if (rows[0].crisis !== crisis) {
     await pool.query("INSERT INTO request_notes (request_id, staff_id, body) VALUES ($1, $2, $3)", [
       requestId,
@@ -69,12 +95,16 @@ export async function updateRequest(requestId: string, formData: FormData) {
     ]);
   }
   if (rows[0].assigned_to !== assignedTo) {
-    const { rows: names } = await pool.query<{ name: string }>("SELECT name FROM staff WHERE id = $1", [assignedTo]);
-    await pool.query("INSERT INTO request_notes (request_id, staff_id, body) VALUES ($1, $2, $3)", [
-      requestId,
-      staff.id,
-      names[0] ? `Assigned to ${names[0].name}.` : "Unassigned.",
-    ]);
+    // A reassignment counts towards the new counsellor's monthly total from today.
+    if (assignedTo) await offerTo(requestId, assignedTo, staff.id, formData.get("agreed") === "yes");
+    else {
+      await pool.query(
+        `UPDATE support_requests SET assigned_to = NULL, assigned_at = NULL, accepted_at = NULL, respond_by = NULL,
+           in_pool = true, updated_at = now() WHERE id = $1`,
+        [requestId],
+      );
+      await note(requestId, staff.id, "Unassigned and put in the pool.");
+    }
   }
   if (rows[0].status !== status) {
     await pool.query("INSERT INTO request_notes (request_id, staff_id, body) VALUES ($1, $2, $3)", [
@@ -88,7 +118,7 @@ export async function updateRequest(requestId: string, formData: FormData) {
 }
 
 export async function addNote(requestId: string, formData: FormData) {
-  const staff = await requireStaff();
+  const { staff } = await requireCase(requestId);
   const body = String(formData.get("body") ?? "").trim().slice(0, 4000);
   if (body) {
     await pool.query("INSERT INTO request_notes (request_id, staff_id, body) VALUES ($1, $2, $3)", [
@@ -102,14 +132,14 @@ export async function addNote(requestId: string, formData: FormData) {
 }
 
 export async function deleteRequest(requestId: string, formData: FormData) {
-  await requireStaff();
+  await requireManager();
   if (formData.get("confirm") !== "yes") redirect(`/admin/requests/${requestId}?confirmDelete=1`);
   await pool.query("DELETE FROM support_requests WHERE id = $1", [requestId]);
   redirect("/admin?deleted=1");
 }
 
 export async function createCompany(_prev: { error?: string }, formData: FormData): Promise<{ error?: string }> {
-  await requireStaff();
+  await requireManager();
   const name = String(formData.get("name") ?? "").trim().slice(0, 200);
   const hrContact = String(formData.get("hrContact") ?? "").trim().slice(0, 300);
   if (!name) return { error: "Enter the company's name." };
@@ -130,54 +160,131 @@ export async function createCompany(_prev: { error?: string }, formData: FormDat
 }
 
 export async function setCompanyActive(companyId: string, active: boolean) {
-  await requireStaff();
+  await requireManager();
   await pool.query("UPDATE companies SET active = $2 WHERE id = $1", [companyId, active]);
   revalidatePath("/admin/companies");
 }
 
-function therapistFields(formData: FormData) {
+function availabilityFields(formData: FormData, maxCapacity: number) {
   const languages = formData
     .getAll("languages")
     .filter((l): l is string => typeof l === "string" && (LANGUAGES as readonly string[]).includes(l) && l !== "Other");
   const capacity = Number(formData.get("capacity"));
+  const away = String(formData.get("awayUntil") ?? "");
   return {
     languages,
-    capacity: Number.isInteger(capacity) && capacity >= 0 && capacity <= 100 ? capacity : null,
+    capacity: Number.isInteger(capacity) && capacity >= 0 && capacity <= maxCapacity ? capacity : null,
     takesClients: formData.get("takesClients") === "yes",
+    awayUntil: /^\d{4}-\d{2}-\d{2}$/.test(away) ? away : null,
   };
 }
 
-export async function addTherapist(_prev: { error?: string }, formData: FormData): Promise<{ error?: string }> {
-  await requireStaff();
+// ---- Team (admins and coordinators) -------------------------------------------
+
+export async function addStaff(_prev: { error?: string; done?: string }, formData: FormData): Promise<{ error?: string; done?: string }> {
+  const me = await requireManager();
   const name = String(formData.get("name") ?? "").trim().slice(0, 120);
   const email = String(formData.get("email") ?? "").trim().toLowerCase().slice(0, 200);
-  const f = therapistFields(formData);
-  if (!name) return { error: "Enter the therapist's name." };
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "Enter an email address so they can be told about new clients." };
-  // "!" is not a valid password hash, so the person can't sign in until given a password with staff:create.
-  const { rowCount } = await pool.query(
-    `INSERT INTO staff (email, name, password_hash, takes_clients, monthly_capacity, languages)
-     VALUES ($1, $2, '!', true, $3, $4)
-     ON CONFLICT (email) DO UPDATE SET takes_clients = true, monthly_capacity = EXCLUDED.monthly_capacity,
-       languages = EXCLUDED.languages`,
-    [email, name, f.capacity ?? DEFAULT_MONTHLY_CAPACITY, f.languages],
+  const role = String(formData.get("role") ?? "counsellor") as Role;
+  const f = availabilityFields(formData, 100);
+  if (!name) return { error: "Enter their name." };
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "Enter their email address: the invitation goes there." };
+  if (!ROLES.includes(role) || (role === "admin" && me.role !== "admin"))
+    return { error: "Only an admin can add another admin." };
+  // "!" is not a valid password hash: they can't sign in until they set a password from the invitation.
+  const { rows } = await pool.query<{ id: string }>(
+    `INSERT INTO staff (email, name, password_hash, role, takes_clients, monthly_capacity, languages)
+     VALUES ($1, $2, '!', $3, $4, $5, $6) ON CONFLICT (email) DO NOTHING RETURNING id`,
+    [email, name, role, role === "counsellor" || f.takesClients, f.capacity ?? DEFAULT_MONTHLY_CAPACITY, f.languages],
   );
-  if (!rowCount) return { error: "Couldn't add that therapist. Try again." };
+  if (!rows[0]) return { error: `${email} already has a login. Use "Resend invitation" on their card instead.` };
+  await sendInvite(rows[0].id, me.name);
   await assignWaitingAndNotify();
   revalidatePath("/admin/team");
-  return {};
+  return { done: `Invitation emailed to ${email}.` };
 }
 
-export async function updateTherapist(staffId: string, formData: FormData) {
-  await requireStaff();
-  const f = therapistFields(formData);
+export async function resendInvite(staffId: string) {
+  const me = await requireManager();
+  await sendInvite(staffId, me.name);
+  redirect("/admin/team?invited=1");
+}
+
+export async function updateStaff(staffId: string, formData: FormData) {
+  const me = await requireManager();
+  const f = availabilityFields(formData, 100);
+  const role = String(formData.get("role") ?? "") as Role;
+  const { rows } = await pool.query<{ role: Role }>("SELECT role FROM staff WHERE id = $1", [staffId]);
+  if (!rows[0]) redirect("/admin/team");
+  // Only admins change roles, and nobody removes their own admin role by accident.
+  const newRole = me.role === "admin" && ROLES.includes(role) && !(staffId === me.id && role !== "admin") ? role : rows[0].role;
   await pool.query(
-    `UPDATE staff SET takes_clients = $2, monthly_capacity = COALESCE($3, monthly_capacity), languages = $4 WHERE id = $1`,
-    [staffId, f.takesClients, f.capacity, f.languages],
+    `UPDATE staff SET takes_clients = $2, monthly_capacity = COALESCE($3, monthly_capacity), languages = $4,
+       away_until = $5, role = $6, is_admin = ($6 = 'admin') WHERE id = $1`,
+    [staffId, f.takesClients, f.capacity, f.languages, f.awayUntil, newRole],
   );
   await assignWaitingAndNotify();
   revalidatePath("/admin/team");
   redirect("/admin/team?saved=1");
+}
+
+// ---- Everyone: their own availability ----------------------------------------------
+
+export async function updateMyAvailability(formData: FormData) {
+  const me = await requireStaff();
+  const { rows } = await pool.query<{ monthly_capacity: number }>("SELECT monthly_capacity FROM staff WHERE id = $1", [me.id]);
+  // Counsellors can go down, or up to the usual 5; a higher limit is for a coordinator to set.
+  const f = availabilityFields(formData, Math.max(DEFAULT_MONTHLY_CAPACITY, rows[0]?.monthly_capacity ?? 0));
+  await pool.query(
+    `UPDATE staff SET takes_clients = $2, monthly_capacity = COALESCE($3, monthly_capacity), languages = $4, away_until = $5
+     WHERE id = $1`,
+    [me.id, f.takesClients, f.capacity, f.languages, f.awayUntil],
+  );
+  await assignWaitingAndNotify();
+  redirect("/admin/availability?saved=1");
+}
+
+// ---- Offers ----------------------------------------------------------------------
+
+export async function acceptCase(requestId: string) {
+  const { staff } = await requireCase(requestId);
+  await acceptOffer(requestId, staff.id);
+  redirect(`/admin/requests/${requestId}?accepted=1`);
+}
+
+export async function declineCase(requestId: string, formData: FormData) {
+  const { staff } = await requireCase(requestId);
+  await declineOffer(requestId, staff.id, String(formData.get("reason") ?? ""));
+  redirect("/admin?declined=1");
+}
+
+export async function takeCase(requestId: string) {
+  const staff = await requireStaff();
+  const ok = await takeFromPool(requestId, staff.id);
+  redirect(ok ? `/admin/requests/${requestId}?taken=1` : "/admin?status=pool&gone=1");
+}
+
+// ---- Passwords (no sign-in needed) ---------------------------------------------------
+
+export async function forgotPassword(_prev: { sent?: boolean }, formData: FormData): Promise<{ sent?: boolean }> {
+  const email = String(formData.get("email") ?? "");
+  try {
+    await sendPasswordReset(email);
+  } catch (err) {
+    console.error("EAP password reset email failed:", err);
+  }
+  return { sent: true };
+}
+
+export async function setPassword(token: string, _prev: { error?: string }, formData: FormData): Promise<{ error?: string }> {
+  const password = String(formData.get("password") ?? "");
+  if (password.length < MIN_PASSWORD_LENGTH)
+    return { error: `Use at least ${MIN_PASSWORD_LENGTH} characters. A few words together is easy to remember.` };
+  if (password !== formData.get("confirm")) return { error: "The two passwords don't match." };
+  const staffId = await setPasswordWithToken(token, password);
+  if (!staffId) return { error: "This link has expired or was already used. Ask for a new one." };
+  await startSession(staffId);
+  redirect("/admin");
 }
 
 // ---- Sessions ----------------------------------------------------------------
@@ -279,6 +386,8 @@ async function emailClient(
         total: SESSIONS_PER_CLIENT,
         format: r.format,
         therapistName: r.therapist,
+        // The first booking explains the cancellation policy.
+        lateCancelHours: kind === "booked" && r.number === 1 ? LATE_CANCEL_HOURS : undefined,
       }),
     );
     return " Confirmation emailed to the client.";
@@ -295,7 +404,9 @@ async function sessionRequest(sessionId: string): Promise<string> {
 }
 
 export async function addSession(requestId: string, formData: FormData) {
-  const staff = await requireStaff();
+  const c = await requireCase(requestId);
+  const staff = c.staff;
+  await acceptIfPending(requestId, c);
   const startsAt = sessionDate(formData);
   if (!startsAt) redirect(`/admin/requests/${requestId}?session=date#sessions`);
   const { rows } = await pool.query<{ n: number }>(
@@ -314,11 +425,11 @@ export async function addSession(requestId: string, formData: FormData) {
 }
 
 export async function moveSession(sessionId: string, formData: FormData) {
-  const staff = await requireStaff();
   const requestId = await sessionRequest(sessionId);
+  const { staff } = await requireCase(requestId);
   const startsAt = sessionDate(formData);
   if (!startsAt) redirect(`/admin/requests/${requestId}?session=date#sessions`);
-  await pool.query("UPDATE client_sessions SET starts_at = $2::timestamp AT TIME ZONE 'Europe/Prague' WHERE id = $1", [
+  await pool.query("UPDATE client_sessions SET starts_at = $2::timestamp AT TIME ZONE 'Europe/Prague', reminder_sent_at = NULL WHERE id = $1", [
     sessionId,
     startsAt,
   ]);
@@ -327,33 +438,39 @@ export async function moveSession(sessionId: string, formData: FormData) {
   redirect(`/admin/requests/${requestId}#sessions`);
 }
 
-export async function setSessionDone(sessionId: string, done: boolean) {
-  const staff = await requireStaff();
+/** "done": the session happened. "late": the client cancelled late, which counts the same. "undo": neither. */
+export async function setSessionOutcome(sessionId: string, outcome: "done" | "late" | "undo") {
   const requestId = await sessionRequest(sessionId);
+  const { staff } = await requireCase(requestId);
   // Only acts on a real change, so a double click can't count a session twice.
   const { rowCount } = await pool.query(
-    done
-      ? "UPDATE client_sessions SET done_at = now() WHERE id = $1 AND done_at IS NULL"
-      : "UPDATE client_sessions SET done_at = NULL WHERE id = $1 AND done_at IS NOT NULL",
-    [sessionId],
+    outcome === "undo"
+      ? "UPDATE client_sessions SET done_at = NULL, late_cancelled = false WHERE id = $1 AND done_at IS NOT NULL"
+      : "UPDATE client_sessions SET done_at = now(), late_cancelled = $2 WHERE id = $1 AND done_at IS NULL",
+    outcome === "undo" ? [sessionId] : [sessionId, outcome === "late"],
   );
   if (!rowCount) redirect(`/admin/requests/${requestId}#sessions`);
   const { rows } = await pool.query<{ done: number }>(
     "SELECT count(*)::int AS done FROM client_sessions WHERE request_id = $1 AND done_at IS NOT NULL",
     [requestId],
   );
+  const counted = `${rows[0].done} of ${SESSIONS_PER_CLIENT}`;
   await note(
     requestId,
     staff.id,
-    done ? `Session marked done (${rows[0].done} of ${SESSIONS_PER_CLIENT}).` : "Session no longer marked done.",
+    outcome === "done"
+      ? `Session marked done (${counted}).`
+      : outcome === "late"
+        ? `Late cancellation by the client: counts as a session (${counted}).`
+        : "Session no longer marked done or late-cancelled.",
   );
   await syncStatusWithSessions(requestId, staff.id);
   redirect(`/admin/requests/${requestId}#sessions`);
 }
 
 export async function removeSession(sessionId: string, formData: FormData) {
-  const staff = await requireStaff();
   const requestId = await sessionRequest(sessionId);
+  const { staff } = await requireCase(requestId);
   // Email before deleting, while the session's details still exist.
   const emailed = await emailClient(formData, sessionId, "cancelled");
   await pool.query("DELETE FROM client_sessions WHERE id = $1", [sessionId]);
@@ -363,7 +480,7 @@ export async function removeSession(sessionId: string, formData: FormData) {
 }
 
 export async function updateClientEmail(requestId: string, formData: FormData) {
-  const staff = await requireStaff();
+  const { staff } = await requireCase(requestId);
   const email = String(formData.get("clientEmail") ?? "").trim().toLowerCase().slice(0, 200);
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) redirect(`/admin/requests/${requestId}?session=email#sessions`);
   const { rows } = await pool.query<{ email: string }>("SELECT email FROM support_requests WHERE id = $1", [requestId]);
@@ -390,7 +507,7 @@ async function sendFeedbackLink(requestId: string, staffId: string) {
 }
 
 export async function emailFeedbackLink(requestId: string) {
-  const staff = await requireStaff();
+  const { staff } = await requireCase(requestId);
   await sendFeedbackLink(requestId, staff.id);
   redirect(`/admin/requests/${requestId}?feedback=sent`);
 }

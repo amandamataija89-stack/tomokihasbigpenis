@@ -107,3 +107,44 @@ CREATE TABLE IF NOT EXISTS feedback (
   recommend       text NOT NULL,
   comments        text NOT NULL DEFAULT ''
 );
+
+-- Roles: admin (sees everything, including feedback), coordinator (sees and assigns all cases),
+-- counsellor (sees only their own clients and the pool).
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS role text NOT NULL DEFAULT 'counsellor'
+  CHECK (role IN ('admin', 'coordinator', 'counsellor'));
+UPDATE staff SET role = 'admin' WHERE is_admin AND role = 'counsellor';
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS away_until date;
+
+-- One-use links for setting a password (invitations and "forgot password").
+CREATE TABLE IF NOT EXISTS password_tokens (
+  token_hash text PRIMARY KEY,
+  staff_id   uuid NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+  expires_at timestamptz NOT NULL
+);
+
+-- Nickname lives in first_name; the full name is optional. consent_at is consent to store and share,
+-- consent_contact_at is consent to be contacted.
+ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS full_name text NOT NULL DEFAULT '';
+ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS consent_contact_at timestamptz;
+
+-- Offers: an assigned counsellor accepts or declines. No answer by respond_by, or a decline,
+-- puts the case in the pool for the coordinator (or another counsellor) to pick up.
+ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS accepted_at timestamptz;
+ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS respond_by timestamptz;
+ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS in_pool boolean NOT NULL DEFAULT false;
+ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS declined_by uuid[] NOT NULL DEFAULT '{}';
+UPDATE support_requests SET accepted_at = assigned_at
+  WHERE assigned_to IS NOT NULL AND accepted_at IS NULL AND status <> 'new';
+
+CREATE TABLE IF NOT EXISTS app_state (
+  key   text PRIMARY KEY,
+  value text NOT NULL
+);
+
+-- Reminder sent halfway to an offer's respond_by, so the counsellor signs in to accept or decline.
+ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS offer_reminded_at timestamptz;
+
+-- A late cancellation counts towards the client's sessions like a session that happened (done_at is set too).
+ALTER TABLE client_sessions ADD COLUMN IF NOT EXISTS late_cancelled boolean NOT NULL DEFAULT false;
+-- The client's reminder email, sent 48 hours before the session.
+ALTER TABLE client_sessions ADD COLUMN IF NOT EXISTS reminder_sent_at timestamptz;

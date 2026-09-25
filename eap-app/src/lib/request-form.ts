@@ -18,7 +18,8 @@ export const TOPICS = [
 ] as const;
 
 export type RequestInput = {
-  firstName: string;
+  firstName: string; // the nickname we call them by
+  fullName: string; // optional
   email: string;
   phone: string;
   contactMethod: string;
@@ -32,7 +33,7 @@ export type RequestInput = {
   location: string;
 };
 
-export type FieldErrors = Partial<Record<keyof RequestInput | "consent", string>>;
+export type FieldErrors = Partial<Record<keyof RequestInput | "consent" | "consentContact", string>>;
 
 // What the form echoes back after an error; crisis stays a string so "not answered" survives.
 export type FormValues = Partial<Omit<RequestInput, "crisis"> & { crisis: string }>;
@@ -52,6 +53,7 @@ export function validateRequest(form: FormData): ValidationResult {
   const crisisAnswer = text(form, "crisis", 3);
   const values: Omit<RequestInput, "crisis"> = {
     firstName: text(form, "firstName", 80),
+    fullName: text(form, "fullName", 160),
     email: text(form, "email", 200).toLowerCase(),
     phone: text(form, "phone", 40),
     contactMethod: text(form, "contactMethod", 40),
@@ -67,7 +69,7 @@ export function validateRequest(form: FormData): ValidationResult {
   };
   const errors: FieldErrors = {};
 
-  if (!values.firstName) errors.firstName = "Enter the name you'd like us to use.";
+  if (!values.firstName) errors.firstName = "Enter a nickname: any name you'd like us to call you.";
   if (!EMAIL_RE.test(values.email)) errors.email = "Enter an email address like name@example.com.";
   if (!(CONTACT_METHODS as readonly string[]).includes(values.contactMethod))
     errors.contactMethod = "Choose how we should contact you.";
@@ -83,8 +85,10 @@ export function validateRequest(form: FormData): ValidationResult {
   if (!(AGE_RANGES as readonly string[]).includes(values.ageRange)) errors.ageRange = "Choose your age range.";
   if (!(GENDERS as readonly string[]).includes(values.gender)) errors.gender = "Choose an option.";
   if (!values.location) errors.location = "Tell us roughly where you're based, e.g. Prague 3 or Brno.";
+  if (form.get("consentContact") !== "yes")
+    errors.consentContact = "We need your agreement to contact you before we can help.";
   if (form.get("consent") !== "yes")
-    errors.consent = "We need your agreement to store your request before we can help.";
+    errors.consent = "We need your agreement to store and share your request with your counsellor before we can help.";
 
   return Object.keys(errors).length
     ? { ok: false, errors, values: { ...values, crisis: crisisAnswer } }

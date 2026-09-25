@@ -1,5 +1,5 @@
 import { Brand } from "@/components/Brand";
-import { requireStaff } from "@/lib/auth";
+import { requireStaff, ROLE_LABELS } from "@/lib/auth";
 import { logout } from "../actions";
 import { StaffNav } from "./StaffNav";
 
@@ -13,10 +13,12 @@ export default async function StaffLayout({ children }: { children: React.ReactN
       <header className="topbar">
         <div style={{ display: "flex", gap: 28, alignItems: "center", flexWrap: "wrap" }}>
           <Brand href="/admin" />
-          <StaffNav isAdmin={staff.is_admin} />
+          <StaffNav role={staff.role} />
         </div>
         <div className="actions">
-          <span className="who">{staff.name}</span>
+          <span className="who">
+            {staff.name} · {ROLE_LABELS[staff.role]}
+          </span>
           <form action={logout}>
             <button type="submit" className="ghost small-btn">Sign out</button>
           </form>

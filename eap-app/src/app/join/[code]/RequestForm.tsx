@@ -98,13 +98,20 @@ export function RequestForm({ code }: { code: string }) {
         <h2>About you</h2>
         <div className="row">
           <div className="field">
-            <label htmlFor="firstName">First name</label>
-            <input id="firstName" name="firstName" type="text" autoComplete="given-name" defaultValue={v.firstName} {...invalid("firstName")} />
-            <span className="small">Or any name you&apos;d like us to use.</span>
+            <label htmlFor="firstName">Nickname</label>
+            <input id="firstName" name="firstName" type="text" autoComplete="nickname" defaultValue={v.firstName} {...invalid("firstName")} />
+            <span className="small">Any name you&apos;d like us to call you. It doesn&apos;t have to be your real name.</span>
             {err("firstName")}
           </div>
-          {select("ageRange", "Age", AGE_RANGES)}
+          <div className="field">
+            <label htmlFor="fullName">
+              Full name<span className="opt">optional</span>
+            </label>
+            <input id="fullName" name="fullName" type="text" autoComplete="name" defaultValue={v.fullName} />
+            <span className="small">Only needed if you want an invoice for insurance.</span>
+          </div>
         </div>
+        <div className="row">{select("ageRange", "Age", AGE_RANGES)}</div>
         <div className="row">
           {select("gender", "Gender", GENDERS)}
           <div className="field">
@@ -167,17 +174,33 @@ export function RequestForm({ code }: { code: string }) {
         <input id="website" name="website" type="text" tabIndex={-1} autoComplete="off" />
       </div>
 
-      <div className="field">
-        <label className="consent">
-          <input type="checkbox" name="consent" value="yes" {...invalid("consent")} />
-          <span>
-            I agree that Prague Integration s.r.o. may store the information in this form, including anything about
-            my wellbeing, to contact me and arrange support. I can ask for it to be deleted at any time by writing to
-            contact@pragueintegration.cz.
-          </span>
-        </label>
-        {err("consent")}
-      </div>
+      <fieldset className="consents">
+        <legend>Your consent</legend>
+        <div className="field">
+          <label className="consent">
+            <input type="checkbox" name="consentContact" value="yes" {...invalid("consentContact")} />
+            <span>
+              I agree that Prague Integration may <b>contact me</b> about this request, in the way I chose above.
+            </span>
+          </label>
+          {err("consentContact")}
+        </div>
+        <div className="field">
+          <label className="consent">
+            <input type="checkbox" name="consent" value="yes" {...invalid("consent")} />
+            <span>
+              I agree that Prague Integration s.r.o. may <b>store the information</b> in this form, including anything
+              about my wellbeing, and <b>share it with the counsellor and coordinator</b> who handle my request. It is
+              never shared with my employer.
+            </span>
+          </label>
+          {err("consent")}
+        </div>
+        <p className="small">
+          You can withdraw your consent or ask for your information to be deleted at any time by writing to
+          contact@pragueintegration.cz.
+        </p>
+      </fieldset>
 
       <div className="actions">
         <button type="submit" disabled={pending}>

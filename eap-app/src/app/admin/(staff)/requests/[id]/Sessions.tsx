@@ -1,5 +1,6 @@
 import { SESSIONS_PER_CLIENT, type ClientSession } from "@/lib/data";
-import { addSession, moveSession, removeSession, setSessionDone, updateClientEmail } from "../../../actions";
+import { LATE_CANCEL_HOURS } from "@/lib/deadlines";
+import { addSession, moveSession, removeSession, setSessionOutcome, updateClientEmail } from "../../../actions";
 import { formatDate, toPragueInput } from "../../../format";
 
 const NotifyBox = ({ label }: { label: string }) => (
@@ -53,6 +54,11 @@ export function Sessions({
         <p className="err" role="alert">This client already has {SESSIONS_PER_CLIENT} sessions booked.</p>
       )}
 
+      <p className="small">
+        Cancelled with less than {LATE_CANCEL_HOURS} hours&apos; notice? Press <b>Late cancellation</b>: it counts as
+        one of the {SESSIONS_PER_CLIENT} sessions. Cancelled in time? Press <b>Remove</b>, and it doesn&apos;t count.
+        Clients are emailed a reminder {LATE_CANCEL_HOURS} hours before each session.
+      </p>
       {sessions.length > 0 && (
         <ol className="sessions">
           {sessions.map((s, i) => {
@@ -64,8 +70,12 @@ export function Sessions({
                   {s.done_at ? (
                     <>
                       <span className="session-when">{formatDate(s.starts_at)}</span>
-                      <span className="pill pill-completed">✓ Done</span>
-                      <button formAction={setSessionDone.bind(null, s.id, false)} className="ghost small-btn">
+                      {s.late_cancelled ? (
+                        <span className="pill pill-contacted">Late cancellation · counts</span>
+                      ) : (
+                        <span className="pill pill-completed">✓ Done</span>
+                      )}
+                      <button formAction={setSessionOutcome.bind(null, s.id, "undo")} className="ghost small-btn">
                         Undo
                       </button>
                     </>
@@ -77,14 +87,17 @@ export function Sessions({
                         aria-label={`Session ${i + 1} date and time`}
                         defaultValue={toPragueInput(s.starts_at)}
                       />
-                      <button formAction={setSessionDone.bind(null, s.id, true)} className="small-btn">
+                      <button formAction={setSessionOutcome.bind(null, s.id, "done")} className="small-btn">
                         Mark done
+                      </button>
+                      <button formAction={setSessionOutcome.bind(null, s.id, "late")} className="ghost small-btn">
+                        Late cancellation
                       </button>
                       <button formAction={moveSession.bind(null, s.id)} className="ghost small-btn">
                         Save new time
                       </button>
                       <button formAction={removeSession.bind(null, s.id)} className="ghost small-btn">
-                        Remove
+                        Remove (cancelled in time)
                       </button>
                       {missed && <span className="small overdue">Date has passed: mark it done or move it</span>}
                       <NotifyBox label="Email the client if I change or remove this session" />

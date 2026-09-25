@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { speaks } from "@/lib/assign";
+import { isManager, requireStaff } from "@/lib/auth";
 import { getRequest, listNotes, listSessions, listStaffWithLoad, STATUSES, STATUS_LABELS } from "@/lib/data";
-import { addNote, deleteRequest, emailFeedbackLink, updateRequest } from "../../../actions";
+import { acceptCase, addNote, declineCase, deleteRequest, emailFeedbackLink, updateRequest } from "../../../actions";
 import { formatDate } from "../../../format";
 import { Sessions } from "./Sessions";
 
@@ -11,17 +12,29 @@ export default async function RequestPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ saved?: string; confirmDelete?: string; session?: string; feedback?: string }>;
+  searchParams: Promise<{
+    saved?: string;
+    confirmDelete?: string;
+    session?: string;
+    feedback?: string;
+    accepted?: string;
+    taken?: string;
+  }>;
 }) {
   const { id } = await params;
   const sp = await searchParams;
+  const me = await requireStaff();
+  const manager = isManager(me);
   const r = await getRequest(id);
-  if (!r) notFound();
+  // Counsellors only ever see their own clients; anything else looks like it doesn't exist.
+  if (!r || (!manager && r.assigned_to !== me.id)) notFound();
   const [notes, staff, sessions] = await Promise.all([
     listNotes(id),
-    listStaffWithLoad(undefined, false),
+    manager ? listStaffWithLoad(undefined, false) : Promise.resolve([]),
     listSessions(id),
   ]);
+  const pendingForMe = r.assigned_to === me.id && !r.accepted_at && r.status === "new";
+  const nameOf = (sid: string) => staff.find((s) => s.id === sid)?.name ?? "a former colleague";
   const label = (s: (typeof staff)[number]) => {
     if (s.id === r.assigned_to) return `${s.name} (current)`;
     const load = `${s.assignedThisMonth}/${s.capacity} this month`;
@@ -31,7 +44,7 @@ export default async function RequestPage({
 
   return (
     <main className="stack" style={{ gap: 20 }}>
-      <p className="small"><Link href="/admin">← All requests</Link></p>
+      <p className="small"><Link href="/admin">← {manager ? "All requests" : "My clients"}</Link></p>
       <div className="actions" style={{ justifyContent: "space-between" }}>
         <h1 style={{ fontSize: 32 }}>{r.first_name}</h1>
         <span className="actions" style={{ gap: 8 }}>
@@ -40,6 +53,44 @@ export default async function RequestPage({
         </span>
       </div>
       {sp.saved && <p className="flash" role="status">Saved.</p>}
+      {sp.accepted && <p className="flash" role="status">Accepted. Please contact them within 24 working hours.</p>}
+      {sp.taken && <p className="flash" role="status">They&apos;re your client now. Please contact them within 24 working hours.</p>}
+
+      {pendingForMe && (
+        <section className="offer">
+          <h2>This client has been offered to you</h2>
+          <p>
+            Please accept or decline{r.respond_by ? ` by ${formatDate(r.respond_by)}` : ""}. If you don&apos;t
+            answer by then, the client goes back to the pool for someone else.
+          </p>
+          <div className="actions">
+            <form action={acceptCase.bind(null, r.id)}>
+              <button type="submit">Accept client</button>
+            </form>
+          </div>
+          <form action={declineCase.bind(null, r.id)} className="form" style={{ gap: 8 }}>
+            <label htmlFor="reason" className="small">Can&apos;t take them? Tell the coordinator why (optional)</label>
+            <textarea id="reason" name="reason" placeholder="e.g. Fully booked until November, or I know this person" />
+            <div className="actions"><button type="submit" className="ghost">Decline, back to the pool</button></div>
+          </form>
+        </section>
+      )}
+
+      {manager && r.status === "new" && (
+        <p className="notice">
+          {!r.assigned_to ? (
+            <><b>In the pool.</b> Assign a counsellor below.</>
+          ) : r.accepted_at ? (
+            <><b>Accepted</b> by {r.assigned_name} on {formatDate(r.accepted_at)}.</>
+          ) : (
+            <>
+              <b>Offered to {r.assigned_name}</b>, waiting for them to accept
+              {r.respond_by ? ` by ${formatDate(r.respond_by)}` : ""}.
+            </>
+          )}
+          {r.declined_by.length > 0 && <> Declined or not answered by: {r.declined_by.map(nameOf).join(", ")}.</>}
+        </p>
+      )}
 
       <div className="detail">
         <div className="stack" style={{ gap: 20 }}>
@@ -47,6 +98,8 @@ export default async function RequestPage({
             <h2>Request</h2>
             <dl className="facts">
               <dt>Urgent?</dt><dd>{r.crisis ? <b className="overdue">Yes, crisis</b> : "No"}</dd>
+              <dt>Nickname</dt><dd>{r.first_name}</dd>
+              <dt>Full name</dt><dd>{r.full_name || <span className="small">Not given</span>}</dd>
               <dt>Company</dt><dd>{r.company_name}</dd>
               <dt>Age</dt><dd>{r.age_range || "—"}</dd>
               <dt>Gender</dt><dd>{r.gender || "—"}</dd>
@@ -58,7 +111,8 @@ export default async function RequestPage({
               <dt>Online / in person</dt><dd>{r.format}</dd>
               <dt>Support with</dt><dd>{r.topics.length ? r.topics.join(", ") : "Not said"}</dd>
               <dt>Received</dt><dd>{formatDate(r.created_at)}</dd>
-              <dt>Consent</dt><dd>Given {formatDate(r.consent_at)}</dd>
+              <dt>Consent to contact</dt><dd>{r.consent_contact_at ? `Given ${formatDate(r.consent_contact_at)}` : "Not recorded"}</dd>
+              <dt>Consent to store and share</dt><dd>Given {formatDate(r.consent_at)}</dd>
             </dl>
             {r.message && (
               <>
@@ -79,14 +133,22 @@ export default async function RequestPage({
                 {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
               </select>
             </div>
-            <div className="field">
-              <label htmlFor="assignedTo">Assigned to</label>
-              <select id="assignedTo" name="assignedTo" defaultValue={r.assigned_to ?? ""}>
-                <option value="">Unassigned</option>
-                {staff.map((s) => <option key={s.id} value={s.id}>{label(s)}</option>)}
-              </select>
-              <span className="small">You can assign anyone, including someone already at their monthly limit.</span>
-            </div>
+            {manager && (
+              <div className="field">
+                <label htmlFor="assignedTo">Counsellor</label>
+                <select id="assignedTo" name="assignedTo" defaultValue={r.assigned_to ?? ""}>
+                  <option value="">Nobody (put in the pool)</option>
+                  {staff.map((s) => <option key={s.id} value={s.id}>{label(s)}</option>)}
+                </select>
+                <label className="consent small-consent">
+                  <input type="checkbox" name="agreed" value="yes" />
+                  <span>Already agreed with them (no need to accept)</span>
+                </label>
+                <span className="small">
+                  Otherwise they&apos;re emailed and have 24 working hours to accept before it goes back to the pool.
+                </span>
+              </div>
+            )}
             <label className="consent">
               <input type="checkbox" name="crisis" value="yes" defaultChecked={r.crisis} />
               <span>Crisis case (needs contact as soon as possible)</span>
@@ -119,19 +181,21 @@ export default async function RequestPage({
             <div className="actions"><button type="submit" className="ghost">Email feedback link</button></div>
           </form>
 
-          <form action={deleteRequest.bind(null, r.id)} className="card form" style={{ gap: 12 }}>
-            <h2 style={{ fontSize: 18 }}>Delete request</h2>
-            <p className="small">
-              Use this when the person asks for their data to be erased, or when it&apos;s no longer needed. This
-              removes the request and all notes permanently.
-            </p>
-            {sp.confirmDelete && <p className="err">Tick the box to confirm.</p>}
-            <label className="consent">
-              <input type="checkbox" name="confirm" value="yes" />
-              <span>Delete {r.first_name}&apos;s request permanently</span>
-            </label>
-            <div className="actions"><button type="submit" className="danger">Delete</button></div>
-          </form>
+          {manager && (
+            <form action={deleteRequest.bind(null, r.id)} className="card form" style={{ gap: 12 }}>
+              <h2 style={{ fontSize: 18 }}>Delete request</h2>
+              <p className="small">
+                Use this when the person asks for their data to be erased, or when it&apos;s no longer needed. This
+                removes the request and all notes permanently.
+              </p>
+              {sp.confirmDelete && <p className="err">Tick the box to confirm.</p>}
+              <label className="consent">
+                <input type="checkbox" name="confirm" value="yes" />
+                <span>Delete {r.first_name}&apos;s request permanently</span>
+              </label>
+              <div className="actions"><button type="submit" className="danger">Delete</button></div>
+            </form>
+          )}
         </div>
       </div>
     </main>

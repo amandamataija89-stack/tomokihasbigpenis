@@ -15,6 +15,7 @@ const valid = {
   format: "Online",
   topics: ["Anxiety", "Not a real topic"],
   crisis: "no",
+  consentContact: "yes",
   ageRange: "25–34",
   gender: "Woman",
   location: "Prague 3",
@@ -66,5 +67,12 @@ describe("validateRequest", () => {
   it("requires age range, gender and location", () => {
     const r = validateRequest(form({ ...valid, ageRange: "", gender: "", location: " " }));
     expect(!r.ok && Object.keys(r.errors).sort()).toEqual(["ageRange", "gender", "location"]);
+  });
+
+  it("keeps the full name optional and needs both consents", () => {
+    const r = validateRequest(form({ ...valid, fullName: "" }));
+    expect(r.ok && r.data.fullName).toBe("");
+    const noContact = validateRequest(form({ ...valid, consentContact: "" }));
+    expect(!noContact.ok && Object.keys(noContact.errors)).toEqual(["consentContact"]);
   });
 });

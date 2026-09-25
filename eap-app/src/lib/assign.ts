@@ -1,5 +1,6 @@
 import type { PoolClient } from "pg";
 import { pool } from "./db";
+import { respondBy } from "./deadlines";
 import { sendEmail, therapistAlert } from "./email";
 
 export const DEFAULT_MONTHLY_CAPACITY = 5;
@@ -33,7 +34,14 @@ export type Choice =
  * waited longest. Therapists who work in the person's language come first; if they are all
  * full, the case goes to another therapist with space and is flagged as a language mismatch.
  */
-export function chooseTherapist(therapists: TherapistLoad[], language: string, crisis = false): Choice {
+export function chooseTherapist(
+  all: TherapistLoad[],
+  language: string,
+  crisis = false,
+  declinedBy: readonly string[] = [],
+): Choice {
+  // Someone who already declined this client (or let the offer lapse) isn't offered it again.
+  const therapists = all.filter((t) => !declinedBy.includes(t.id));
   if (therapists.length === 0) return { therapist: null, reason: "no-therapists" };
   // A crisis case never waits: if everyone is full it goes over someone's limit, least-loaded first.
   const open = crisis && therapists.every((t) => t.assignedThisMonth >= t.capacity)
@@ -73,7 +81,13 @@ export async function therapistLoads(db: Queryable = pool, onlyTakingClients = t
        count(r.id) FILTER (WHERE r.assigned_at >= ${MONTH_START_SQL})::int AS assigned,
        max(r.assigned_at) AS last_assigned_at
      FROM staff s LEFT JOIN support_requests r ON r.assigned_to = s.id
-     ${onlyTakingClients ? "WHERE s.takes_clients" : ""}
+     ${
+       onlyTakingClients
+         ? // Available: taking clients, not away, and has set a password (so can sign in to accept).
+           `WHERE s.takes_clients AND s.password_hash <> '!'
+              AND (s.away_until IS NULL OR s.away_until < (now() AT TIME ZONE 'Europe/Prague')::date)`
+         : ""
+     }
      GROUP BY s.id ORDER BY s.name`,
   );
   return rows.map((r) => ({
@@ -87,7 +101,13 @@ export async function therapistLoads(db: Queryable = pool, onlyTakingClients = t
   }));
 }
 
-export type Assignment = { requestId: string; therapist: TherapistLoad; languageMatch: boolean; crisis: boolean };
+export type Assignment = {
+  requestId: string;
+  therapist: TherapistLoad;
+  languageMatch: boolean;
+  crisis: boolean;
+  respondBy: Date;
+};
 
 // Assigns one request inside an open transaction and records why in its notes.
 async function assignOne(
@@ -96,9 +116,10 @@ async function assignOne(
   requestId: string,
   language: string,
   crisis: boolean,
+  declinedBy: readonly string[],
   noteIfWaiting: boolean,
 ): Promise<Assignment | null> {
-  const choice = chooseTherapist(loads, language, crisis);
+  const choice = chooseTherapist(loads, language, crisis, declinedBy);
   if (!choice.therapist) {
     if (noteIfWaiting)
       await client.query("INSERT INTO request_notes (request_id, body) VALUES ($1, $2)", [
@@ -108,12 +129,14 @@ async function assignOne(
     return null;
   }
   const t = choice.therapist;
+  const deadline = respondBy(new Date(), crisis);
   await client.query(
-    "UPDATE support_requests SET assigned_to = $2, assigned_at = now(), overdue_warned_at = NULL, updated_at = now() WHERE id = $1",
-    [requestId, t.id],
+    `UPDATE support_requests SET assigned_to = $2, assigned_at = now(), accepted_at = NULL, respond_by = $3,
+       in_pool = false, overdue_warned_at = NULL, offer_reminded_at = NULL, updated_at = now() WHERE id = $1`,
+    [requestId, t.id, deadline],
   );
   const skipped = loads.filter((x) => x.assignedThisMonth >= x.capacity).map((x) => x.name);
-  let note = `${crisis ? "URGENT. " : ""}Assigned automatically to ${t.name} (new client ${t.assignedThisMonth + 1} of ${t.capacity} this month).`;
+  let note = `${crisis ? "URGENT. " : ""}Offered automatically to ${t.name} (new client ${t.assignedThisMonth + 1} of ${t.capacity} this month), waiting for them to accept.`;
   if (t.assignedThisMonth >= t.capacity) note += " Everyone was full, so this crisis case goes over their limit.";
   else if (skipped.length) note += ` Skipped because full: ${skipped.join(", ")}.`;
   if (!choice.languageMatch)
@@ -122,7 +145,7 @@ async function assignOne(
   // Keep the in-memory counts current so a batch spreads cases out correctly.
   t.assignedThisMonth++;
   t.lastAssignedAt = new Date();
-  return { requestId, therapist: t, languageMatch: choice.languageMatch, crisis };
+  return { requestId, therapist: t, languageMatch: choice.languageMatch, crisis, respondBy: deadline };
 }
 
 // Runs fn under a lock so two requests arriving together can't both take someone's last place.
@@ -145,25 +168,27 @@ async function withAssignLock<T>(fn: (client: PoolClient) => Promise<T>): Promis
 /** Assigns a new request, or leaves a note that it's waiting for a free place. */
 export function autoAssign(requestId: string, language: string, crisis: boolean): Promise<Assignment | null> {
   return withAssignLock(async (client) =>
-    assignOne(client, await therapistLoads(client), requestId, language, crisis, true),
+    assignOne(client, await therapistLoads(client), requestId, language, crisis, [], true),
   );
 }
 
 /**
  * Hands out open requests still waiting for a therapist, oldest first, as places open:
  * a new month, a raised limit, or a therapist added or back to taking clients.
+ * Cases in the pool (declined or not answered) are left for the coordinator.
  */
 export function assignWaiting(): Promise<Assignment[]> {
   return withAssignLock(async (client) => {
-    const { rows } = await client.query<{ id: string; language: string; crisis: boolean }>(
-      `SELECT id, language, crisis FROM support_requests WHERE assigned_to IS NULL AND status = 'new'
+    const { rows } = await client.query<{ id: string; language: string; crisis: boolean; declined_by: string[] }>(
+      `SELECT id, language, crisis, declined_by FROM support_requests
+       WHERE assigned_to IS NULL AND status = 'new' AND NOT in_pool
        ORDER BY crisis DESC, created_at`,
     );
     if (!rows.length) return [];
     const loads = await therapistLoads(client);
     const done: Assignment[] = [];
     for (const r of rows) {
-      const a = await assignOne(client, loads, r.id, r.language, r.crisis, false);
+      const a = await assignOne(client, loads, r.id, r.language, r.crisis, r.declined_by, false);
       if (a) done.push(a);
     }
     return done;
@@ -174,7 +199,7 @@ export function assignWaiting(): Promise<Assignment[]> {
 export async function assignWaitingAndNotify(): Promise<Assignment[]> {
   const done = await assignWaiting();
   const sent = await Promise.allSettled(
-    done.map((a) => sendEmail(therapistAlert(a.therapist.email, a.therapist.name, a.requestId, a.crisis))),
+    done.map((a) => sendEmail(therapistAlert(a.therapist.email, a.therapist.name, a.requestId, a.crisis, a.respondBy))),
   );
   for (const s of sent) if (s.status === "rejected") console.error("EAP email failed:", s.reason);
   return done;

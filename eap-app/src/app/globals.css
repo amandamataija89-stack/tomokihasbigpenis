@@ -231,3 +231,16 @@ ol.sessions { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
 .stat .big-num { font-family: var(--display); font-weight: 800; font-size: 36px; color: var(--ink); font-variant-numeric: tabular-nums; line-height: 1.1; }
 .feedback-item { display: grid; gap: 10px; padding: 18px 20px; }
 .choices.scale .choice span { min-width: 44px; text-align: center; }
+.consents { gap: 12px; }
+
+/* Pool, offers, team */
+.pool { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+.pool-card { display: grid; gap: 12px; padding: 18px 20px; align-content: start; }
+.pool-card.crisis { box-shadow: inset 4px 0 0 var(--error); }
+.offer { background: var(--amber-soft); border-radius: 10px; padding: 18px 20px; display: grid; gap: 12px; }
+.offer h2 { font-size: 20px; }
+.offer textarea { min-height: 70px; }
+.role-pill { font-size: 12px; }
+.date-input { font: inherit; font-size: 15px; color: var(--text); background: var(--field); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; }
+.role-select { width: auto !important; padding: 6px 10px !important; font-size: 15px !important; }
+.invite-pending { background: var(--amber-soft); border-radius: 8px; padding: 8px 12px; justify-content: space-between; }
