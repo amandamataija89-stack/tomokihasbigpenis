@@ -56,6 +56,26 @@ either use the Pro plan, or have a free service such as cron-job.org call
 `Authorization: Bearer <CRON_SECRET>`. The time limits are in
 `src/lib/deadlines.ts`.
 
+## Anonymous client feedback (admins only)
+
+- When a client's case is **Completed**, they're emailed a feedback link
+  automatically, once per case. Staff can also send it from any case with
+  **Email feedback link**, for example when a case ends early.
+- The client answers four questions: overall experience (1 to 5), their
+  counsellor (1 to 5, optional), whether the sessions helped, and whether
+  they'd recommend the service. They can also add a comment.
+- **Anonymous:** the answers are stored with only the counsellor and the
+  month. There's no name, email, case or exact date. Each link works once
+  and is deleted when used, so nothing links a response back to a client.
+  With very few clients per counsellor in a month, you may still be able to
+  guess who wrote something, so read it that way.
+- **Only admins can see it**, on the **Feedback** page (averages overall and
+  per counsellor, plus every comment). Counsellors don't see the page in the
+  menu, and they're sent back to Requests if they open the address directly.
+- Make yourself an admin (once, after creating your login):
+  `DATABASE_URL=... npm run staff:admin -- amanda@pragueintegration.cz`.
+  Add `--remove` to take admin away.
+
 ## Sessions
 
 Each client gets up to 5 sessions. On a case, under **Sessions**:
@@ -92,6 +112,8 @@ only, which is what you can report back to a client.
 | `/admin/requests/<id>` | Staff | Full request, sessions, status, assignee, notes, delete |
 | `/admin/team` | Staff | Therapists, their languages, monthly limit and this month's count |
 | `/admin/companies` | Staff | Add a company, copy its link, pause it, see request counts |
+| `/admin/feedback` | Admins only | Anonymous client feedback |
+| `/feedback/<link>` | Client | One-use anonymous feedback form |
 
 When a request comes in, the team gets an email at `TEAM_NOTIFY_EMAIL` with a
 link to it. That email deliberately contains nothing the person wrote; the
@@ -112,8 +134,10 @@ account as the outreach scripts can be reused).
    npm install
    DATABASE_URL="postgres://..." npm run db:migrate
    DATABASE_URL="postgres://..." npm run staff:create -- amanda@pragueintegration.cz "Amanda Mataija"
+   DATABASE_URL="postgres://..." npm run staff:admin -- amanda@pragueintegration.cz
    ```
-   The second command prints a generated password. Run it once for each
+   `staff:create` prints a generated password. `staff:admin` lets you see
+   client feedback; don't run it for counsellors. Run `staff:create` once for each
    colleague who should see requests. Running it again for the same email
    resets that person's password and signs them out.
 3. **Hosting.** Import the repository into [Vercel](https://vercel.com), set

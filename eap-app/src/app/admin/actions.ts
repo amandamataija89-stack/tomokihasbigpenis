@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { endSession, requireStaff, startSession } from "@/lib/auth";
+import { inviteFeedback } from "@/lib/feedback";
 import { assignWaitingAndNotify, DEFAULT_MONTHLY_CAPACITY } from "@/lib/assign";
 import { generateCompanyCode } from "@/lib/codes";
 import { SESSIONS_PER_CLIENT, STATUSES, STATUS_LABELS, type Status } from "@/lib/data";
@@ -221,6 +222,14 @@ async function syncStatusWithSessions(requestId: string, staffId: string) {
       ? `All ${SESSIONS_PER_CLIENT} sessions done. Case marked Completed.`
       : `Status changed from ${STATUS_LABELS[r.status]} to ${STATUS_LABELS[next]}.`,
   );
+  // Only once per case, even if a session is undone and redone.
+  if (next === "completed") {
+    const { rows: sent } = await pool.query(
+      "SELECT 1 FROM request_notes WHERE request_id = $1 AND body LIKE 'Anonymous feedback link emailed%'",
+      [requestId],
+    );
+    if (!sent.length) await sendFeedbackLink(requestId, staffId);
+  }
 }
 
 const whenFmt = new Intl.DateTimeFormat("en-GB", {
@@ -364,4 +373,24 @@ export async function updateClientEmail(requestId: string, formData: FormData) {
     await note(requestId, staff.id, `Client email changed from ${rows[0].email} to ${email}.`);
   }
   redirect(`/admin/requests/${requestId}?session=emailsaved#sessions`);
+}
+
+async function sendFeedbackLink(requestId: string, staffId: string) {
+  let ok = false;
+  try {
+    ok = await inviteFeedback(requestId);
+  } catch (err) {
+    console.error("EAP feedback invite failed:", err);
+  }
+  await note(
+    requestId,
+    staffId,
+    ok ? "Anonymous feedback link emailed to the client." : "The feedback link could not be emailed to the client.",
+  );
+}
+
+export async function emailFeedbackLink(requestId: string) {
+  const staff = await requireStaff();
+  await sendFeedbackLink(requestId, staff.id);
+  redirect(`/admin/requests/${requestId}?feedback=sent`);
 }

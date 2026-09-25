@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { speaks } from "@/lib/assign";
 import { getRequest, listNotes, listSessions, listStaffWithLoad, STATUSES, STATUS_LABELS } from "@/lib/data";
-import { addNote, deleteRequest, updateRequest } from "../../../actions";
+import { addNote, deleteRequest, emailFeedbackLink, updateRequest } from "../../../actions";
 import { formatDate } from "../../../format";
 import { Sessions } from "./Sessions";
 
@@ -11,7 +11,7 @@ export default async function RequestPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ saved?: string; confirmDelete?: string; session?: string }>;
+  searchParams: Promise<{ saved?: string; confirmDelete?: string; session?: string; feedback?: string }>;
 }) {
   const { id } = await params;
   const sp = await searchParams;
@@ -108,6 +108,16 @@ export default async function RequestPage({
               </div>
             ))}
           </section>
+
+          <form action={emailFeedbackLink.bind(null, r.id)} className="card form" style={{ gap: 12 }}>
+            <h2 style={{ fontSize: 18 }}>Anonymous feedback</h2>
+            <p className="small">
+              Clients are emailed a one-use feedback link automatically when all sessions are done. Send it now if the
+              case ended early. Answers are anonymous and only admins can read them.
+            </p>
+            {sp.feedback && <p className="flash" role="status">Feedback link emailed to {r.email}.</p>}
+            <div className="actions"><button type="submit" className="ghost">Email feedback link</button></div>
+          </form>
 
           <form action={deleteRequest.bind(null, r.id)} className="card form" style={{ gap: 12 }}>
             <h2 style={{ fontSize: 18 }}>Delete request</h2>

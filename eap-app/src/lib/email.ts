@@ -114,3 +114,11 @@ export function teamOverdueWarning(clientFirstName: string, requestId: string, h
     text: `${clientFirstName} asked for support more than ${hours} hours ago, nobody is assigned, and the case is still New.\n\nPlease assign it now:\n${appUrl()}/admin/requests/${requestId}\n`,
   };
 }
+
+export function feedbackInvitation(to: string, firstName: string, token: string): Mail {
+  return {
+    to,
+    subject: "How did it go? Anonymous feedback – Prague Integration",
+    text: `Hi ${firstName},\n\nThank you for working with us. We'd be grateful for your feedback: it takes about two minutes and helps us improve.\n\n${appUrl()}/feedback/${token}\n\nYour answers are anonymous: we don't store your name or email with them, and your counsellor doesn't see them. The link works once and expires in 60 days.\n\nPrague Integration\n`,
+  };
+}

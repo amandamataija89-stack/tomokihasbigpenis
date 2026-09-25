@@ -13,7 +13,7 @@ export default async function StaffLayout({ children }: { children: React.ReactN
       <header className="topbar">
         <div style={{ display: "flex", gap: 28, alignItems: "center", flexWrap: "wrap" }}>
           <Brand href="/admin" />
-          <StaffNav />
+          <StaffNav isAdmin={staff.is_admin} />
         </div>
         <div className="actions">
           <span className="who">{staff.name}</span>

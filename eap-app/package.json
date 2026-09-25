@@ -9,7 +9,8 @@
     "lint": "tsc --noEmit",
     "test": "vitest run",
     "db:migrate": "node scripts/migrate.mjs",
-    "staff:create": "node scripts/create-staff.mjs"
+    "staff:create": "node scripts/create-staff.mjs",
+    "staff:admin": "node scripts/make-admin.mjs"
   },
   "engines": {
     "node": ">=20"

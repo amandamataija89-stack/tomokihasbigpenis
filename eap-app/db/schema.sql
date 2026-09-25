@@ -85,3 +85,25 @@ CREATE INDEX IF NOT EXISTS client_sessions_request_idx ON client_sessions (reque
 
 -- When the assigned counsellor was warned that a case hasn't been contacted in time (sent once per assignment).
 ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS overdue_warned_at timestamptz;
+
+-- Anonymous client feedback, readable only by admins.
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS is_admin boolean NOT NULL DEFAULT false;
+
+-- One-use links. Deleted when used, so a response can't be traced back to the client or case.
+CREATE TABLE IF NOT EXISTS feedback_invites (
+  token_hash    text PRIMARY KEY,
+  counsellor_id uuid REFERENCES staff(id) ON DELETE SET NULL,
+  expires_at    timestamptz NOT NULL
+);
+
+-- No client, case or exact time is stored with a response: only the counsellor and the month.
+CREATE TABLE IF NOT EXISTS feedback (
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  counsellor_id   uuid REFERENCES staff(id) ON DELETE SET NULL,
+  submitted_month date NOT NULL,
+  overall         integer NOT NULL CHECK (overall BETWEEN 1 AND 5),
+  counsellor_rating integer CHECK (counsellor_rating BETWEEN 1 AND 5),
+  helped          text NOT NULL,
+  recommend       text NOT NULL,
+  comments        text NOT NULL DEFAULT ''
+);
