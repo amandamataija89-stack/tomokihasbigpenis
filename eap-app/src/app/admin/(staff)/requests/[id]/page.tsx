@@ -6,6 +6,8 @@ import { getRequest, listNotes, listSessions, listStaffWithLoad, STATUSES, STATU
 import { acceptCase, addNote, declineCase, deleteRequest, emailFeedbackLink, updateRequest } from "../../../actions";
 import { contactDue } from "@/lib/deadlines";
 import { formatDate } from "../../../format";
+import { listMessages, markClientMessagesRead } from "@/lib/messages";
+import { Messages } from "./Messages";
 import { Sessions } from "./Sessions";
 
 export default async function RequestPage({
@@ -20,6 +22,7 @@ export default async function RequestPage({
     feedback?: string;
     accepted?: string;
     taken?: string;
+    msg?: string;
   }>;
 }) {
   const { id } = await params;
@@ -29,10 +32,13 @@ export default async function RequestPage({
   const r = await getRequest(id);
   // Counsellors only ever see their own clients; anything else looks like it doesn't exist.
   if (!r || (!manager && r.assigned_to !== me.id)) notFound();
-  const [notes, staff, sessions] = await Promise.all([
+  // The client's messages count as read once whoever looks after them opens the case.
+  if (r.assigned_to === me.id || (!r.assigned_to && manager)) await markClientMessagesRead(id);
+  const [notes, staff, sessions, messages] = await Promise.all([
     listNotes(id),
     manager ? listStaffWithLoad(undefined, false) : Promise.resolve([]),
     listSessions(id),
+    listMessages(id),
   ]);
   const pendingForMe = r.assigned_to === me.id && !r.accepted_at && r.status === "new";
   const due = contactDue(r.created_at, r.crisis);
@@ -130,6 +136,7 @@ export default async function RequestPage({
               </>
             )}
           </section>
+          <Messages requestId={r.id} nickname={r.first_name} messages={messages} flash={sp.msg} />
           <Sessions requestId={r.id} sessions={sessions} clientEmail={r.email} error={sp.session} />
         </div>
 

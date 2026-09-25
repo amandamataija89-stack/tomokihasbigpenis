@@ -151,3 +151,23 @@ ALTER TABLE client_sessions ADD COLUMN IF NOT EXISTS reminder_sent_at timestampt
 
 -- When the coordinator was told a client's contact promise was missed (once per case).
 ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS contact_missed_at timestamptz;
+
+-- Conversation between the counsellor and the client, on the case. The client reads and replies on a
+-- private page reached by a link in their emails (no login). Emails never contain the message text.
+CREATE TABLE IF NOT EXISTS client_messages (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  request_id uuid NOT NULL REFERENCES support_requests(id) ON DELETE CASCADE,
+  sender     text NOT NULL CHECK (sender IN ('staff', 'client')),
+  staff_id   uuid REFERENCES staff(id) ON DELETE SET NULL,
+  body       text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  read_at    timestamptz
+);
+CREATE INDEX IF NOT EXISTS client_messages_request_idx ON client_messages (request_id, created_at);
+
+-- Private links to a client's conversation page. Several can be valid at once (one per email sent).
+CREATE TABLE IF NOT EXISTS message_links (
+  token_hash text PRIMARY KEY,
+  request_id uuid NOT NULL REFERENCES support_requests(id) ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now()
+);

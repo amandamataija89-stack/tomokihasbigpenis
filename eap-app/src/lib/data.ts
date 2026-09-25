@@ -75,13 +75,15 @@ export type RequestRow = {
   sessions_done: number;
   sessions_total: number;
   next_session: Date | null;
+  unread: number; // messages from the client not yet read
 };
 
 const REQUEST_SELECT = `
   SELECT r.*, c.name AS company_name, s.name AS assigned_name,
     (SELECT count(*)::int FROM client_sessions cs WHERE cs.request_id = r.id AND cs.done_at IS NOT NULL) AS sessions_done,
     (SELECT count(*)::int FROM client_sessions cs WHERE cs.request_id = r.id) AS sessions_total,
-    (SELECT min(starts_at) FROM client_sessions cs WHERE cs.request_id = r.id AND cs.done_at IS NULL) AS next_session
+    (SELECT min(starts_at) FROM client_sessions cs WHERE cs.request_id = r.id AND cs.done_at IS NULL) AS next_session,
+    (SELECT count(*)::int FROM client_messages m WHERE m.request_id = r.id AND m.sender = 'client' AND m.read_at IS NULL) AS unread
   FROM support_requests r
   JOIN companies c ON c.id = r.company_id
   LEFT JOIN staff s ON s.id = r.assigned_to`;

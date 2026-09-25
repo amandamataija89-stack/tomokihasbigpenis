@@ -96,6 +96,28 @@ clients per month (counsellors can choose up to 5; a coordinator can set
 more on the Team page), **away until** a date, and languages. Offers skip
 anyone who isn't available.
 
+## Messages with the client
+
+Counsellor and client talk on the case, not by personal email or phone.
+
+- On each case, **Messages with …** shows the conversation, with a box to
+  write to the client. The first message counts as accepting the client
+  and moves a New case to **Contacted**.
+- The client gets an email saying there's a new message, with a **private
+  link** to their conversation page. They read and reply there, with no
+  login. Their confirmation email and every session email include the same
+  kind of link, so they can also write first (for example to cancel a
+  session).
+- A client's reply emails the counsellor looking after them (or the
+  coordinator, if nobody has the case yet) with a link to sign in. The
+  requests list shows "1 new message" until they open the case.
+- **Emails never contain what anyone wrote**, only that there's a new
+  message. The words stay in the app.
+- Anyone with a client's link can read that conversation, so the pages tell
+  clients to keep it to themselves. Links stop working 30 days after a case
+  is completed or closed.
+- Other counsellors can't see or write in a conversation that isn't theirs.
+
 ## Sessions
 
 Each client gets up to 5 sessions. On a case, under **Sessions**:
@@ -137,6 +159,7 @@ The number of sessions is `SESSIONS_PER_CLIENT` in `src/lib/data.ts`; the
 | `/` | Employee | Enter company code |
 | `/join/ABCD-EFGH` | Employee | Request form for that company |
 | `/feedback/<link>` | Client | One-use anonymous feedback form |
+| `/messages/<link>` | Client | Their private conversation with their counsellor |
 | `/admin` | Staff | My clients (counsellors) or all requests (coordinators, admins), plus the pool |
 | `/admin/requests/<id>` | Staff | The case: accept/decline, sessions, status, notes |
 | `/admin/availability` | Staff | Their own availability |

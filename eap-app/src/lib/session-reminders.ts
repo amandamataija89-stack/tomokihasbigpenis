@@ -2,6 +2,7 @@ import { pool } from "./db";
 import { LATE_CANCEL_HOURS } from "./deadlines";
 import { formatDeadline, sendEmail, sessionReminder } from "./email";
 import { SESSIONS_PER_CLIENT } from "./data";
+import { clientMessageLink } from "./messages";
 
 const whenFmt = new Intl.DateTimeFormat("en-GB", {
   weekday: "long",
@@ -22,6 +23,7 @@ const whenFmt = new Intl.DateTimeFormat("en-GB", {
 export async function sendSessionReminders(now = new Date()): Promise<number> {
   const { rows } = await pool.query<{
     id: string;
+    request_id: string;
     starts_at: Date;
     email: string;
     first_name: string;
@@ -29,7 +31,7 @@ export async function sendSessionReminders(now = new Date()): Promise<number> {
     therapist: string | null;
     number: number;
   }>(
-    `SELECT cs.id, cs.starts_at, r.email, r.first_name, r.format, s.name AS therapist,
+    `SELECT cs.id, cs.request_id, cs.starts_at, r.email, r.first_name, r.format, s.name AS therapist,
        (SELECT count(*)::int FROM client_sessions o WHERE o.request_id = r.id AND o.starts_at <= cs.starts_at) AS number
      FROM client_sessions cs
      JOIN support_requests r ON r.id = cs.request_id
@@ -53,6 +55,7 @@ export async function sendSessionReminders(now = new Date()): Promise<number> {
           format: r.format,
           therapistName: r.therapist,
           lateCancelHours: LATE_CANCEL_HOURS,
+          messageLink: await clientMessageLink(r.request_id),
           cancelBy: formatDeadline(new Date(r.starts_at.getTime() - LATE_CANCEL_HOURS * 3600_000)),
         }),
       );

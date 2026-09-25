@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { employeeConfirmation, sessionConfirmation, sessionReminder } from "./email";
+import { employeeConfirmation, newMessageForClient, newReplyForStaff, sessionConfirmation, sessionReminder } from "./email";
 
 const base = {
   to: "jana@example.com",
@@ -47,5 +47,21 @@ describe("employeeConfirmation", () => {
   it("promises 24 working hours, or as soon as possible for urgent requests", () => {
     expect(employeeConfirmation("a@example.com", "Míša").text).toContain("within 24 working hours (Monday to Friday)");
     expect(employeeConfirmation("a@example.com", "Míša", true).text).toContain("as soon as possible");
+  });
+});
+
+describe("message notifications", () => {
+  it("link to the conversation but never include the message", () => {
+    const m = newMessageForClient("a@example.com", "Nela", "Eva Nováková", "https://eap.example/messages/abc");
+    expect(m.text).toContain("https://eap.example/messages/abc");
+    expect(m.subject).toBe("New message from Eva Nováková");
+    const s = newReplyForStaff("eva@example.com", "Eva", "Nela", "123");
+    expect(s.text).toContain("/admin/requests/123#messages");
+  });
+
+  it("put the private link in the confirmation and session emails", () => {
+    expect(employeeConfirmation("a@example.com", "Nela", false, "https://x/messages/t").text).toContain("https://x/messages/t");
+    const booked = sessionConfirmation({ ...base, kind: "booked", format: "Online", messageLink: "https://x/messages/t" });
+    expect(booked.text).toContain("message us on your private page (https://x/messages/t)");
   });
 });

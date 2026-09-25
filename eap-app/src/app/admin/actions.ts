@@ -10,6 +10,7 @@ import { SESSIONS_PER_CLIENT, STATUSES, STATUS_LABELS, type Status } from "@/lib
 import { pool } from "@/lib/db";
 import { LATE_CANCEL_HOURS } from "@/lib/deadlines";
 import { sendEmail, sessionConfirmation, therapistAlert, type SessionEmail } from "@/lib/email";
+import { clientMessageLink, MAX_MESSAGE_LENGTH, sendStaffMessage } from "@/lib/messages";
 import { acceptOffer, declineOffer, offerTo, takeFromPool } from "@/lib/offers";
 import { verifyPassword } from "@/lib/password";
 import { MIN_PASSWORD_LENGTH, sendInvite, sendPasswordReset, setPasswordWithToken } from "@/lib/staff-accounts";
@@ -365,6 +366,7 @@ async function emailClient(
 ): Promise<string> {
   if (formData.get("notifyClient") !== "yes") return "";
   const { rows } = await pool.query<{
+    request_id: string;
     email: string;
     first_name: string;
     format: string;
@@ -372,7 +374,7 @@ async function emailClient(
     starts_at: Date;
     number: number;
   }>(
-    `SELECT r.email, r.first_name, r.format, s.name AS therapist, cs.starts_at,
+    `SELECT r.id AS request_id, r.email, r.first_name, r.format, s.name AS therapist, cs.starts_at,
        (SELECT count(*)::int FROM client_sessions o WHERE o.request_id = r.id AND o.starts_at <= cs.starts_at) AS number
      FROM client_sessions cs
      JOIN support_requests r ON r.id = cs.request_id
@@ -393,6 +395,7 @@ async function emailClient(
         total: SESSIONS_PER_CLIENT,
         format: r.format,
         therapistName: r.therapist,
+        messageLink: await clientMessageLink(r.request_id),
         // The first booking explains the cancellation policy.
         lateCancelHours: kind === "booked" && r.number === 1 ? LATE_CANCEL_HOURS : undefined,
       }),
@@ -517,4 +520,26 @@ export async function emailFeedbackLink(requestId: string) {
   const { staff } = await requireCase(requestId);
   await sendFeedbackLink(requestId, staff.id);
   redirect(`/admin/requests/${requestId}?feedback=sent`);
+}
+
+// ---- Messages with the client ---------------------------------------------------------
+
+export async function messageClient(requestId: string, formData: FormData) {
+  const c = await requireCase(requestId);
+  const body = String(formData.get("message") ?? "").trim().slice(0, MAX_MESSAGE_LENGTH);
+  if (!body) redirect(`/admin/requests/${requestId}?msg=empty#messages`);
+  await acceptIfPending(requestId, c);
+  try {
+    await sendStaffMessage(requestId, c.staff.id, body);
+  } catch (err) {
+    console.error("EAP message email failed:", err);
+    redirect(`/admin/requests/${requestId}?msg=emailfailed#messages`);
+  }
+  // Writing to the client is first contact.
+  const { rowCount } = await pool.query(
+    "UPDATE support_requests SET status = 'contacted', updated_at = now() WHERE id = $1 AND status = 'new'",
+    [requestId],
+  );
+  await note(requestId, c.staff.id, `Sent the client a message.${rowCount ? " Status changed from New to Contacted." : ""}`);
+  redirect(`/admin/requests/${requestId}?msg=sent#messages`);
 }

@@ -105,6 +105,13 @@ export default async function RequestsPage({
                     <td>
                       <Link className="rowlink" href={`/admin/requests/${r.id}`}>{r.first_name}</Link>
                       {r.crisis && <> <span className="pill pill-crisis">Crisis</span></>}
+                      {r.unread > 0 && (
+                        <div>
+                          <Link href={`/admin/requests/${r.id}#messages`} className="pill pill-unread">
+                            {r.unread} new {r.unread === 1 ? "message" : "messages"}
+                          </Link>
+                        </div>
+                      )}
                     </td>
                     <td>{r.company_name}</td>
                     <td>{r.language}</td>

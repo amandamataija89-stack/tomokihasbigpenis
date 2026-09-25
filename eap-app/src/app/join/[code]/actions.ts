@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { normalizeCompanyCode } from "@/lib/codes";
 import { findCompanyByCode, insertRequest } from "@/lib/data";
 import { autoAssign } from "@/lib/assign";
+import { clientMessageLink } from "@/lib/messages";
 import { employeeConfirmation, sendEmail, teamAlert, therapistAlert } from "@/lib/email";
 import { validateRequest, type FieldErrors, type FormValues } from "@/lib/request-form";
 
@@ -37,7 +38,7 @@ export async function submitRequest(rawCode: string, _prev: SubmitState, formDat
   }
   const mails = [
     teamAlert(company.name, id, therapist?.name ?? null, result.data.crisis),
-    employeeConfirmation(result.data.email, result.data.firstName, result.data.crisis),
+    employeeConfirmation(result.data.email, result.data.firstName, result.data.crisis, await clientMessageLink(id)),
   ];
   if (therapist) mails.push(therapistAlert(therapist.email, therapist.name, id, result.data.crisis));
   const sent = await Promise.allSettled(mails.map(sendEmail));

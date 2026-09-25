@@ -114,15 +114,20 @@ export function passwordReset(to: string, name: string, token: string): Mail {
   };
 }
 
-export function employeeConfirmation(to: string, firstName: string, crisis = false): Mail {
+// How the client reaches us in writing: their private conversation page.
+const messageLine = (link?: string) =>
+  link ? `\n\nTo write to us, or to read and answer our messages, use your private page:\n${link}\n(Keep this link to yourself: anyone with it can read your messages.)` : "";
+
+export function employeeConfirmation(to: string, firstName: string, crisis = false, messageLink?: string): Mail {
   return {
     to,
     subject: "We've received your request – Prague Integration",
-    text: `Hi ${firstName},\n\nThank you for reaching out. We've received your request and someone from our team will contact you ${crisis ? "as soon as possible" : "within 24 working hours (Monday to Friday)"}, in the way you asked.\n\nEverything you share with us is confidential. Your employer is not told who uses the programme.\n\nIf you need urgent help before we reach you, call 112 (emergency) or the Linka první psychické pomoci on 116 123 (free, 24/7).\n\nPrague Integration\n+420 608 573 256\ncontact@pragueintegration.cz\n`,
+    text: `Hi ${firstName},\n\nThank you for reaching out. We've received your request and someone from our team will contact you ${crisis ? "as soon as possible" : "within 24 working hours (Monday to Friday)"}, in the way you asked.${messageLine(messageLink)}\n\nEverything you share with us is confidential. Your employer is not told who uses the programme.\n\nIf you need urgent help before we reach you, call 112 (emergency) or the Linka první psychické pomoci on 116 123 (free, 24/7).\n\nPrague Integration\n+420 608 573 256\ncontact@pragueintegration.cz\n`,
   };
 }
 
 export type SessionEmail = {
+  messageLink?: string; // the client's private conversation page
   lateCancelHours?: number; // include the cancellation policy (first booking and reminders)
   to: string;
   firstName: string;
@@ -164,7 +169,7 @@ export function sessionConfirmation(s: SessionEmail): Mail {
   return {
     to: s.to,
     subject: `${subject} – Prague Integration`,
-    text: `Hi ${s.firstName},\n\n${lead[0].toUpperCase()}${lead.slice(1)}\n\n${s.when} (Prague time)${body}\n\nIf you need to change the time, reply to this email or call +420 608 573 256.\n\nPrague Integration\ncontact@pragueintegration.cz\n`,
+    text: `Hi ${s.firstName},\n\n${lead[0].toUpperCase()}${lead.slice(1)}\n\n${s.when} (Prague time)${body}\n\nIf you need to change the time, ${s.messageLink ? `message us on your private page (${s.messageLink})` : "reply to this email"} or call +420 608 573 256.\n\nPrague Integration\ncontact@pragueintegration.cz\n`,
   };
 }
 
@@ -211,6 +216,23 @@ export function sessionReminder(s: Omit<SessionEmail, "kind"> & { cancelBy: stri
   return {
     to: s.to,
     subject: `Reminder: your session on ${s.when} – Prague Integration`,
-    text: `Hi ${s.firstName},\n\nA reminder of your upcoming session${s.therapistName ? ` with ${s.therapistName}` : ""}:\n\n${s.when} (Prague time)\nSession ${s.number} of ${s.total}${where ? `\n${where}` : ""}\n\nIf you need to cancel or move it, please tell us by ${s.cancelBy}: reply to this email or call +420 608 573 256. After that, a cancellation counts as one of your ${s.total} sessions.\n\nSee you soon,\nPrague Integration\n`,
+    text: `Hi ${s.firstName},\n\nA reminder of your upcoming session${s.therapistName ? ` with ${s.therapistName}` : ""}:\n\n${s.when} (Prague time)\nSession ${s.number} of ${s.total}${where ? `\n${where}` : ""}\n\nIf you need to cancel or move it, please tell us by ${s.cancelBy}: ${s.messageLink ? `message us on your private page (${s.messageLink})` : "reply to this email"} or call +420 608 573 256. After that, a cancellation counts as one of your ${s.total} sessions.\n\nSee you soon,\nPrague Integration\n`,
+  };
+}
+
+// Message notifications carry no message text: it stays in the app.
+export function newMessageForClient(to: string, firstName: string, counsellorName: string | null, link: string): Mail {
+  return {
+    to,
+    subject: `New message from ${counsellorName ?? "Prague Integration"}`,
+    text: `Hi ${firstName},\n\n${counsellorName ?? "Your counsellor"} from Prague Integration has sent you a message. Read it and reply on your private page:\n${link}\n\nFor your privacy, messages aren't included in emails. Please reply on the page rather than to this email.\n\nPrague Integration\n`,
+  };
+}
+
+export function newReplyForStaff(to: string, staffName: string, clientNickname: string, requestId: string): Mail {
+  return {
+    to,
+    subject: `New message from ${clientNickname}`,
+    text: `Hi ${staffName},\n\n${clientNickname} has sent a message. Sign in to read and answer it:\n${appUrl()}/admin/requests/${requestId}#messages\n`,
   };
 }
