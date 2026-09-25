@@ -558,8 +558,9 @@ type SetupState = { error?: string; name?: string; email?: string };
 export async function setupFirstAdmin(_prev: SetupState, formData: FormData): Promise<SetupState> {
   // Echoed back with any error, so the form keeps what was typed.
   const keep = { name: String(formData.get("name") ?? ""), email: String(formData.get("email") ?? "") };
-  const expected = process.env.SETUP_CODE ?? "";
-  const given = String(formData.get("setupCode") ?? "");
+  // Stray spaces around a pasted code shouldn't lock anyone out.
+  const expected = (process.env.SETUP_CODE ?? "").trim();
+  const given = String(formData.get("setupCode") ?? "").trim();
   const a = Buffer.from(given);
   const b = Buffer.from(expected);
   if (!expected) return { error: "Add a SETUP_CODE setting in Vercel first (any code you make up), then redeploy.", ...keep };
