@@ -12,7 +12,7 @@ type Member = { id: string; role: Role; takes_clients: boolean; away_until: stri
 export default async function TeamPage({
   searchParams,
 }: {
-  searchParams: Promise<{ saved?: string; invited?: string; welcome?: string; noemail?: string }>;
+  searchParams: Promise<{ saved?: string; invited?: string; welcome?: string; noemail?: string; emailerror?: string }>;
 }) {
   const me = await requireManager();
   const sp = await searchParams;
@@ -52,6 +52,11 @@ export default async function TeamPage({
       )}
       {sp.saved && <p className="flash" role="status">Saved.</p>}
       {sp.invited && <p className="flash" role="status">Invitation emailed.</p>}
+      {sp.emailerror && (
+        <p className="err" role="alert">
+          No invitation was sent. {sp.emailerror.slice(0, 400)}
+        </p>
+      )}
       {sp.noemail && (
         <p className="err" role="alert">
           No invitation was sent: email isn&apos;t connected yet. Add RESEND_API_KEY in Vercel&apos;s environment

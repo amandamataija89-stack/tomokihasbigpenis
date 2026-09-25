@@ -4,7 +4,8 @@
 type Mail = { to: string; subject: string; text: string };
 
 export async function sendEmail({ to, subject, text }: Mail): Promise<void> {
-  const key = process.env.RESEND_API_KEY;
+  // Tolerates a key pasted with spaces, quotes or line breaks around it.
+  const key = process.env.RESEND_API_KEY?.replace(/["'\s]/g, "");
   const from = process.env.EMAIL_FROM ?? "Prague Integration <contact@pragueintegration.cz>";
   if (!key) {
     console.info(`[email not sent: RESEND_API_KEY unset] to=${to} subject=${subject}\n${text}`);
@@ -16,6 +17,21 @@ export async function sendEmail({ to, subject, text }: Mail): Promise<void> {
     body: JSON.stringify({ from, to: [to], subject, text }),
   });
   if (!res.ok) throw new Error(`Resend returned ${res.status}: ${await res.text()}`);
+}
+
+/** Plain-English reason an email couldn't be sent, safe to show to staff (never includes the key). */
+export function emailProblem(err: unknown): string {
+  const msg = err instanceof Error ? err.message : String(err);
+  const status = Number(msg.match(/Resend returned (\d+)/)?.[1]);
+  if (status === 401 || /api key is invalid|missing api key/i.test(msg))
+    return "Resend didn't accept the RESEND_API_KEY in Vercel. Create a new API key in Resend, paste it into Vercel again, and redeploy.";
+  if (/domain is not verified|not verified/i.test(msg))
+    return "Resend says the sending domain isn't verified yet. Check it shows Verified in Resend, then try again.";
+  if (status === 403)
+    return "Resend refused to send: the API key may be limited to a different domain, or have no sending permission. Create a new key with Sending access for pragueintegration.cz.";
+  if (status === 429) return "Resend is busy (too many emails at once). Wait a minute and try again.";
+  const detail = msg.replace(/re_[A-Za-z0-9_]+/g, "[key]").slice(0, 300);
+  return `The email couldn't be sent. Resend said: ${detail}`;
 }
 
 const appUrl = () => process.env.APP_URL ?? "http://localhost:3000";
