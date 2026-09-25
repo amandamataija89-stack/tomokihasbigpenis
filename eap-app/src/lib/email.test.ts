@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sessionConfirmation, sessionReminder } from "./email";
+import { employeeConfirmation, sessionConfirmation, sessionReminder } from "./email";
 
 const base = {
   to: "jana@example.com",
@@ -40,5 +40,12 @@ describe("cancellation policy", () => {
     const m = sessionReminder({ ...base, format: "Online", lateCancelHours: 48, cancelBy: "Sunday 27 September, 17:00" });
     expect(m.subject).toContain("Reminder");
     expect(m.text).toContain("please tell us by Sunday 27 September, 17:00");
+  });
+});
+
+describe("employeeConfirmation", () => {
+  it("promises 24 working hours, or as soon as possible for urgent requests", () => {
+    expect(employeeConfirmation("a@example.com", "Míša").text).toContain("within 24 working hours (Monday to Friday)");
+    expect(employeeConfirmation("a@example.com", "Míša", true).text).toContain("as soon as possible");
   });
 });

@@ -37,7 +37,7 @@ export async function submitRequest(rawCode: string, _prev: SubmitState, formDat
   }
   const mails = [
     teamAlert(company.name, id, therapist?.name ?? null, result.data.crisis),
-    employeeConfirmation(result.data.email, result.data.firstName),
+    employeeConfirmation(result.data.email, result.data.firstName, result.data.crisis),
   ];
   if (therapist) mails.push(therapistAlert(therapist.email, therapist.name, id, result.data.crisis));
   const sent = await Promise.allSettled(mails.map(sendEmail));

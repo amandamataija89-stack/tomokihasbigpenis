@@ -23,7 +23,7 @@ export default async function JoinPage({ params }: { params: Promise<{ code: str
         <h1>Ask for support</h1>
         <p className="lede">
           Tell us a little about yourself and how you&apos;d like to be contacted. Someone from our team will get
-          back to you within 24 hours to arrange a first conversation.
+          back to you within 24 working hours (Monday to Friday) to arrange a first conversation.
         </p>
       </section>
       <p className="reassure">

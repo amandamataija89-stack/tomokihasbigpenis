@@ -20,7 +20,7 @@ export default async function Thanks({ searchParams }: { searchParams: Promise<{
         <p className="lede">
           {urgent
             ? "Someone from our team will contact you as soon as possible, in the way you asked."
-            : "Someone from our team will contact you within 24 hours, in the way you asked."}{" "}
+            : "Someone from our team will contact you within 24 working hours (Monday to Friday), in the way you asked."}{" "}
           We&apos;ve also sent a confirmation to your email.
         </p>
         {!urgent && (

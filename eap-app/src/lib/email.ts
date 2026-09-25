@@ -27,7 +27,7 @@ export function teamAlert(companyName: string, requestId: string, assignedName: 
   return {
     to: process.env.TEAM_NOTIFY_EMAIL ?? "contact@pragueintegration.cz",
     subject: `${crisis ? "URGENT – " : ""}New EAP request (${companyName})${assignedName ? "" : " – needs assigning"}`,
-    text: `${urgent}A new support request has come in.\n\nCompany: ${companyName}\n${who}\n\nOpen it here to see the details and make contact within 24 hours:\n${appUrl()}/admin/requests/${requestId}\n`,
+    text: `${urgent}A new support request has come in.\n\nCompany: ${companyName}\n${who}\n\nOpen it here to see the details and make contact within 24 working hours:\n${appUrl()}/admin/requests/${requestId}\n`,
   };
 }
 
@@ -50,7 +50,7 @@ export function therapistAlert(to: string, therapistName: string, requestId: str
     text: `Hi ${therapistName},\n\nA new EAP client has been offered to you.${
       crisis ? " They say they need help urgently." : ""
     }\n\nPlease open it and press Accept or Decline${by ? ` by ${by} (Prague time)` : ""}. If you don't answer by then, the client goes back to the pool for someone else.${
-      crisis ? " Once you accept, contact them as soon as possible today." : " Once you accept, please make first contact within 24 hours."
+      crisis ? " Once you accept, contact them as soon as possible today." : " Once you accept, please make first contact within 24 working hours (Monday to Friday)."
     }\n\n${appUrl()}/admin/requests/${requestId}\n`,
   };
 }
@@ -114,11 +114,11 @@ export function passwordReset(to: string, name: string, token: string): Mail {
   };
 }
 
-export function employeeConfirmation(to: string, firstName: string): Mail {
+export function employeeConfirmation(to: string, firstName: string, crisis = false): Mail {
   return {
     to,
     subject: "We've received your request – Prague Integration",
-    text: `Hi ${firstName},\n\nThank you for reaching out. We've received your request and someone from our team will contact you within 24 hours, in the way you asked.\n\nEverything you share with us is confidential. Your employer is not told who uses the programme.\n\nIf you need urgent help before we reach you, call 112 (emergency) or the Linka první psychické pomoci on 116 123 (free, 24/7).\n\nPrague Integration\n+420 608 573 256\ncontact@pragueintegration.cz\n`,
+    text: `Hi ${firstName},\n\nThank you for reaching out. We've received your request and someone from our team will contact you ${crisis ? "as soon as possible" : "within 24 working hours (Monday to Friday)"}, in the way you asked.\n\nEverything you share with us is confidential. Your employer is not told who uses the programme.\n\nIf you need urgent help before we reach you, call 112 (emergency) or the Linka první psychické pomoci on 116 123 (free, 24/7).\n\nPrague Integration\n+420 608 573 256\ncontact@pragueintegration.cz\n`,
   };
 }
 

@@ -202,11 +202,11 @@ Checks: `npm run lint` (TypeScript) and `npm test` (unit tests).
 
 ## Before going live, please confirm
 
-- **Response times.** The client pages and emails promise contact "within 24
-  hours". With 24 working hours to accept plus 24 to make contact, it can
-  now take longer, especially over a weekend. Change the wording, or shorten
-  the times in `src/lib/deadlines.ts`.
-- **Cancellation policy.** Emails say sessions cancelled with less than 48
+- **Response times.** Clients are promised contact within 24 working hours
+  (Monday to Friday), or as soon as possible if urgent. In the requests list a
+  case turns red once that has passed. Only weekends are skipped, not public
+  holidays.
+- **Cancellation policy (confirmed):** sessions cancelled with less than 48
   hours' notice count as one of the 5. Make sure client contracts say the
   same.
 - **Confidentiality wording.** Pages tell employees their employer is not
