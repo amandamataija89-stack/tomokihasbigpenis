@@ -1,0 +1,571 @@
+<title>Prague Integration EAP Application</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Source+Sans+3:wght@400;600&display=swap">
+<style>
+  :root {
+    --ink: #0a0a0a;
+    --text: #1d2321;
+    --muted: #5b6662;
+    --bg: #f3f5f4;
+    --surface: #ffffff;
+    --line: #dde3e0;
+    --field: #ffffff;
+    --green: #4e9c77;
+    --green-strong: #3a7f5f;
+    --green-soft: #e3f0e9;
+    --rose: #d98aa0;
+    --navy: #33416b;
+    --error: #b3261e;
+    --focus: #33416b;
+    --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+    --body: "Source Sans 3", "Segoe UI", system-ui, -apple-system, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --ink: #f2f4f3;
+      --text: #dfe5e2;
+      --muted: #9aa7a2;
+      --bg: #121615;
+      --surface: #1a201e;
+      --line: #2e3734;
+      --field: #141917;
+      --green: #6cbb94;
+      --green-strong: #86cfaa;
+      --green-soft: #1f3129;
+      --rose: #e7a3b6;
+      --navy: #9fb0e0;
+      --error: #f2877f;
+      --focus: #9fb0e0;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --ink: #f2f4f3;
+    --text: #dfe5e2;
+    --muted: #9aa7a2;
+    --bg: #121615;
+    --surface: #1a201e;
+    --line: #2e3734;
+    --field: #141917;
+    --green: #6cbb94;
+    --green-strong: #86cfaa;
+    --green-soft: #1f3129;
+    --rose: #e7a3b6;
+    --navy: #9fb0e0;
+    --error: #f2877f;
+    --focus: #9fb0e0;
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--body);
+    font-size: 17px;
+    line-height: 1.55;
+    padding-inline: 16px;
+    padding-block: 32px 64px;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; display: grid; gap: 32px; }
+
+  /* Brand mark, rebuilt from the logo */
+  .brand { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+  .wordmark { font-family: var(--display); font-weight: 800; font-size: 24px; line-height: 1.1; color: var(--ink); }
+  .wordmark .plus { color: var(--green); display: block; font-size: 22px; }
+  .marks { display: grid; grid-template-columns: repeat(2, 14px); gap: 6px 5px; padding-top: 4px; }
+  .dot { width: 14px; height: 14px; border-radius: 50%; background: var(--rose); }
+  .tri-up, .tri-down { width: 0; height: 0; border-left: 7px solid transparent; border-right: 7px solid transparent; }
+  .tri-up { border-bottom: 11px solid var(--navy); }
+  .tri-down { border-top: 11px solid var(--navy); }
+
+  .intro h1 {
+    font-family: var(--display); font-weight: 800; color: var(--ink);
+    font-size: clamp(30px, 6vw, 42px); line-height: 1.08; margin: 0 0 12px;
+    text-wrap: balance; letter-spacing: -0.01em;
+  }
+  .intro p { margin: 0; max-width: 62ch; color: var(--muted); }
+
+  .steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .steps li { border-top: 3px solid var(--green); padding-top: 10px; font-size: 15px; color: var(--muted); }
+  .steps b { display: block; color: var(--ink); font-family: var(--display); font-weight: 600; font-size: 16px; margin-bottom: 2px; }
+
+  form, .review { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 8px 28px 28px; }
+  fieldset { border: 0; margin: 0; padding: 24px 0 8px; border-bottom: 1px solid var(--line); display: grid; gap: 18px; min-width: 0; }
+  fieldset:last-of-type { border-bottom: 0; }
+  legend { font-family: var(--display); font-weight: 600; font-size: 20px; color: var(--ink); padding: 0; margin-bottom: 4px; display: flex; gap: 10px; align-items: baseline; }
+  legend .n { font-size: 13px; letter-spacing: 0.08em; color: var(--green-strong); font-variant-numeric: tabular-nums; }
+  .hint { font-size: 14px; color: var(--muted); margin: -10px 0 0; }
+
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .field { display: grid; gap: 6px; min-width: 0; }
+  label, .qlabel { font-weight: 600; font-size: 15px; color: var(--ink); }
+  .opt { font-weight: 400; color: var(--muted); font-size: 13px; margin-left: 4px; }
+  input[type="text"], input[type="email"], input[type="tel"], input[type="number"], input[type="url"], input[type="date"], select, textarea {
+    width: 100%; font: inherit; font-size: 16px; color: var(--text); background: var(--field);
+    border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px;
+  }
+  textarea { min-height: 96px; resize: vertical; }
+  input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible, .choice input:focus-visible + span {
+    outline: 2px solid var(--focus); outline-offset: 2px;
+  }
+  .invalid input, .invalid select, .invalid textarea { border-color: var(--error); }
+  .err { color: var(--error); font-size: 14px; display: none; }
+  .invalid .err { display: block; }
+
+  .choices { display: flex; flex-wrap: wrap; gap: 8px; }
+  .choice { position: relative; }
+  .choice input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  .choice span {
+    display: inline-block; border: 1px solid var(--line); border-radius: 999px; padding: 7px 14px;
+    font-size: 15px; cursor: pointer; background: var(--field); color: var(--text); transition: background .15s, border-color .15s;
+  }
+  .choice input:checked + span { background: var(--green-soft); border-color: var(--green); color: var(--ink); font-weight: 600; }
+  .choice input:checked + span::before { content: "✓ "; color: var(--green-strong); }
+
+  .group-title { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 4px 0 -8px; font-weight: 600; }
+
+  .consent { display: flex; gap: 10px; align-items: flex-start; font-size: 15px; font-weight: 400; color: var(--text); }
+  .consent input { margin-top: 5px; width: 18px; height: 18px; accent-color: var(--green); flex: none; }
+  .privacy { font-size: 14px; color: var(--muted); max-width: 65ch; }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding-top: 24px; }
+  button { font: inherit; font-weight: 600; font-size: 16px; border-radius: 6px; padding: 11px 20px; cursor: pointer; border: 1px solid transparent; }
+  .primary { background: var(--green-strong); color: #fff; }
+  :root[data-theme="dark"] .primary { color: #0b1410; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .primary { color: #0b1410; } }
+  .primary:hover { filter: brightness(1.06); }
+  .ghost { background: transparent; color: var(--ink); border-color: var(--line); }
+  .status { font-size: 14px; color: var(--muted); }
+
+  .review { padding-top: 24px; display: grid; gap: 18px; }
+  .review h2 { font-family: var(--display); font-weight: 800; color: var(--ink); font-size: 26px; margin: 0; text-wrap: balance; }
+  .review p { margin: 0; max-width: 62ch; }
+  .sendto { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; background: var(--green-soft); border-radius: 8px; padding: 14px 16px; }
+  .sendto code { font-family: var(--body); font-weight: 600; font-size: 17px; color: var(--ink); user-select: all; }
+  pre.summary {
+    margin: 0; white-space: pre-wrap; word-break: break-word; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 13.5px; line-height: 1.55; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 16px; max-height: 420px; overflow: auto;
+  }
+
+  footer { font-size: 14px; color: var(--muted); display: grid; gap: 4px; }
+  footer b { color: var(--ink); }
+
+  @media (max-width: 600px) {
+    .row, .steps { grid-template-columns: 1fr; }
+    form, .review { padding-inline: 18px; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header class="brand" aria-label="Prague Integration">
+    <div class="wordmark">Prague<br>Integration<span class="plus">+</span></div>
+    <div class="marks" aria-hidden="true">
+      <span class="dot"></span><span class="dot"></span>
+      <span class="tri-up"></span><span class="tri-down"></span>
+    </div>
+  </header>
+
+  <section class="intro">
+    <h1>Employee Assistance Programme application</h1>
+    <p>Tell us about your organisation and what support you want for your people. Our team of 30+ psychologists, counsellors, coaches and trainers works online, in person, onsite and hybrid, in English, Czech, Russian, Spanish and more.</p>
+  </section>
+
+  <ol class="steps" aria-label="How enrolment works">
+    <li><b>You apply</b>Fill in this form and send it to us.</li>
+    <li><b>We propose</b>We contact you to discuss a programme built for your team.</li>
+    <li><b>We launch</b>Your employees get a confidential way to reach us.</li>
+  </ol>
+
+  <form id="eap-form" novalidate>
+    <fieldset>
+      <legend><span class="n">01</span>Your organisation</legend>
+      <div class="row">
+        <div class="field" data-required>
+          <label for="company">Company name</label>
+          <input id="company" name="company" type="text" autocomplete="organization" placeholder="e.g. Vltava Software s.r.o.">
+          <span class="err">Enter your company's legal name.</span>
+        </div>
+        <div class="field">
+          <label for="ico">IČO<span class="opt">optional</span></label>
+          <input id="ico" name="ico" type="text" inputmode="numeric" placeholder="8-digit company ID">
+          <span class="err">IČO is 8 digits.</span>
+        </div>
+      </div>
+      <div class="field">
+        <label for="address">Address<span class="opt">optional</span></label>
+        <input id="address" name="address" type="text" autocomplete="street-address" placeholder="Street, city, postcode">
+      </div>
+      <div class="row">
+        <div class="field" data-required>
+          <label for="industry">Industry</label>
+          <select id="industry" name="industry">
+            <option value="">Choose one</option>
+            <option>IT and software</option>
+            <option>Finance, banking and insurance</option>
+            <option>Professional services and consulting</option>
+            <option>Manufacturing and engineering</option>
+            <option>Retail and hospitality</option>
+            <option>Healthcare and pharma</option>
+            <option>Education and research</option>
+            <option>Public sector and NGO</option>
+            <option>Other</option>
+          </select>
+          <span class="err">Choose the closest industry.</span>
+        </div>
+        <div class="field">
+          <label for="website">Website<span class="opt">optional</span></label>
+          <input id="website" name="website" type="url" placeholder="https://">
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend><span class="n">02</span>Your people</legend>
+      <div class="row">
+        <div class="field" data-required>
+          <label for="employees">Total employees</label>
+          <input id="employees" name="employees" type="number" min="1" inputmode="numeric" placeholder="e.g. 120">
+          <span class="err">Enter a number of 1 or more.</span>
+        </div>
+        <div class="field" data-required>
+          <label for="covered">Employees to cover</label>
+          <input id="covered" name="covered" type="number" min="1" inputmode="numeric" placeholder="e.g. 120">
+          <span class="err">Enter a number of 1 or more, no higher than total employees.</span>
+        </div>
+      </div>
+      <div class="field">
+        <label for="locations">Office locations<span class="opt">optional</span></label>
+        <input id="locations" name="locations" type="text" placeholder="e.g. Prague 1, Brno, fully remote team in Slovakia">
+      </div>
+      <div class="field">
+        <span class="qlabel" id="q-work">How does your team work?</span>
+        <div class="choices" role="group" aria-labelledby="q-work">
+          <label class="choice"><input type="checkbox" name="work" value="Office-based"><span>Office-based</span></label>
+          <label class="choice"><input type="checkbox" name="work" value="Hybrid"><span>Hybrid</span></label>
+          <label class="choice"><input type="checkbox" name="work" value="Fully remote"><span>Fully remote</span></label>
+          <label class="choice"><input type="checkbox" name="work" value="Shift / on-site"><span>Shift / on-site</span></label>
+        </div>
+      </div>
+      <div class="field" data-required data-group="languages">
+        <span class="qlabel" id="q-lang">Languages your employees need support in</span>
+        <div class="choices" role="group" aria-labelledby="q-lang">
+          <label class="choice"><input type="checkbox" name="languages" value="English"><span>English</span></label>
+          <label class="choice"><input type="checkbox" name="languages" value="Czech"><span>Czech</span></label>
+          <label class="choice"><input type="checkbox" name="languages" value="Russian"><span>Russian</span></label>
+          <label class="choice"><input type="checkbox" name="languages" value="Spanish"><span>Spanish</span></label>
+          <label class="choice"><input type="checkbox" name="languages" value="Other"><span>Other</span></label>
+        </div>
+        <span class="err">Choose at least one language.</span>
+      </div>
+      <div class="field">
+        <label for="expats">Share of international / expat employees<span class="opt">optional</span></label>
+        <select id="expats" name="expats">
+          <option value="">Choose one</option>
+          <option>Under 10%</option>
+          <option>10–30%</option>
+          <option>30–60%</option>
+          <option>Over 60%</option>
+          <option>Not sure</option>
+        </select>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend><span class="n">03</span>Support you're interested in</legend>
+      <p class="hint">Pick everything that might fit. We'll shape the final programme with you.</p>
+      <p class="group-title">For individual employees</p>
+      <div class="choices" role="group" aria-label="Support for individual employees" data-group="services">
+        <label class="choice"><input type="checkbox" name="services" value="Confidential counselling / therapy"><span>Confidential counselling / therapy</span></label>
+        <label class="choice"><input type="checkbox" name="services" value="Coaching"><span>Coaching</span></label>
+        <label class="choice"><input type="checkbox" name="services" value="Support groups"><span>Support groups</span></label>
+        <label class="choice"><input type="checkbox" name="services" value="ADHD testing and assessment"><span>ADHD testing and assessment</span></label>
+      </div>
+      <p class="group-title">Workshops and training</p>
+      <div class="choices" role="group" aria-label="Workshops and training">
+        <label class="choice"><input type="checkbox" name="services" value="Mental Health First Aid"><span>Mental Health First Aid</span></label>
+        <label class="choice"><input type="checkbox" name="services" value="Burnout Prevention"><span>Burnout Prevention</span></label>
+        <label class="choice"><input type="checkbox" name="services" value="Stress Management & Resilience Training"><span>Stress Management &amp; Resilience</span></label>
+        <label class="choice"><input type="checkbox" name="services" value="Neurodiversity in the Workplace"><span>Neurodiversity in the Workplace</span></label>
+        <label class="choice"><input type="checkbox" name="services" value="Men's Mental Health & Emotional Wellbeing"><span>Men's Mental Health &amp; Emotional Wellbeing</span></label>
+        <label class="choice"><input type="checkbox" name="services" value="Tailor-made workshop"><span>Tailor-made workshop</span></label>
+      </div>
+      <div class="field" data-required data-group="services" id="services-field">
+        <span class="err">Choose at least one kind of support.</span>
+      </div>
+      <div class="field">
+        <span class="qlabel" id="q-delivery">Preferred delivery</span>
+        <div class="choices" role="group" aria-labelledby="q-delivery">
+          <label class="choice"><input type="checkbox" name="delivery" value="Online"><span>Online</span></label>
+          <label class="choice"><input type="checkbox" name="delivery" value="In person at Prague Integration"><span>In person at our Prague 1 office</span></label>
+          <label class="choice"><input type="checkbox" name="delivery" value="Onsite at your workplace"><span>Onsite at your workplace</span></label>
+          <label class="choice"><input type="checkbox" name="delivery" value="Hybrid"><span>Hybrid</span></label>
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend><span class="n">04</span>Programme details</legend>
+      <div class="row">
+        <div class="field">
+          <label for="start">Preferred start date<span class="opt">optional</span></label>
+          <input id="start" name="start" type="date">
+        </div>
+        <div class="field">
+          <label for="family">Include family members?</label>
+          <select id="family" name="family">
+            <option value="">Choose one</option>
+            <option>Yes</option>
+            <option>No</option>
+            <option>Would like to discuss</option>
+          </select>
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label for="current">Do you have an EAP today?</label>
+          <select id="current" name="current">
+            <option value="">Choose one</option>
+            <option>No, this would be our first</option>
+            <option>Yes, we're looking to switch</option>
+            <option>Yes, we want to add to it</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="budget">Annual budget<span class="opt">optional</span></label>
+          <input id="budget" name="budget" type="text" placeholder="e.g. CZK 200,000 or not decided">
+        </div>
+      </div>
+      <div class="field">
+        <label for="goals">What would you like the programme to help with?<span class="opt">optional</span></label>
+        <textarea id="goals" name="goals" placeholder="e.g. rising sick leave after a reorganisation, helping new expat hires settle in, training managers to spot burnout"></textarea>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend><span class="n">05</span>Contact person</legend>
+      <div class="row">
+        <div class="field" data-required>
+          <label for="name">Full name</label>
+          <input id="name" name="name" type="text" autocomplete="name">
+          <span class="err">Enter the contact person's name.</span>
+        </div>
+        <div class="field">
+          <label for="role">Job title<span class="opt">optional</span></label>
+          <input id="role" name="role" type="text" autocomplete="organization-title" placeholder="e.g. HR Business Partner">
+        </div>
+      </div>
+      <div class="row">
+        <div class="field" data-required>
+          <label for="email">Work email</label>
+          <input id="email" name="email" type="email" autocomplete="email" placeholder="name@company.cz">
+          <span class="err">Enter an email address like name@company.cz.</span>
+        </div>
+        <div class="field">
+          <label for="phone">Phone<span class="opt">optional</span></label>
+          <input id="phone" name="phone" type="tel" autocomplete="tel" placeholder="+420">
+        </div>
+      </div>
+      <div class="field">
+        <label for="contact-lang">Preferred language for our reply</label>
+        <select id="contact-lang" name="contactLang">
+          <option>English</option>
+          <option>Czech</option>
+        </select>
+      </div>
+      <div class="field" data-required data-group="consent">
+        <label class="consent"><input type="checkbox" id="consent" name="consent" value="yes"><span>I agree that Prague Integration s.r.o. may use the details in this application to contact me and prepare an EAP proposal.</span></label>
+        <span class="err">We need your agreement before we can contact you.</span>
+      </div>
+      <p class="privacy">Controller: Prague Integration s.r.o., IČO 21048428, Olšanská 4E, 130 00 Prague. We use these details only to respond to this application. Please don't include any employee's personal or health information here. To have your data corrected or deleted, write to contact@pragueintegration.cz.</p>
+    </fieldset>
+
+    <div class="actions">
+      <button type="submit" class="primary" id="submit">Review application</button>
+      <button type="button" class="ghost" id="clear">Clear form</button>
+      <span class="status" id="status" role="status" aria-live="polite"></span>
+    </div>
+  </form>
+
+  <section class="review" id="review" hidden aria-labelledby="review-title">
+    <h2 id="review-title" tabindex="-1">Your application is ready to send</h2>
+    <p>Copy the application below and email it to us. We'll get back to you to arrange a call about your programme.</p>
+    <div class="sendto">
+      <span>Send to</span>
+      <code id="to-address">contact@pragueintegration.cz</code>
+      <span>Subject: <b id="subject-line"></b></span>
+    </div>
+    <pre class="summary" id="summary"></pre>
+    <div class="actions">
+      <button type="button" class="primary" id="copy">Copy application</button>
+      <button type="button" class="ghost" id="copy-email">Copy email address</button>
+      <button type="button" class="ghost" id="edit">Edit answers</button>
+      <span class="status" id="copy-status" role="status" aria-live="polite"></span>
+    </div>
+  </section>
+
+  <footer>
+    <span><b>Prague Integration s.r.o.</b> · Mezibranská 4, 110 00 Prague 1</span>
+    <span>contact@pragueintegration.cz · +420 608 573 256 · pragueintegration.cz</span>
+  </footer>
+</div>
+
+<script>
+(function () {
+  var form = document.getElementById("eap-form");
+  var review = document.getElementById("review");
+  var summaryEl = document.getElementById("summary");
+  var status = document.getElementById("status");
+  var copyStatus = document.getElementById("copy-status");
+  var DRAFT_KEY = "pi-eap-application-draft";
+
+  function checked(name) {
+    return Array.prototype.map.call(form.querySelectorAll('input[name="' + name + '"]:checked'), function (i) { return i.value; });
+  }
+  function val(id) { return document.getElementById(id).value.trim(); }
+
+  function setInvalid(field, bad) { field.classList.toggle("invalid", bad); return bad; }
+
+  function validate() {
+    var firstBad = null;
+    form.querySelectorAll(".field").forEach(function (f) { f.classList.remove("invalid"); });
+    function flag(id, bad) {
+      var field = document.getElementById(id).closest(".field");
+      if (setInvalid(field, bad) && !firstBad) firstBad = document.getElementById(id);
+    }
+    flag("company", !val("company"));
+    flag("ico", val("ico") !== "" && !/^\d{8}$/.test(val("ico").replace(/\s/g, "")));
+    flag("industry", !val("industry"));
+    var total = parseInt(val("employees"), 10), covered = parseInt(val("covered"), 10);
+    flag("employees", !(total >= 1));
+    flag("covered", !(covered >= 1) || (total >= 1 && covered > total));
+    flag("name", !val("name"));
+    flag("email", !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val("email")));
+
+    var langField = form.querySelector('[data-group="languages"]');
+    if (setInvalid(langField, checked("languages").length === 0) && !firstBad) firstBad = langField.querySelector("input");
+    var svcField = document.getElementById("services-field");
+    if (setInvalid(svcField, checked("services").length === 0) && !firstBad) firstBad = form.querySelector('input[name="services"]');
+    var consentField = form.querySelector('[data-group="consent"]');
+    if (setInvalid(consentField, !document.getElementById("consent").checked) && !firstBad) firstBad = document.getElementById("consent");
+    return firstBad;
+  }
+
+  function line(label, value) { return value ? label + ": " + value + "\n" : ""; }
+  function list(values) { return values.length ? values.join(", ") : ""; }
+
+  function buildSummary() {
+    var start = val("start");
+    var startText = start ? new Date(start + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) : "";
+    var s = "EMPLOYEE ASSISTANCE PROGRAMME APPLICATION\n";
+    s += "Submitted " + new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) + "\n\n";
+    s += "ORGANISATION\n" + line("Company", val("company")) + line("IČO", val("ico")) + line("Address", val("address")) + line("Industry", val("industry")) + line("Website", val("website")) + "\n";
+    s += "PEOPLE\n" + line("Total employees", val("employees")) + line("Employees to cover", val("covered")) + line("Locations", val("locations")) + line("Work pattern", list(checked("work"))) + line("Languages needed", list(checked("languages"))) + line("International / expat share", val("expats")) + "\n";
+    s += "SUPPORT REQUESTED\n" + line("Services", list(checked("services"))) + line("Delivery", list(checked("delivery"))) + "\n";
+    s += "PROGRAMME\n" + line("Preferred start", startText) + line("Family members", val("family")) + line("Current EAP", val("current")) + line("Annual budget", val("budget")) + line("Goals", val("goals")) + "\n";
+    s += "CONTACT\n" + line("Name", val("name")) + line("Job title", val("role")) + line("Email", val("email")) + line("Phone", val("phone")) + line("Reply in", val("contact-lang")) + "\n";
+    s += "Consent: The applicant agrees that Prague Integration s.r.o. may use these details to contact them and prepare an EAP proposal.\n";
+    return s;
+  }
+
+  // Per-viewer draft so a half-finished form survives a reload.
+  function saveDraft() {
+    var data = {};
+    Array.prototype.forEach.call(form.elements, function (el) {
+      if (!el.name) return;
+      if (el.type === "checkbox") { if (el.checked) (data[el.name] = data[el.name] || []).push(el.value); }
+      else data[el.name] = el.value;
+    });
+    try { localStorage.setItem(DRAFT_KEY, JSON.stringify(data)); } catch (e) {}
+  }
+  function loadDraft() {
+    var data;
+    try { data = JSON.parse(localStorage.getItem(DRAFT_KEY) || "null"); } catch (e) { data = null; }
+    if (!data) return;
+    Array.prototype.forEach.call(form.elements, function (el) {
+      if (!el.name || !(el.name in data)) return;
+      if (el.type === "checkbox") el.checked = (data[el.name] || []).indexOf(el.value) !== -1;
+      else el.value = data[el.name];
+    });
+    status.textContent = "Restored your unsent answers.";
+  }
+
+  var draftTimer;
+  form.addEventListener("input", function () { clearTimeout(draftTimer); draftTimer = setTimeout(saveDraft, 400); });
+  form.addEventListener("change", function (e) {
+    var f = e.target.closest(".field.invalid");
+    if (f) f.classList.remove("invalid");
+    if (e.target.name === "languages") form.querySelector('[data-group="languages"]').classList.remove("invalid");
+    if (e.target.name === "services") document.getElementById("services-field").classList.remove("invalid");
+  });
+
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var bad = validate();
+    if (bad) {
+      status.textContent = "Some answers need attention. They're marked in red.";
+      bad.focus();
+      return;
+    }
+    status.textContent = "";
+    summaryEl.textContent = buildSummary();
+    document.getElementById("subject-line").textContent = "EAP application: " + val("company");
+    form.hidden = true;
+    review.hidden = false;
+    document.getElementById("review-title").focus();
+    review.scrollIntoView({ block: "start" });
+  });
+
+  document.getElementById("edit").addEventListener("click", function () {
+    review.hidden = true;
+    form.hidden = false;
+    copyStatus.textContent = "";
+    document.getElementById("company").focus();
+  });
+
+  var clearArmed = false;
+  document.getElementById("clear").addEventListener("click", function (e) {
+    if (!clearArmed) {
+      clearArmed = true;
+      e.target.textContent = "Click again to clear everything";
+      setTimeout(function () { clearArmed = false; e.target.textContent = "Clear form"; }, 4000);
+      return;
+    }
+    clearArmed = false;
+    e.target.textContent = "Clear form";
+    form.reset();
+    form.querySelectorAll(".invalid").forEach(function (f) { f.classList.remove("invalid"); });
+    try { localStorage.removeItem(DRAFT_KEY); } catch (err) {}
+    status.textContent = "Form cleared.";
+  });
+
+  function selectText(el) {
+    var range = document.createRange();
+    range.selectNodeContents(el);
+    var sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+  function copy(text, el, done) {
+    function fallback() {
+      selectText(el);
+      copyStatus.textContent = "Selected. Press Ctrl+C (or ⌘C) to copy.";
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { copyStatus.textContent = done; }, fallback);
+    } else fallback();
+  }
+  document.getElementById("copy").addEventListener("click", function () {
+    copy(summaryEl.textContent, summaryEl, "Application copied. Paste it into an email to contact@pragueintegration.cz.");
+  });
+  document.getElementById("copy-email").addEventListener("click", function () {
+    var el = document.getElementById("to-address");
+    copy(el.textContent, el, "Email address copied.");
+  });
+
+  loadDraft();
+})();
+</script>

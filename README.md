@@ -72,6 +72,13 @@ batch"), just invoke the skill again — it dedupes against previous runs.
 - `data/` — generated contact lists, drafts, and reports (gitignored —
   this is personal data and shouldn't live in git history)
 
+## Employee Assistance Programme app
+
+`eap-app/` is a separate web app where employees of client companies
+register for confidential support and Prague Integration's team follows up.
+See `eap-app/README.md`. `eap/company-application.html` is a standalone
+form companies can fill in to apply for the programme.
+
 ## Note
 
 `editor` runs a checklist, not a legal review. For an ongoing campaign at
