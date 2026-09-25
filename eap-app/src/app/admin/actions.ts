@@ -216,11 +216,16 @@ export async function addStaff(_prev: { error?: string; done?: string }, formDat
   await sendInvite(rows[0].id, me.name);
   await assignWaitingAndNotify();
   revalidatePath("/admin/team");
+  if (!process.env.RESEND_API_KEY)
+    return {
+      error: `${name} is added, but email isn't connected yet (RESEND_API_KEY is missing in Vercel), so no invitation was sent. Once it's connected, press "Resend invitation" on their card.`,
+    };
   return { done: `Invitation emailed to ${email}.` };
 }
 
 export async function resendInvite(staffId: string) {
   const me = await requireManager();
+  if (!process.env.RESEND_API_KEY) redirect("/admin/team?noemail=1");
   await sendInvite(staffId, me.name);
   redirect("/admin/team?invited=1");
 }
