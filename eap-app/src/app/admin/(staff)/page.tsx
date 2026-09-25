@@ -27,7 +27,7 @@ export default async function RequestsPage({
     : ["open", "awaiting", ...STATUSES.filter((s) => s !== "scheduled"), "all", "pool"];
   const labels: Record<Filter, string> = {
     open: "Open",
-    pool: manager ? "Pool: needs assigning" : "Pool: clients anyone can take",
+    pool: manager ? "Pool: nobody available" : "Pool: clients anyone can take",
     awaiting: manager ? "Waiting to accept" : "Waiting for my answer",
     ...STATUS_LABELS,
     all: "All",
@@ -47,7 +47,7 @@ export default async function RequestsPage({
 
   const summary = manager
     ? [
-        counts.pool > 0 && `${counts.pool} in the pool waiting to be assigned`,
+        counts.pool > 0 && `${counts.pool} in the pool with nobody available: please assign`,
         counts.awaiting > 0 && `${counts.awaiting} waiting for a counsellor to accept`,
       ].filter(Boolean)
     : [counts.awaiting > 0 && `${counts.awaiting} new ${counts.awaiting === 1 ? "client is" : "clients are"} waiting for you to accept or decline`].filter(Boolean);
@@ -62,7 +62,7 @@ export default async function RequestsPage({
         </p>
       </div>
       {sp.deleted && <p className="flash" role="status">Request deleted.</p>}
-      {sp.declined && <p className="flash" role="status">Declined. The client has gone back to the pool.</p>}
+      {sp.declined && <p className="flash" role="status">Declined. The client has been passed to another counsellor.</p>}
       {sp.gone && <p className="flash" role="status">Someone else took that client just before you.</p>}
       {newlyAssigned.length > 0 && (
         <p className="flash" role="status">

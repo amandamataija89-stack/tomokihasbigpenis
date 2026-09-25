@@ -137,6 +137,7 @@ async function assignOne(
   );
   const skipped = loads.filter((x) => x.assignedThisMonth >= x.capacity).map((x) => x.name);
   let note = `${crisis ? "URGENT. " : ""}Offered automatically to ${t.name} (new client ${t.assignedThisMonth + 1} of ${t.capacity} this month), waiting for them to accept.`;
+  if (declinedBy.length) note += ` (${declinedBy.length} ${declinedBy.length === 1 ? "counsellor" : "counsellors"} passed on it before.)`;
   if (t.assignedThisMonth >= t.capacity) note += " Everyone was full, so this crisis case goes over their limit.";
   else if (skipped.length) note += ` Skipped because full: ${skipped.join(", ")}.`;
   if (!choice.languageMatch)
@@ -173,15 +174,39 @@ export function autoAssign(requestId: string, language: string, crisis: boolean)
 }
 
 /**
- * Hands out open requests still waiting for a therapist, oldest first, as places open:
- * a new month, a raised limit, or a therapist added or back to taking clients.
- * Cases in the pool (declined or not answered) are left for the coordinator.
+ * After a decline or an unanswered offer: offers the client straight away to the next available
+ * counsellor (never one who already declined them). If nobody is available the client waits in
+ * the pool, marked so, and is offered as soon as someone is.
+ */
+export function offerToNext(requestId: string): Promise<Assignment | null> {
+  return withAssignLock(async (client) => {
+    const { rows } = await client.query<{ language: string; crisis: boolean; declined_by: string[] }>(
+      "SELECT language, crisis, declined_by FROM support_requests WHERE id = $1 AND assigned_to IS NULL AND status = 'new'",
+      [requestId],
+    );
+    if (!rows[0]) return null;
+    const r = rows[0];
+    const a = await assignOne(client, await therapistLoads(client), requestId, r.language, r.crisis, r.declined_by, false);
+    if (!a) {
+      await client.query("UPDATE support_requests SET in_pool = true WHERE id = $1", [requestId]);
+      await client.query("INSERT INTO request_notes (request_id, body) VALUES ($1, $2)", [
+        requestId,
+        "Nobody else is available right now. Waiting in the pool: it will be offered as soon as someone is, or the coordinator can assign it.",
+      ]);
+    }
+    return a;
+  });
+}
+
+/**
+ * Offers every client still waiting for a counsellor, oldest (and crisis) first, as places open:
+ * a new month, a raised limit, someone back from being away or newly signed up.
  */
 export function assignWaiting(): Promise<Assignment[]> {
   return withAssignLock(async (client) => {
     const { rows } = await client.query<{ id: string; language: string; crisis: boolean; declined_by: string[] }>(
       `SELECT id, language, crisis, declined_by FROM support_requests
-       WHERE assigned_to IS NULL AND status = 'new' AND NOT in_pool
+       WHERE assigned_to IS NULL AND status = 'new'
        ORDER BY crisis DESC, created_at`,
     );
     if (!rows.length) return [];

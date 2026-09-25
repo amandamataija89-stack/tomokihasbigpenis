@@ -41,30 +41,40 @@ Clients are only offered to counsellors who have set their password.
 
 ## How new clients reach a counsellor
 
-1. **Offer.** A new request is offered automatically to the available
-   counsellor with the fewest new clients this month who works in the
-   client's language (then whoever has waited longest). The counsellor is
-   emailed a link.
-2. **Accept or decline.** The counsellor signs in and presses **Accept** or
-   **Decline** (with an optional reason for the coordinator). Booking a
-   session or changing the status also counts as accepting.
-3. **Deadline: 24 working hours** (weekends don't count; crisis cases: 2
-   hours). Halfway there, an unanswered offer gets a **reminder email**. If
-   there's still no answer by the deadline, or the counsellor declines, the
-   client goes to the **pool**. They're never offered again to the same
-   counsellor.
-4. **The pool.** Counsellors see pool clients without names or contact
-   details, and can press **Take this client**. The **coordinator** gets a
-   **daily summary email** from 08:00 (clients in the pool, offers waiting,
-   overdue contacts), signs in and assigns them. When assigning, the
-   coordinator can tick "Already agreed with them" to skip acceptance.
-   A crisis case going back to the pool emails the coordinator straight away.
-5. **First contact.** Once accepted, the counsellor should contact the client
-   within 24 working hours (2 hours for a crisis), or they get a reminder
-   email.
+All times count from when the client submits the form, so they fit inside
+the promise the client is given: **contact within 24 working hours**
+(Monday to Friday), or 2 hours if urgent.
+
+1. **Offer.** The moment a client submits, they're offered automatically to
+   the available counsellor with the fewest new clients this month who works
+   in their language. That counsellor is emailed a link.
+2. **Accept or decline within 4 office hours** (Monday to Friday,
+   08:00–18:00; crisis: 30 minutes), with a reminder email halfway. For
+   example, offered Monday 10:00, answer by 14:00; offered Monday 20:00,
+   answer by Tuesday 12:00. Booking a session or changing the status also
+   counts as accepting.
+3. **Decline or no answer: straight to the next available counsellor**,
+   automatically and with an email to them, as many times as needed. Nobody
+   is offered the same client twice. Nobody waits for the coordinator.
+4. **Nobody available?** (everyone full, away, or already passed on them)
+   The client waits in the **pool** and the **coordinator is emailed at
+   once**. The app still offers them automatically as soon as someone
+   becomes available, and meanwhile the coordinator can assign them or a
+   counsellor can take them from the pool. When assigning, the coordinator
+   can tick "Already agreed with them" to skip acceptance. Setting a case to
+   "Nobody" passes it to the next available counsellor.
+5. **First contact.** At **18 working hours** after the client submitted
+   (1 hour for a crisis), a counsellor who still hasn't made contact gets a
+   reminder email with the exact time the client was promised. At **24
+   working hours** (2 hours for a crisis) the promise is missed: the
+   coordinator and the counsellor are both emailed. The case page shows
+   "Promised contact by", in red once it has passed.
+6. **Daily summary** for the coordinator from 08:00: clients in the pool,
+   offers waiting, promises missed.
 
 Every reminder goes to the counsellor's email with a link to sign in and
-see the case. Every step is recorded in the case notes.
+see the case. Every step is recorded in the case notes. The times are in
+`src/lib/deadlines.ts`.
 
 ### Sharing out clients
 
@@ -142,10 +152,12 @@ Stack: Next.js 15, Postgres (plain SQL, no ORM), Resend for email.
 
 ## The hourly job
 
-`/api/cron/overdue` runs every hour. It sends offer reminders, returns
-unanswered offers to the pool, offers waiting clients when places open, sends
-first-contact reminders, the coordinator's daily summary and the clients'
-48-hour session reminders.
+`/api/cron/overdue` runs every hour. It sends offer reminders, passes
+unanswered offers to the next counsellor, offers waiting clients when someone
+becomes available, sends first-contact reminders and missed-promise alerts,
+the coordinator's daily summary and the clients' 48-hour session reminders.
+Because offers last 4 office hours (30 minutes for a crisis), running it
+every 15 minutes is better if your scheduler allows it.
 
 `vercel.json` asks Vercel to call it hourly with the `CRON_SECRET`
 environment variable (set it to any long random string). **Vercel's free
@@ -202,9 +214,9 @@ Checks: `npm run lint` (TypeScript) and `npm test` (unit tests).
 
 ## Before going live, please confirm
 
-- **Response times.** Clients are promised contact within 24 working hours
-  (Monday to Friday), or as soon as possible if urgent. In the requests list a
-  case turns red once that has passed. Only weekends are skipped, not public
+- **Response times (confirmed):** clients are promised contact within 24
+  working hours (Monday to Friday), or as soon as possible if urgent; offers
+  last 4 office hours (08:00–18:00). Only weekends are skipped, not public
   holidays.
 - **Cancellation policy (confirmed):** sessions cancelled with less than 48
   hours' notice count as one of the 5. Make sure client contracts say the

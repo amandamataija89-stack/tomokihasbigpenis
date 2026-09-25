@@ -4,6 +4,7 @@ import { speaks } from "@/lib/assign";
 import { isManager, requireStaff } from "@/lib/auth";
 import { getRequest, listNotes, listSessions, listStaffWithLoad, STATUSES, STATUS_LABELS } from "@/lib/data";
 import { acceptCase, addNote, declineCase, deleteRequest, emailFeedbackLink, updateRequest } from "../../../actions";
+import { contactDue } from "@/lib/deadlines";
 import { formatDate } from "../../../format";
 import { Sessions } from "./Sessions";
 
@@ -34,6 +35,7 @@ export default async function RequestPage({
     listSessions(id),
   ]);
   const pendingForMe = r.assigned_to === me.id && !r.accepted_at && r.status === "new";
+  const due = contactDue(r.created_at, r.crisis);
   const nameOf = (sid: string) => staff.find((s) => s.id === sid)?.name ?? "a former colleague";
   const label = (s: (typeof staff)[number]) => {
     if (s.id === r.assigned_to) return `${s.name} (current)`;
@@ -53,15 +55,16 @@ export default async function RequestPage({
         </span>
       </div>
       {sp.saved && <p className="flash" role="status">Saved.</p>}
-      {sp.accepted && <p className="flash" role="status">Accepted. Please contact them within 24 working hours.</p>}
-      {sp.taken && <p className="flash" role="status">They&apos;re your client now. Please contact them within 24 working hours.</p>}
+      {sp.accepted && <p className="flash" role="status">Accepted. Please contact them by {formatDate(due)}.</p>}
+      {sp.taken && <p className="flash" role="status">They&apos;re your client now. Please contact them by {formatDate(due)}.</p>}
 
       {pendingForMe && (
         <section className="offer">
           <h2>This client has been offered to you</h2>
           <p>
             Please accept or decline{r.respond_by ? ` by ${formatDate(r.respond_by)}` : ""}. If you don&apos;t
-            answer by then, the client goes back to the pool for someone else.
+            answer by then, the client is passed to the next available counsellor. The client was promised contact
+            by {formatDate(due)}.
           </p>
           <div className="actions">
             <form action={acceptCase.bind(null, r.id)}>
@@ -71,7 +74,7 @@ export default async function RequestPage({
           <form action={declineCase.bind(null, r.id)} className="form" style={{ gap: 8 }}>
             <label htmlFor="reason" className="small">Can&apos;t take them? Tell the coordinator why (optional)</label>
             <textarea id="reason" name="reason" placeholder="e.g. Fully booked until November, or I know this person" />
-            <div className="actions"><button type="submit" className="ghost">Decline, back to the pool</button></div>
+            <div className="actions"><button type="submit" className="ghost">Decline, pass to another counsellor</button></div>
           </form>
         </section>
       )}
@@ -79,7 +82,7 @@ export default async function RequestPage({
       {manager && r.status === "new" && (
         <p className="notice">
           {!r.assigned_to ? (
-            <><b>In the pool.</b> Assign a counsellor below.</>
+            <><b>In the pool: nobody available.</b> Assign a counsellor below. It will also be offered automatically as soon as someone is available.</>
           ) : r.accepted_at ? (
             <><b>Accepted</b> by {r.assigned_name} on {formatDate(r.accepted_at)}.</>
           ) : (
@@ -111,6 +114,12 @@ export default async function RequestPage({
               <dt>Online / in person</dt><dd>{r.format}</dd>
               <dt>Support with</dt><dd>{r.topics.length ? r.topics.join(", ") : "Not said"}</dd>
               <dt>Received</dt><dd>{formatDate(r.created_at)}</dd>
+              {r.status === "new" && (
+                <>
+                  <dt>Promised contact by</dt>
+                  <dd className={due.getTime() < Date.now() ? "overdue" : undefined}>{formatDate(due)}</dd>
+                </>
+              )}
               <dt>Consent to contact</dt><dd>{r.consent_contact_at ? `Given ${formatDate(r.consent_contact_at)}` : "Not recorded"}</dd>
               <dt>Consent to store and share</dt><dd>Given {formatDate(r.consent_at)}</dd>
             </dl>
@@ -137,7 +146,7 @@ export default async function RequestPage({
               <div className="field">
                 <label htmlFor="assignedTo">Counsellor</label>
                 <select id="assignedTo" name="assignedTo" defaultValue={r.assigned_to ?? ""}>
-                  <option value="">Nobody (put in the pool)</option>
+                  <option value="">Nobody: offer to the next available counsellor</option>
                   {staff.map((s) => <option key={s.id} value={s.id}>{label(s)}</option>)}
                 </select>
                 <label className="consent small-consent">
@@ -145,7 +154,8 @@ export default async function RequestPage({
                   <span>Already agreed with them (no need to accept)</span>
                 </label>
                 <span className="small">
-                  Otherwise they&apos;re emailed and have 24 working hours to accept before it goes back to the pool.
+                  Otherwise they&apos;re emailed and have 4 office hours (30 minutes for a crisis) to accept, before it passes
+                  to the next available counsellor.
                 </span>
               </div>
             )}

@@ -4,12 +4,12 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { endSession, isManager, requireManager, requireStaff, ROLES, startSession, type Role, type Staff } from "@/lib/auth";
 import { inviteFeedback } from "@/lib/feedback";
-import { assignWaitingAndNotify, DEFAULT_MONTHLY_CAPACITY } from "@/lib/assign";
+import { assignWaitingAndNotify, DEFAULT_MONTHLY_CAPACITY, offerToNext } from "@/lib/assign";
 import { generateCompanyCode } from "@/lib/codes";
 import { SESSIONS_PER_CLIENT, STATUSES, STATUS_LABELS, type Status } from "@/lib/data";
 import { pool } from "@/lib/db";
 import { LATE_CANCEL_HOURS } from "@/lib/deadlines";
-import { sendEmail, sessionConfirmation, type SessionEmail } from "@/lib/email";
+import { sendEmail, sessionConfirmation, therapistAlert, type SessionEmail } from "@/lib/email";
 import { acceptOffer, declineOffer, offerTo, takeFromPool } from "@/lib/offers";
 import { verifyPassword } from "@/lib/password";
 import { MIN_PASSWORD_LENGTH, sendInvite, sendPasswordReset, setPasswordWithToken } from "@/lib/staff-accounts";
@@ -98,12 +98,19 @@ export async function updateRequest(requestId: string, formData: FormData) {
     // A reassignment counts towards the new counsellor's monthly total from today.
     if (assignedTo) await offerTo(requestId, assignedTo, staff.id, formData.get("agreed") === "yes");
     else {
+      // Taken off this counsellor: offer to the next available one (not them again).
       await pool.query(
         `UPDATE support_requests SET assigned_to = NULL, assigned_at = NULL, accepted_at = NULL, respond_by = NULL,
-           in_pool = true, updated_at = now() WHERE id = $1`,
+           declined_by = CASE WHEN assigned_to IS NULL THEN declined_by ELSE array_append(declined_by, assigned_to) END,
+           updated_at = now() WHERE id = $1`,
         [requestId],
       );
-      await note(requestId, staff.id, "Unassigned and put in the pool.");
+      await note(requestId, staff.id, "Taken off the counsellor.");
+      const next = await offerToNext(requestId);
+      if (next)
+        await sendEmail(therapistAlert(next.therapist.email, next.therapist.name, requestId, next.crisis, next.respondBy)).catch(
+          (err) => console.error("EAP email failed:", err),
+        );
     }
   }
   if (rows[0].status !== status) {

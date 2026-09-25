@@ -49,8 +49,8 @@ export function therapistAlert(to: string, therapistName: string, requestId: str
     subject: `${crisis ? "URGENT – " : ""}New EAP client offered to you: please accept or decline`,
     text: `Hi ${therapistName},\n\nA new EAP client has been offered to you.${
       crisis ? " They say they need help urgently." : ""
-    }\n\nPlease open it and press Accept or Decline${by ? ` by ${by} (Prague time)` : ""}. If you don't answer by then, the client goes back to the pool for someone else.${
-      crisis ? " Once you accept, contact them as soon as possible today." : " Once you accept, please make first contact within 24 working hours (Monday to Friday)."
+    }\n\nPlease open it and press Accept or Decline${by ? ` by ${by} (Prague time)` : ""}. If you don't answer by then, the client is passed to the next available counsellor.${
+      crisis ? " Once you accept, contact them as soon as possible today." : " Once you accept, please contact them as soon as you can: they were promised contact within 24 working hours of asking."
     }\n\n${appUrl()}/admin/requests/${requestId}\n`,
   };
 }
@@ -59,27 +59,27 @@ export function offerReminder(to: string, therapistName: string, requestId: stri
   return {
     to,
     subject: `${crisis ? "URGENT – " : ""}Reminder: please accept or decline your new EAP client`,
-    text: `Hi ${therapistName},\n\nA new client offered to you is still waiting for your answer. Please sign in and press Accept or Decline by ${formatDeadline(respondBy)} (Prague time). After that the client goes back to the pool for someone else.\n\n${appUrl()}/admin/requests/${requestId}\n`,
+    text: `Hi ${therapistName},\n\nA new client offered to you is still waiting for your answer. Please sign in and press Accept or Decline by ${formatDeadline(respondBy)} (Prague time). After that the client is passed to the next available counsellor.\n\n${appUrl()}/admin/requests/${requestId}\n`,
   };
 }
 
 export function offerReleased(to: string, therapistName: string, clientNickname: string, reason: "declined" | "no-reply"): Mail {
   return {
     to,
-    subject: `${clientNickname} has gone back to the pool`,
+    subject: `${clientNickname} has been passed to another counsellor`,
     text: `Hi ${therapistName},\n\n${
       reason === "no-reply"
-        ? `The offer of ${clientNickname} wasn't accepted in time, so they've gone back to the pool for the coordinator to reassign.`
-        : `Thanks for letting us know. ${clientNickname} has gone back to the pool for the coordinator to reassign.`
+        ? `The offer of ${clientNickname} wasn't answered in time, so it has been passed to another counsellor.`
+        : `Thanks for letting us know. ${clientNickname} has been passed to another counsellor.`
     } You don't need to do anything.\n`,
   };
 }
 
-export function crisisInPool(to: string, clientNickname: string, requestId: string): Mail {
+export function nobodyAvailable(to: string, clientNickname: string, requestId: string, crisis: boolean): Mail {
   return {
     to,
-    subject: `URGENT – crisis case back in the pool: ${clientNickname}`,
-    text: `A client who said they need help urgently has gone back to the pool (declined or not accepted in time).\n\nPlease assign them now:\n${appUrl()}/admin/requests/${requestId}\n`,
+    subject: `${crisis ? "URGENT – " : ""}No counsellor available for ${clientNickname}`,
+    text: `${clientNickname}${crisis ? ", who said they need help urgently," : ""} was declined or not accepted in time, and no other counsellor is available right now (everyone is full, away, or has already passed on them).\n\nThe app will offer them automatically as soon as someone becomes available, but please assign them now if you can:\n${appUrl()}/admin/requests/${requestId}\n`,
   };
 }
 
@@ -87,9 +87,9 @@ export type Digest = { pool: number; crisisInPool: number; awaiting: number; ove
 
 export function dailyDigest(to: string, d: Digest): Mail {
   const lines = [
-    `Clients in the pool, waiting to be assigned: ${d.pool}${d.crisisInPool ? ` (${d.crisisInPool} crisis)` : ""}`,
+    `Clients in the pool (nobody available): ${d.pool}${d.crisisInPool ? ` (${d.crisisInPool} crisis)` : ""}`,
     `Offers waiting for a counsellor to accept: ${d.awaiting}`,
-    `Accepted but not contacted in time: ${d.overdue}`,
+    `Not contacted by the promised time: ${d.overdue}`,
   ];
   return {
     to,
@@ -171,15 +171,25 @@ export function sessionConfirmation(s: SessionEmail): Mail {
 export function overdueWarning(
   to: string,
   counsellorName: string,
-  clientFirstName: string,
+  clientNickname: string,
   requestId: string,
-  hours: number,
+  contactBy: string,
   crisis: boolean,
 ): Mail {
   return {
     to,
-    subject: `${crisis ? "URGENT – " : ""}Reminder: ${clientFirstName} hasn't been contacted yet`,
-    text: `Hi ${counsellorName},\n\n${clientFirstName}${crisis ? ", who said they need help urgently," : ""} was accepted by you more than ${hours}${crisis ? "" : " working"} hours ago and is still marked New.\n\nPlease contact them ${crisis ? "right away" : "today"}, then book their first session or set the case to Contacted:\n${appUrl()}/admin/requests/${requestId}\n\nIf you can't take this client, tell the team so it can be reassigned.\n`,
+    subject: `${crisis ? "URGENT – " : ""}Reminder: please contact ${clientNickname} by ${contactBy}`,
+    text: `Hi ${counsellorName},\n\n${clientNickname}${crisis ? ", who said they need help urgently," : ""} was promised first contact by ${contactBy} (Prague time) and is still marked New.\n\nPlease contact them ${crisis ? "right away" : "today"}, then book their first session or set the case to Contacted:\n${appUrl()}/admin/requests/${requestId}\n`,
+  };
+}
+
+export function contactMissed(to: string, clientNickname: string, requestId: string, counsellorName: string | null, crisis: boolean): Mail {
+  return {
+    to,
+    subject: `${crisis ? "URGENT – " : ""}Contact promise missed: ${clientNickname}`,
+    text: `${clientNickname}${crisis ? " (crisis)" : ""} was promised first contact within ${crisis ? "2 hours" : "24 working hours"} and the case is still New. ${
+      counsellorName ? `It's with ${counsellorName}.` : "No counsellor has it yet."
+    }\n\nPlease check on it now:\n${appUrl()}/admin/requests/${requestId}\n`,
   };
 }
 

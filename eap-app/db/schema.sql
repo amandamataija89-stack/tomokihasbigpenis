@@ -148,3 +148,6 @@ ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS offer_reminded_at timestam
 ALTER TABLE client_sessions ADD COLUMN IF NOT EXISTS late_cancelled boolean NOT NULL DEFAULT false;
 -- The client's reminder email, sent 48 hours before the session.
 ALTER TABLE client_sessions ADD COLUMN IF NOT EXISTS reminder_sent_at timestamptz;
+
+-- When the coordinator was told a client's contact promise was missed (once per case).
+ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS contact_missed_at timestamptz;

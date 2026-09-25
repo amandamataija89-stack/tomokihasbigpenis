@@ -1,6 +1,7 @@
+import { offerToNext } from "./assign";
 import { pool } from "./db";
-import { respondBy } from "./deadlines";
-import { crisisInPool, dailyDigest, offerReleased, offerReminder, sendEmail, therapistAlert } from "./email";
+import { offerReminderAt, respondBy } from "./deadlines";
+import { dailyDigest, nobodyAvailable, offerReleased, offerReminder, sendEmail, therapistAlert } from "./email";
 
 // Coordinators get pool alerts and the daily summary; if there are none, admins do.
 export async function coordinatorEmails(): Promise<string[]> {
@@ -30,10 +31,14 @@ export async function acceptOffer(requestId: string, staffId: string): Promise<b
   return !!rowCount;
 }
 
-async function toPool(requestId: string, counsellorId: string, reason: "declined" | "no-reply", why = "") {
+/**
+ * The offered counsellor declined or didn't answer in time: the client goes straight to the next
+ * available counsellor. Only if nobody is available does the coordinator hear about it.
+ */
+async function passOn(requestId: string, counsellorId: string, reason: "declined" | "no-reply", why = "") {
   const { rows } = await pool.query<{ first_name: string; crisis: boolean; name: string; email: string }>(
     `UPDATE support_requests r SET assigned_to = NULL, assigned_at = NULL, accepted_at = NULL, respond_by = NULL,
-       in_pool = true, declined_by = array_append(r.declined_by, $2::uuid), updated_at = now()
+       declined_by = array_append(r.declined_by, $2::uuid), updated_at = now()
      FROM staff s WHERE r.id = $1 AND r.assigned_to = $2 AND s.id = $2
      RETURNING r.first_name, r.crisis, s.name, s.email`,
     [requestId, counsellorId],
@@ -43,18 +48,18 @@ async function toPool(requestId: string, counsellorId: string, reason: "declined
   await note(
     requestId,
     reason === "declined" ? counsellorId : null,
-    reason === "declined"
-      ? `Declined the client${why ? `: "${why}"` : ""}. Back in the pool.`
-      : `${r.name} didn't accept in time. Back in the pool.`,
+    reason === "declined" ? `Declined the client${why ? `: "${why}"` : ""}.` : `${r.name} didn't answer in time.`,
   );
+  const next = await offerToNext(requestId);
   const mails = [offerReleased(r.email, r.name, r.first_name, reason)];
-  if (r.crisis) for (const to of await coordinatorEmails()) mails.push(crisisInPool(to, r.first_name, requestId));
+  if (next) mails.push(therapistAlert(next.therapist.email, next.therapist.name, requestId, next.crisis, next.respondBy));
+  else for (const to of await coordinatorEmails()) mails.push(nobodyAvailable(to, r.first_name, requestId, r.crisis));
   await sendAll(mails);
   return true;
 }
 
 export const declineOffer = (requestId: string, staffId: string, why: string) =>
-  toPool(requestId, staffId, "declined", why.trim().slice(0, 500));
+  passOn(requestId, staffId, "declined", why.trim().slice(0, 500));
 
 /** A counsellor takes a client from the pool. Returns false if someone else got there first. */
 export async function takeFromPool(requestId: string, staffId: string): Promise<boolean> {
@@ -92,31 +97,40 @@ export async function offerTo(requestId: string, counsellorId: string, byStaffId
   if (deadline) await sendAll([therapistAlert(r.email, r.name, requestId, r.crisis, deadline)]);
 }
 
-/** Hourly: halfway to the deadline, reminds a counsellor who hasn't answered an offer yet (once per offer). */
+/** Halfway to the answer-by time, reminds a counsellor who hasn't answered an offer yet (once per offer). */
 export async function remindPendingOffers(now = new Date()): Promise<number> {
-  const { rows } = await pool.query<{ id: string; crisis: boolean; respond_by: Date; name: string; email: string }>(
-    `SELECT r.id, r.crisis, r.respond_by, s.name, s.email
+  const { rows } = await pool.query<{
+    id: string;
+    crisis: boolean;
+    assigned_at: Date;
+    respond_by: Date;
+    name: string;
+    email: string;
+  }>(
+    `SELECT r.id, r.crisis, r.assigned_at, r.respond_by, s.name, s.email
      FROM support_requests r JOIN staff s ON s.id = r.assigned_to
-     WHERE r.accepted_at IS NULL AND r.status = 'new' AND r.offer_reminded_at IS NULL AND r.respond_by > $1
-       AND r.assigned_at + (r.respond_by - r.assigned_at) / 2 <= $1`,
+     WHERE r.accepted_at IS NULL AND r.status = 'new' AND r.offer_reminded_at IS NULL AND r.respond_by > $1`,
     [now],
   );
+  let n = 0;
   for (const r of rows) {
+    if (offerReminderAt(r.assigned_at, r.crisis) > now) continue;
     await sendAll([offerReminder(r.email, r.name, r.id, r.crisis, r.respond_by)]);
     await pool.query("UPDATE support_requests SET offer_reminded_at = now() WHERE id = $1", [r.id]);
     await note(r.id, null, `Reminder emailed to ${r.name} to accept or decline.`);
+    n++;
   }
-  return rows.length;
+  return n;
 }
 
-/** Hourly: offers nobody answered in time go back to the pool. */
+/** Offers nobody answered in time pass to the next available counsellor. */
 export async function releaseExpiredOffers(): Promise<number> {
   const { rows } = await pool.query<{ id: string; assigned_to: string }>(
     `SELECT id, assigned_to FROM support_requests
      WHERE assigned_to IS NOT NULL AND accepted_at IS NULL AND respond_by < now() AND status = 'new'`,
   );
   let n = 0;
-  for (const r of rows) if (await toPool(r.id, r.assigned_to, "no-reply")) n++;
+  for (const r of rows) if (await passOn(r.id, r.assigned_to, "no-reply")) n++;
   return n;
 }
 
@@ -139,7 +153,7 @@ export async function sendDailyDigest(now = new Date()): Promise<boolean> {
        count(*) FILTER (WHERE assigned_to IS NULL AND status = 'new')::int AS pool,
        count(*) FILTER (WHERE assigned_to IS NULL AND status = 'new' AND crisis)::int AS crisis_in_pool,
        count(*) FILTER (WHERE assigned_to IS NOT NULL AND accepted_at IS NULL AND status = 'new')::int AS awaiting,
-       count(*) FILTER (WHERE accepted_at IS NOT NULL AND status = 'new' AND overdue_warned_at IS NOT NULL)::int AS overdue
+       count(*) FILTER (WHERE status = 'new' AND contact_missed_at IS NOT NULL)::int AS overdue
      FROM support_requests`,
   );
   const d = rows[0];
