@@ -193,7 +193,7 @@ const pragueLabel = (local: string) =>
   ) +
   `, ${local.slice(11)}`;
 
-// Keeps the case status in step with its sessions: booked once a date exists, completed once all are done.
+// Keeps the case status in step with its sessions: Contacted once a session is booked, Completed once all are done.
 async function syncStatusWithSessions(requestId: string, staffId: string) {
   const { rows } = await pool.query<{ status: Status; total: number; done: number }>(
     `SELECT r.status,
@@ -206,8 +206,8 @@ async function syncStatusWithSessions(requestId: string, staffId: string) {
   if (!r) return;
   let next: Status = r.status;
   if (r.done >= SESSIONS_PER_CLIENT && r.status !== "closed") next = "completed";
-  else if (r.status === "completed") next = "scheduled";
-  else if (r.total > 0 && (r.status === "new" || r.status === "contacted")) next = "scheduled";
+  else if (r.status === "completed") next = "contacted";
+  else if (r.total > 0 && r.status === "new") next = "contacted";
   if (next === r.status) return;
   await pool.query("UPDATE support_requests SET status = $2, updated_at = now() WHERE id = $1", [requestId, next]);
   await note(

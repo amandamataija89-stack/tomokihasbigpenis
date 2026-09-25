@@ -6,7 +6,7 @@ A web app for Prague Integration's Employee Assistance Programme. It has two sid
   fill in a short confidential request, and get an email confirming that the
   team will contact them within 24 hours.
 - **Prague Integration staff** sign in at `/admin` to see new requests,
-  track status (New → Contacted → Session booked → Closed), keep notes,
+  track status (New → Contacted → Completed, or Closed), keep notes,
   and delete a request when someone asks for their data to be erased. Staff
   also add client companies there, which creates each company's code and
   registration link.
@@ -43,10 +43,11 @@ Each therapist has a limit of new clients per calendar month (5 by default;
 Each client gets up to 5 sessions. On a case, under **Sessions**:
 
 - Book each session with its own date and time. Booking the first one moves
-  the case to "Session booked".
+  a New case to "Contacted".
 - Move a session to a new time, or remove it.
 - Press **Mark done** after each session happens. When all 5 are done the
-  case becomes **Completed** (and leaves the Open list). Undo puts it back.
+  case becomes **Completed** (and leaves the Open list). Undo puts it back to
+  Contacted.
 - A session whose date has passed without being marked done shows in red,
   on the case and in the requests list.
 - **The client is emailed automatically** when a session is booked, moved or
