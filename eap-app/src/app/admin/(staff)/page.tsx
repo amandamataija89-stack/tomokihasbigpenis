@@ -60,7 +60,6 @@ export default async function RequestsPage({
               <tr>
                 <th>Name</th>
                 <th>Company</th>
-                <th>Contact by</th>
                 <th>Language</th>
                 <th>Status</th>
                 <th>Sessions</th>
@@ -76,11 +75,10 @@ export default async function RequestsPage({
                     {r.crisis && <> <span className="pill pill-crisis">Crisis</span></>}
                   </td>
                   <td>{r.company_name}</td>
-                  <td>{r.contact_method}</td>
                   <td>{r.language}</td>
                   <td><span className={`pill pill-${r.status}`}>{STATUS_LABELS[r.status]}</span></td>
                   <td className="age">
-                    {r.sessions_done} / {SESSIONS_PER_CLIENT} done
+                    {r.sessions_total === 0 ? <span className="small">—</span> : `${r.sessions_done} / ${SESSIONS_PER_CLIENT} done`}
                     {r.next_session &&
                       (r.next_session.getTime() < now ? (
                         <div className="overdue">{formatDate(r.next_session)} not marked done</div>

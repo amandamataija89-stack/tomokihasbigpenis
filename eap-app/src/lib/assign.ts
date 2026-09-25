@@ -109,7 +109,7 @@ async function assignOne(
   }
   const t = choice.therapist;
   await client.query(
-    "UPDATE support_requests SET assigned_to = $2, assigned_at = now(), updated_at = now() WHERE id = $1",
+    "UPDATE support_requests SET assigned_to = $2, assigned_at = now(), overdue_warned_at = NULL, updated_at = now() WHERE id = $1",
     [requestId, t.id],
   );
   const skipped = loads.filter((x) => x.assignedThisMonth >= x.capacity).map((x) => x.name);

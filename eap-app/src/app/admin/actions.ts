@@ -53,6 +53,7 @@ export async function updateRequest(requestId: string, formData: FormData) {
   // A reassignment counts towards the new therapist's monthly total from today.
   await pool.query(
     `UPDATE support_requests SET status = $2, assigned_to = $3, crisis = $4, updated_at = now(),
+       overdue_warned_at = CASE WHEN assigned_to IS DISTINCT FROM $3::uuid THEN NULL ELSE overdue_warned_at END,
        assigned_at = CASE WHEN $3::uuid IS NULL THEN NULL
                           WHEN assigned_to IS DISTINCT FROM $3::uuid THEN now()
                           ELSE assigned_at END
@@ -193,7 +194,8 @@ const pragueLabel = (local: string) =>
   ) +
   `, ${local.slice(11)}`;
 
-// Keeps the case status in step with its sessions: Contacted once a session is booked, Completed once all are done.
+// Keeps the case status in step with its sessions: Contacted once a session is booked,
+// In progress once one is done, Completed once all are done. A Closed case is left alone.
 async function syncStatusWithSessions(requestId: string, staffId: string) {
   const { rows } = await pool.query<{ status: Status; total: number; done: number }>(
     `SELECT r.status,
@@ -205,8 +207,10 @@ async function syncStatusWithSessions(requestId: string, staffId: string) {
   const r = rows[0];
   if (!r) return;
   let next: Status = r.status;
-  if (r.done >= SESSIONS_PER_CLIENT && r.status !== "closed") next = "completed";
-  else if (r.status === "completed") next = "contacted";
+  if (r.status === "closed") return;
+  if (r.done >= SESSIONS_PER_CLIENT) next = "completed";
+  else if (r.done > 0) next = "in_progress";
+  else if (r.status === "completed" || r.status === "in_progress") next = "contacted";
   else if (r.total > 0 && r.status === "new") next = "contacted";
   if (next === r.status) return;
   await pool.query("UPDATE support_requests SET status = $2, updated_at = now() WHERE id = $1", [requestId, next]);

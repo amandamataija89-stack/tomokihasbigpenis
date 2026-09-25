@@ -1,3 +1,5 @@
+import { CONTACT_WITHIN_HOURS, CRISIS_CONTACT_WITHIN_HOURS } from "@/lib/deadlines";
+
 const dateFmt = new Intl.DateTimeFormat("en-GB", {
   day: "numeric",
   month: "short",
@@ -18,7 +20,7 @@ export function age(d: Date, now = Date.now()): string {
 
 // First contact is due within 24 hours, or 2 hours for someone who said they need help urgently.
 export const isOverdue = (d: Date, now = Date.now(), crisis = false) =>
-  now - d.getTime() > (crisis ? 2 : 24) * 3600_000;
+  now - d.getTime() > (crisis ? CRISIS_CONTACT_WITHIN_HOURS : CONTACT_WITHIN_HOURS) * 3600_000;
 
 // Value for an <input type="datetime-local">, in Prague time: "2026-09-30T14:00".
 export function toPragueInput(d: Date): string {

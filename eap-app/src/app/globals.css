@@ -158,6 +158,7 @@ td a.rowlink:hover { text-decoration: underline; }
 .pill-new { background: var(--rose-soft); color: var(--ink); }
 .pill-contacted { background: var(--amber-soft); color: var(--amber); }
 .pill-scheduled { background: var(--navy-soft); color: var(--navy); }
+.pill-in_progress { background: var(--navy); color: var(--surface); }
 .pill-closed { background: var(--bg); color: var(--muted); border: 1px solid var(--line); }
 .pill-inactive { background: var(--bg); color: var(--muted); border: 1px solid var(--line); }
 

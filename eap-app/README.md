@@ -6,7 +6,7 @@ A web app for Prague Integration's Employee Assistance Programme. It has two sid
   fill in a short confidential request, and get an email confirming that the
   team will contact them within 24 hours.
 - **Prague Integration staff** sign in at `/admin` to see new requests,
-  track status (New → Contacted → Completed, or Closed), keep notes,
+  track status (New → Contacted → In progress → Completed, or Closed), keep notes,
   and delete a request when someone asks for their data to be erased. Staff
   also add client companies there, which creates each company's code and
   registration link.
@@ -38,6 +38,24 @@ Each therapist has a limit of new clients per calendar month (5 by default;
   email). Therapists added on the Team page can't sign in until given a
   password with `npm run staff:create -- <their email> "<name>"`.
 
+## Reminders when a client isn't contacted in time
+
+Every hour the app checks for cases still marked **New** 24 hours after they
+came in (2 hours for crisis cases). It emails the assigned counsellor a
+reminder with a link to the case, or the team if nobody is assigned. Each case
+gets one reminder per counsellor. If the case is reassigned, or assigned later,
+the new counsellor gets their own reminder. Every reminder is noted on the case.
+A case counts as contacted once its status moves on from New, which happens
+automatically when a session is booked.
+
+The check is `/api/cron/overdue`. `vercel.json` asks Vercel to call it hourly,
+sending the `CRON_SECRET` environment variable (set it to any long random
+string). **Vercel's free Hobby plan only runs scheduled jobs once a day**, so
+either use the Pro plan, or have a free service such as cron-job.org call
+`https://<your app>/api/cron/overdue` every hour with the header
+`Authorization: Bearer <CRON_SECRET>`. The time limits are in
+`src/lib/deadlines.ts`.
+
 ## Sessions
 
 Each client gets up to 5 sessions. On a case, under **Sessions**:
@@ -45,9 +63,10 @@ Each client gets up to 5 sessions. On a case, under **Sessions**:
 - Book each session with its own date and time. Booking the first one moves
   a New case to "Contacted".
 - Move a session to a new time, or remove it.
-- Press **Mark done** after each session happens. When all 5 are done the
+- Press **Mark done** after each session happens. The first one moves the
+  case to **In progress**. When all 5 are done the
   case becomes **Completed** (and leaves the Open list). Undo puts it back to
-  Contacted.
+  In progress, or to Contacted if no session is done any more.
 - A session whose date has passed without being marked done shows in red,
   on the case and in the requests list.
 - **The client is emailed automatically** when a session is booked, moved or
@@ -104,6 +123,7 @@ account as the outreach scripts can be reused).
    - `DATABASE_URL`: the connection string from step 1
    - `APP_URL`: the address the app will live at, e.g. `https://eap.pragueintegration.cz`
    - `RESEND_API_KEY`, `EMAIL_FROM`, `TEAM_NOTIFY_EMAIL`
+   - `CRON_SECRET`: any long random string (see "Reminders" below)
 4. Optionally point a subdomain such as `eap.pragueintegration.cz` at it.
 5. Sign in at `/admin`, add your first client under **Companies**, and send
    the link to their HR team.
@@ -136,8 +156,8 @@ passwords and form validation).
 - **Crisis numbers.** The pages list 112 and Linka první psychické pomoci
   (116 123).
 - **Crisis response time.** The staff list turns a crisis case red after 2
-  hours without contact. Adjust `isOverdue` in `src/app/admin/format.ts` to
-  your own protocol, and decide who covers crisis cases out of hours: the app
+  hours without contact, and the counsellor is emailed a reminder. Adjust
+  `src/lib/deadlines.ts` to your own protocol, and decide who covers crisis cases out of hours: the app
   only emails, it doesn't phone anyone.
 
 ## Not included yet

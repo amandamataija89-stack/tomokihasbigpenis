@@ -1,12 +1,13 @@
 import { pool } from "./db";
 import type { RequestInput } from "./request-form";
 
-export const STATUSES = ["new", "contacted", "scheduled", "completed", "closed"] as const;
+export const STATUSES = ["new", "contacted", "scheduled", "in_progress", "completed", "closed"] as const;
 export type Status = (typeof STATUSES)[number];
 export const STATUS_LABELS: Record<Status, string> = {
   new: "New",
   contacted: "Contacted",
   scheduled: "Session booked",
+  in_progress: "In progress",
   completed: "Completed",
   closed: "Closed",
 };
@@ -94,7 +95,7 @@ export async function statusCounts(): Promise<Record<Status, number>> {
   const { rows } = await pool.query<{ status: Status; n: number }>(
     "SELECT status, count(*)::int AS n FROM support_requests GROUP BY status",
   );
-  const counts = { new: 0, contacted: 0, scheduled: 0, completed: 0, closed: 0 };
+  const counts = { new: 0, contacted: 0, scheduled: 0, in_progress: 0, completed: 0, closed: 0 };
   for (const r of rows) counts[r.status] = r.n;
   return counts;
 }

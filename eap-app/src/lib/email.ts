@@ -91,3 +91,26 @@ export function sessionConfirmation(s: SessionEmail): Mail {
     text: `Hi ${s.firstName},\n\n${lead[0].toUpperCase()}${lead.slice(1)}\n\n${s.when} (Prague time)${body}\n\nIf you need to change the time, reply to this email or call +420 608 573 256.\n\nPrague Integration\ncontact@pragueintegration.cz\n`,
   };
 }
+
+export function overdueWarning(
+  to: string,
+  counsellorName: string,
+  clientFirstName: string,
+  requestId: string,
+  hours: number,
+  crisis: boolean,
+): Mail {
+  return {
+    to,
+    subject: `${crisis ? "URGENT – " : ""}Reminder: ${clientFirstName} hasn't been contacted yet`,
+    text: `Hi ${counsellorName},\n\n${clientFirstName}${crisis ? ", who said they need help urgently," : ""} asked for support more than ${hours} hours ago and is still marked New.\n\nPlease contact them ${crisis ? "right away" : "today"}, then book their first session or set the case to Contacted:\n${appUrl()}/admin/requests/${requestId}\n\nIf you can't take this client, tell the team so it can be reassigned.\n`,
+  };
+}
+
+export function teamOverdueWarning(clientFirstName: string, requestId: string, hours: number, crisis: boolean): Mail {
+  return {
+    to: process.env.TEAM_NOTIFY_EMAIL ?? "contact@pragueintegration.cz",
+    subject: `${crisis ? "URGENT – " : ""}Unassigned request not contacted in ${hours} hours`,
+    text: `${clientFirstName} asked for support more than ${hours} hours ago, nobody is assigned, and the case is still New.\n\nPlease assign it now:\n${appUrl()}/admin/requests/${requestId}\n`,
+  };
+}

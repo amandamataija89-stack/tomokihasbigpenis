@@ -72,7 +72,7 @@ ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS location text NOT NULL DEF
 -- Sessions: each client gets up to 5; the case is completed when all are done.
 ALTER TABLE support_requests DROP CONSTRAINT IF EXISTS support_requests_status_check;
 ALTER TABLE support_requests ADD CONSTRAINT support_requests_status_check
-  CHECK (status IN ('new', 'contacted', 'scheduled', 'completed', 'closed'));
+  CHECK (status IN ('new', 'contacted', 'scheduled', 'in_progress', 'completed', 'closed'));
 
 CREATE TABLE IF NOT EXISTS client_sessions (
   id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -82,3 +82,6 @@ CREATE TABLE IF NOT EXISTS client_sessions (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS client_sessions_request_idx ON client_sessions (request_id, starts_at);
+
+-- When the assigned counsellor was warned that a case hasn't been contacted in time (sent once per assignment).
+ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS overdue_warned_at timestamptz;
