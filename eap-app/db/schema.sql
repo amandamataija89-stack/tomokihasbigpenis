@@ -1,6 +1,6 @@
 -- Prague Integration EAP. Safe to run more than once.
 
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
+DO $$ BEGIN CREATE EXTENSION IF NOT EXISTS pgcrypto; EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 CREATE TABLE IF NOT EXISTS staff (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),

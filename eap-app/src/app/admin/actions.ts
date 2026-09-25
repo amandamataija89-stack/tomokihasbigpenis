@@ -13,7 +13,14 @@ import { sendEmail, sessionConfirmation, therapistAlert, type SessionEmail } fro
 import { clientMessageLink, MAX_MESSAGE_LENGTH, sendStaffMessage } from "@/lib/messages";
 import { acceptOffer, declineOffer, offerTo, takeFromPool } from "@/lib/offers";
 import { verifyPassword } from "@/lib/password";
-import { MIN_PASSWORD_LENGTH, sendInvite, sendPasswordReset, setPasswordWithToken } from "@/lib/staff-accounts";
+import { timingSafeEqual } from "node:crypto";
+import {
+  createFirstAdmin,
+  MIN_PASSWORD_LENGTH,
+  sendInvite,
+  sendPasswordReset,
+  setPasswordWithToken,
+} from "@/lib/staff-accounts";
 import { LANGUAGES } from "@/lib/request-form";
 
 // Every action checks the session itself: server actions are reachable without the page.
@@ -542,4 +549,33 @@ export async function messageClient(requestId: string, formData: FormData) {
   );
   await note(requestId, c.staff.id, `Sent the client a message.${rowCount ? " Status changed from New to Contacted." : ""}`);
   redirect(`/admin/requests/${requestId}?msg=sent#messages`);
+}
+
+// ---- First admin (one time, no sign-in needed) --------------------------------------------
+
+type SetupState = { error?: string; name?: string; email?: string };
+
+export async function setupFirstAdmin(_prev: SetupState, formData: FormData): Promise<SetupState> {
+  // Echoed back with any error, so the form keeps what was typed.
+  const keep = { name: String(formData.get("name") ?? ""), email: String(formData.get("email") ?? "") };
+  const expected = process.env.SETUP_CODE ?? "";
+  const given = String(formData.get("setupCode") ?? "");
+  const a = Buffer.from(given);
+  const b = Buffer.from(expected);
+  if (!expected) return { error: "Add a SETUP_CODE setting in Vercel first (any code you make up), then redeploy.", ...keep };
+  if (a.length !== b.length || !timingSafeEqual(a, b)) {
+    await new Promise((r) => setTimeout(r, 400));
+    return { error: "That setup code doesn't match the SETUP_CODE setting in Vercel.", ...keep };
+  }
+  const name = String(formData.get("name") ?? "").trim().slice(0, 120);
+  const email = String(formData.get("email") ?? "").trim().toLowerCase().slice(0, 200);
+  const password = String(formData.get("password") ?? "");
+  if (!name) return { error: "Enter your name.", ...keep };
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "Enter your email address.", ...keep };
+  if (password.length < MIN_PASSWORD_LENGTH) return { error: `Use a password of at least ${MIN_PASSWORD_LENGTH} characters.`, ...keep };
+  if (password !== formData.get("confirm")) return { error: "The two passwords don't match.", ...keep };
+  const id = await createFirstAdmin(name, email, password);
+  if (!id) return { error: "Setup is already done. Sign in instead.", ...keep };
+  await startSession(id);
+  redirect("/admin/team?welcome=1");
 }

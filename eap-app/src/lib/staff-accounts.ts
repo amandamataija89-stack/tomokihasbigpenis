@@ -50,3 +50,38 @@ export async function setPasswordWithToken(token: string, password: string): Pro
   await pool.query("DELETE FROM staff_sessions WHERE staff_id = $1", [owner.id]);
   return owner.id;
 }
+
+/** True once someone can sign in as an admin; the first-admin setup page then closes for good. */
+export async function adminExists(): Promise<boolean> {
+  const { rows } = await pool.query("SELECT 1 FROM staff WHERE role = 'admin' AND password_hash <> '!' LIMIT 1");
+  return rows.length > 0;
+}
+
+/** Creates the first admin. Returns their id, or null if an admin already exists. */
+export async function createFirstAdmin(name: string, email: string, password: string): Promise<string | null> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT pg_advisory_xact_lock(hashtext('eap-first-admin'))");
+    const { rows: existing } = await client.query("SELECT 1 FROM staff WHERE role = 'admin' AND password_hash <> '!' LIMIT 1");
+    if (existing.length) {
+      await client.query("ROLLBACK");
+      return null;
+    }
+    const { rows } = await client.query<{ id: string }>(
+      `INSERT INTO staff (email, name, password_hash, role, is_admin, takes_clients)
+       VALUES ($1, $2, $3, 'admin', true, false)
+       ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name, password_hash = EXCLUDED.password_hash,
+         role = 'admin', is_admin = true
+       RETURNING id`,
+      [email, name, hashPassword(password)],
+    );
+    await client.query("COMMIT");
+    return rows[0].id;
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}

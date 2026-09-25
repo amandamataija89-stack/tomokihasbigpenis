@@ -167,6 +167,7 @@ The number of sessions is `SESSIONS_PER_CLIENT` in `src/lib/data.ts`; the
 | `/admin/companies` | Coordinators, admins | Company codes and registration links |
 | `/admin/feedback` | Admins | Anonymous client feedback |
 | `/admin/forgot`, `/admin/set-password/<link>` | Staff | Reset or choose a password |
+| `/admin/setup` | You, once | Create the first admin login (needs `SETUP_CODE`) |
 
 Employers never see who registered. The Companies page shows request counts
 only, which is what you can report back to a client.
@@ -191,36 +192,32 @@ or have a free service such as cron-job.org call
 
 ## Deploying
 
-1. **Database.** Create a Postgres database hosted in the EU, e.g.
-   [Neon](https://neon.tech) or [Supabase](https://supabase.com) in the
-   Frankfurt region. Copy its connection string.
-2. **Create the tables and your own admin login** from a computer with
-   Node 20+ (this is the only time you use the command line for logins):
-   ```sh
-   cd eap-app
-   npm install
-   DATABASE_URL="postgres://..." npm run db:migrate
-   DATABASE_URL="postgres://..." npm run staff:create -- amanda@pragueintegration.cz "Amanda Mataija"
-   DATABASE_URL="postgres://..." npm run staff:admin -- amanda@pragueintegration.cz
-   ```
-   `staff:create` prints a generated password; you can change it later with
-   "Forgot your password?". After that, invite everyone else from the
-   **Team** page.
-3. **Hosting.** Import the repository into [Vercel](https://vercel.com), set
-   the project's root directory to `eap-app`, choose the Frankfurt
-   (`fra1`) function region, and add the environment variables from
-   `.env.example`:
-   - `DATABASE_URL`: the connection string from step 1
-   - `APP_URL`: the address the app will live at, e.g. `https://eap.pragueintegration.cz`
-   - `RESEND_API_KEY`, `EMAIL_FROM`, `TEAM_NOTIFY_EMAIL`
-   - `CRON_SECRET`: any long random string (see "The hourly job")
-4. Optionally point a subdomain such as `eap.pragueintegration.cz` at it.
-5. Sign in at `/admin`, invite your coordinator and counsellors under
-   **Team**, add your first client under **Companies**, and send the link to
-   their HR team.
+No command line needed. The database sets itself up on every deploy.
 
-After updating the app, run `npm run db:migrate` again. It's safe to run
-more than once.
+1. **Database.** Create a Postgres database on [Neon](https://neon.tech) in
+   the Frankfurt region (AWS Europe Central 1). Under **Connect**, turn on
+   connection pooling and copy the connection string.
+2. **Hosting.** On [Vercel](https://vercel.com) (Pro plan for commercial
+   use), import this GitHub repository and set:
+   - **Root Directory:** `eap-app`
+   - **Environment variables** (see `.env.example`):
+     - `DATABASE_URL`: the Neon connection string
+     - `APP_URL`: the address people will use, e.g. `https://eap.pragueintegration.cz`
+     - `RESEND_API_KEY`, `EMAIL_FROM`, `TEAM_NOTIFY_EMAIL`
+     - `SETUP_CODE`: a code you make up, used once in step 3
+     - `CRON_SECRET`: any long random string (see "The hourly job")
+   - After the first deploy: **Settings → Functions → Region: Frankfurt (fra1)**.
+3. **Your admin login.** Open `https://<your app>/admin/setup`, type the
+   setup code, your name, email and a password. The page closes for good
+   once an admin exists.
+4. **Team and companies.** On the Team page, invite your coordinator and
+   counsellors; they get an email to choose their password. Under
+   Companies, add your first client and send the link to their HR team.
+5. Optionally point a subdomain such as `eap.pragueintegration.cz` at it
+   (Vercel → Settings → Domains), then update `APP_URL` and redeploy.
+
+Every later deploy updates the database automatically (`npm run
+vercel-build` runs `db/schema.sql`, which is safe to run repeatedly).
 
 ## Local development
 

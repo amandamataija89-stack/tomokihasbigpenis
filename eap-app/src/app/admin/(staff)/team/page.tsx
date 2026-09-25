@@ -9,7 +9,11 @@ const monthName = () => new Intl.DateTimeFormat("en-GB", { month: "long", timeZo
 
 type Member = { id: string; role: Role; takes_clients: boolean; away_until: string | null; invited: boolean };
 
-export default async function TeamPage({ searchParams }: { searchParams: Promise<{ saved?: string; invited?: string }> }) {
+export default async function TeamPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ saved?: string; invited?: string; welcome?: string }>;
+}) {
   const me = await requireManager();
   const sp = await searchParams;
   const [loads, { rows: members }] = await Promise.all([
@@ -40,6 +44,12 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
           nobody is available.
         </p>
       </div>
+      {sp.welcome && (
+        <p className="flash" role="status">
+          Welcome! You&apos;re signed in as admin. Next: invite your coordinator and counsellors below, then add your
+          first client company under Companies.
+        </p>
+      )}
       {sp.saved && <p className="flash" role="status">Saved.</p>}
       {sp.invited && <p className="flash" role="status">Invitation emailed.</p>}
 

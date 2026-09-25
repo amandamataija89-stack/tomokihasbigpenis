@@ -10,7 +10,8 @@
     "test": "vitest run",
     "db:migrate": "node scripts/migrate.mjs",
     "staff:create": "node scripts/create-staff.mjs",
-    "staff:admin": "node scripts/make-admin.mjs"
+    "staff:admin": "node scripts/make-admin.mjs",
+    "vercel-build": "node scripts/migrate.mjs && next build"
   },
   "engines": {
     "node": ">=20"
