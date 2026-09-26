@@ -290,11 +290,58 @@ export function newReplyForStaff(to: string, staffName: string, clientNickname: 
   };
 }
 
-export function invoiceEmail(to: string, firstName: string, number: string, pdfBase64: string, filename: string): Mail {
+export type InvoiceEmailInfo = {
+  number: string;
+  amount: number;
+  paid: boolean;
+  dueOn: string | null; // e.g. "14. 11. 2026"
+  variableSymbol: string;
+  account: string;
+  iban: string;
+};
+
+const payLines = (i: InvoiceEmailInfo) =>
+  `Částka / Amount: ${i.amount.toLocaleString("cs-CZ")} Kč\nÚčet / Account: ${i.account}${i.iban ? `\nIBAN: ${i.iban}` : ""}\nVariabilní symbol / Variable symbol: ${i.variableSymbol}${i.dueOn ? `\nSplatnost / Due date: ${i.dueOn}` : ""}\n\nNebo naskenujte QR kód v příloze ve své bankovní aplikaci.\nOr scan the attached QR code in your banking app.`;
+
+/** The invoice PDF, and for an invoice to pay, how to pay it with the QR code attached as an image. */
+export function invoiceEmail(
+  to: string,
+  firstName: string,
+  info: InvoiceEmailInfo,
+  pdfBase64: string,
+  filename: string,
+  qrPngBase64?: string,
+): Mail {
+  const attachments: Attachment[] = [{ filename, content: pdfBase64 }];
+  if (qrPngBase64) attachments.push({ filename: `qr-platba-${info.number}.png`, content: qrPngBase64 });
+  const body = info.paid
+    ? `v příloze posíláme fakturu č. ${info.number}. Je již uhrazena, nic dalšího neplaťte.\nPlease find attached invoice no. ${info.number}. It has already been paid: there is nothing more to pay.`
+    : `v příloze posíláme fakturu č. ${info.number}. Prosíme o úhradu do ${info.dueOn}.\nPlease find attached invoice no. ${info.number}, due by ${info.dueOn}.\n\n${payLines(info)}`;
   return {
     to,
-    subject: `Faktura / Invoice ${number} – Prague Integration`,
-    text: `Dobrý den / Hello ${firstName},\n\nv příloze posíláme fakturu č. ${number}. Je již uhrazena, nic dalšího neplaťte.\nPlease find attached invoice no. ${number}. It has already been paid: there is nothing more to pay.\n\nDěkujeme / Thank you,\nPrague Integration\n+420 608 573 256\ncontact@pragueintegration.cz\n`,
-    attachments: [{ filename, content: pdfBase64 }],
+    subject: `Faktura / Invoice ${info.number} – Prague Integration`,
+    text: `Dobrý den / Hello ${firstName},\n\n${body}\n\nDěkujeme / Thank you,\nPrague Integration\n+420 608 573 256\ncontact@pragueintegration.cz\n`,
+    attachments,
+  };
+}
+
+/** Sent once when an invoice is past its due date. */
+export function invoiceOverdueEmail(to: string, firstName: string, info: InvoiceEmailInfo, qrPngBase64?: string): Mail {
+  return {
+    to,
+    subject: `Připomínka platby / Payment reminder: faktura ${info.number} – Prague Integration`,
+    text: `Dobrý den / Hello ${firstName},\n\nfaktura č. ${info.number} byla splatná ${info.dueOn} a zatím jsme neobdrželi platbu. Pokud jste již zaplatili, děkujeme a tuto zprávu prosím ignorujte.\nInvoice no. ${info.number} was due on ${info.dueOn} and we haven't received the payment yet. If you've already paid, thank you, and please ignore this message.\n\n${payLines({ ...info, dueOn: null })}\n\nDěkujeme / Thank you,\nPrague Integration\n+420 608 573 256\ncontact@pragueintegration.cz\n`,
+    attachments: qrPngBase64 ? [{ filename: `qr-platba-${info.number}.png`, content: qrPngBase64 }] : undefined,
+  };
+}
+
+/** Tells the coordinator which invoices have just become overdue. */
+export function overdueInvoicesAlert(to: string, list: { firstName: string; number: string; amount: number; dueOn: string }[]): Mail {
+  return {
+    to,
+    subject: `Overdue invoices: ${list.length}`,
+    text: `These invoices are past their due date. The clients have been sent a payment reminder.\n\n${list
+      .map((l) => `${l.firstName}: invoice ${l.number}, ${l.amount.toLocaleString("cs-CZ")} CZK, due ${l.dueOn}`)
+      .join("\n")}\n\nSee them on Monthly billing:\n${appUrl()}/admin/billing\n`,
   };
 }

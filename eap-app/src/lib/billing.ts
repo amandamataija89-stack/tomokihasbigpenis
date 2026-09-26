@@ -9,37 +9,55 @@ export const PAYMENT_METHODS = ["Bank transfer", "Cash", "Card"] as const;
 
 // ---- Prices --------------------------------------------------------------------------
 
-export type PriceRow = { service: string; price_czk: number | null };
+// Prices on the price list are ranges without VAT; the counsellor picks each client's price from it,
+// in steps of PRICE_STEP. Sessions and payments store the price with VAT (what the client pays).
+export const PRICE_STEP = 100;
+
+export type PriceRow = { service: string; min_net_czk: number | null; max_net_czk: number | null };
 
 export async function priceList(): Promise<PriceRow[]> {
-  const { rows } = await pool.query<PriceRow>("SELECT service, price_czk FROM price_list ORDER BY service");
+  const { rows } = await pool.query<PriceRow>("SELECT service, min_net_czk, max_net_czk FROM price_list ORDER BY service");
   return rows;
 }
 
-export async function setListPrice(service: string, price: number | null): Promise<void> {
+export async function setPriceRange(service: string, min: number | null, max: number | null): Promise<void> {
   await pool.query(
-    `INSERT INTO price_list (service, price_czk, updated_at) VALUES ($1, $2, now())
-     ON CONFLICT (service) DO UPDATE SET price_czk = EXCLUDED.price_czk, updated_at = now()`,
-    [service, price],
+    `INSERT INTO price_list (service, min_net_czk, max_net_czk, updated_at) VALUES ($1, $2, $3, now())
+     ON CONFLICT (service) DO UPDATE SET min_net_czk = EXCLUDED.min_net_czk, max_net_czk = EXCLUDED.max_net_czk, updated_at = now()`,
+    [service, min, max],
   );
 }
 
+/** The prices a counsellor can pick from a range, e.g. 900, 1000, … 2300. */
+export function priceSteps(min: number, max: number, step = PRICE_STEP): number[] {
+  if (max < min) return [];
+  const out: number[] = [];
+  for (let p = min; p <= max; p += step) out.push(p);
+  if (out[out.length - 1] !== max) out.push(max);
+  return out;
+}
+
+/** The price with VAT for a price without VAT (unchanged when not a VAT payer). Whole crowns. */
+export const withVat = (net: number, s: Pick<InvoiceSettings, "vatPayer" | "vatRate">) =>
+  s.vatPayer ? Math.round((net * (100 + s.vatRate)) / 100) : net;
+
 /**
- * The price a new session starts with: the client's own price, else the price list for their kind
- * of support, else what their last session cost. null when none of those is known.
+ * The price (with VAT) a new session starts with: the client's price chosen by their counsellor, else the
+ * list price when their kind of support has a single price, else what their last session cost.
  */
 export async function defaultSessionPrice(requestId: string, db: Queryable = pool): Promise<number | null> {
-  const { rows } = await db.query<{ price: number | null }>(
-    `SELECT COALESCE(
-       r.session_price_czk,
-       (SELECT price_czk FROM price_list WHERE service = r.service),
+  const { rows } = await db.query<{ own: number | null; min: number | null; max: number | null; last: number | null }>(
+    `SELECT r.session_price_czk AS own, l.min_net_czk AS min, l.max_net_czk AS max,
        (SELECT price_czk FROM client_sessions WHERE request_id = r.id AND price_czk IS NOT NULL
-        ORDER BY starts_at DESC LIMIT 1)
-     ) AS price
-     FROM support_requests r WHERE r.id = $1`,
+        ORDER BY starts_at DESC LIMIT 1) AS last
+     FROM support_requests r LEFT JOIN price_list l ON l.service = r.service WHERE r.id = $1`,
     [requestId],
   );
-  return rows[0]?.price ?? null;
+  const r = rows[0];
+  if (!r) return null;
+  if (r.own !== null) return r.own;
+  if (r.min !== null && r.min === r.max) return withVat(r.min, await invoiceSettings(db));
+  return r.last;
 }
 
 /** A price typed in a form: whole CZK, null when empty, undefined when it isn't a number. */
@@ -66,10 +84,18 @@ export function billingFrom(form: FormData): BillingDetails {
 
 // ---- Payments and packages -------------------------------------------------------------
 
+/**
+ * A payment received, or an invoice issued and awaiting payment (paid_on null, due_on set).
+ * Sessions on an unpaid invoice have payment_id set but paid_at still null.
+ */
 export type Payment = {
   id: string;
   amount_czk: number;
-  paid_on: string; // YYYY-MM-DD
+  paid_on: string | null; // YYYY-MM-DD; null while the invoice is unpaid
+  due_on: string | null; // YYYY-MM-DD
+  period: string | null; // 'YYYY-MM' for a monthly invoice
+  emailed_at: Date | null;
+  overdue_reminded_at: Date | null;
   method: string;
   invoice_number: string | null;
   invoiced_at: Date | null;
@@ -80,8 +106,8 @@ export type Payment = {
 
 export async function listPayments(requestId: string): Promise<Payment[]> {
   const { rows } = await pool.query<Payment>(
-    `SELECT p.id, p.amount_czk, to_char(p.paid_on, 'YYYY-MM-DD') AS paid_on, p.method, p.invoice_number,
-       p.invoiced_at, p.created_at,
+    `SELECT p.id, p.amount_czk, to_char(p.paid_on, 'YYYY-MM-DD') AS paid_on, to_char(p.due_on, 'YYYY-MM-DD') AS due_on,
+       p.period, p.emailed_at, p.overdue_reminded_at, p.method, p.invoice_number, p.invoiced_at, p.created_at,
        (SELECT sessions FROM packages WHERE payment_id = p.id LIMIT 1) AS package_sessions,
        COALESCE((SELECT array_agg(id ORDER BY starts_at) FROM client_sessions WHERE payment_id = p.id), '{}') AS session_ids
      FROM payments p WHERE p.request_id = $1 ORDER BY p.paid_on DESC, p.created_at DESC`,
@@ -133,7 +159,7 @@ export function recordPayment(p: NewPayment): Promise<number | null> {
     // Only this client's sessions that aren't paid yet.
     const { rows: sessions } = await c.query<{ id: string; price_czk: number | null }>(
       `SELECT id, price_czk FROM client_sessions
-       WHERE request_id = $1 AND id = ANY($2::uuid[]) AND paid_at IS NULL FOR UPDATE`,
+       WHERE request_id = $1 AND id = ANY($2::uuid[]) AND paid_at IS NULL AND payment_id IS NULL FOR UPDATE`,
       [p.requestId, p.sessionIds],
     );
     if (!sessions.length) return null;
@@ -176,7 +202,7 @@ export function recordPackage(p: {
     );
     const { rowCount } = await c.query(
       `UPDATE client_sessions SET package_id = $2, paid_at = $3::date
-       WHERE id IN (SELECT id FROM client_sessions WHERE request_id = $1 AND paid_at IS NULL
+       WHERE id IN (SELECT id FROM client_sessions WHERE request_id = $1 AND paid_at IS NULL AND payment_id IS NULL
                     ORDER BY starts_at LIMIT $4)`,
       [p.requestId, pkg[0].id, p.paidOn, p.sessions],
     );
@@ -189,7 +215,7 @@ export async function useFromPackage(requestId: string, sessionId: string, db: Q
   const { rowCount } = await db.query(
     `UPDATE client_sessions cs SET package_id = k.id, paid_at = p.paid_on
      FROM packages k JOIN payments p ON p.id = k.payment_id
-     WHERE cs.id = $2 AND cs.paid_at IS NULL AND k.id = (
+     WHERE cs.id = $2 AND cs.paid_at IS NULL AND cs.payment_id IS NULL AND k.id = (
        SELECT k2.id FROM packages k2
        WHERE k2.request_id = $1
          AND (SELECT count(*) FROM client_sessions WHERE package_id = k2.id) < k2.sessions
@@ -240,7 +266,9 @@ export type InvoiceSettings = {
   supplierAddress: string;
   ico: string;
   dic: string;
-  note: string; // printed at the bottom, e.g. the VAT status
+  vatPayer: boolean; // invoices are tax documents (daňový doklad) with VAT shown
+  vatRate: number; // percent; prices entered include VAT
+  note: string; // printed at the bottom
   bankAccount: string; // Czech format, e.g. 123456789/0800
   iban: string;
   registration: string; // e.g. "Registered in the Commercial Register kept by the Municipal Court in Prague, section C, file 12345"
@@ -252,12 +280,14 @@ export type InvoiceSettings = {
 
 export const DEFAULT_INVOICE_SETTINGS: InvoiceSettings = {
   supplierName: "Prague Integration s.r.o.",
-  supplierAddress: "Mezibranská 4\n110 00 Praha 1",
-  ico: "",
-  dic: "",
-  note: "Nejsme plátci DPH. / Not a VAT payer.",
-  bankAccount: "",
-  iban: "",
+  supplierAddress: "Olšanská 4E\n130 00 Praha 3",
+  ico: "21048428",
+  dic: "CZ21048428",
+  vatPayer: true,
+  vatRate: 21,
+  note: "",
+  bankAccount: "5454387003/5500",
+  iban: "CZ4555000000005454387003",
   registration: "",
   email: "contact@pragueintegration.cz",
   phone: "+420 608 573 256",
@@ -281,6 +311,16 @@ export async function saveInvoiceSettings(s: InvoiceSettings): Promise<void> {
      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
     [JSON.stringify(s)],
   );
+}
+
+/**
+ * Splits a price that includes VAT into base and VAT, in haléře (hundredths of a crown), the way
+ * Czech VAT law computes it from a gross price: VAT = price × rate / (100 + rate), rounded.
+ */
+export function vatSplit(grossCzk: number, ratePercent: number): { base: number; vat: number; gross: number } {
+  const gross = Math.round(grossCzk * 100);
+  const vat = Math.round((gross * ratePercent) / (100 + ratePercent));
+  return { base: gross - vat, vat, gross };
 }
 
 /** The number after `n`: the digits at its end go up by one, keeping their width ("2026009" → "2026010"). */
@@ -317,10 +357,143 @@ export function issueInvoice(paymentId: string): Promise<string> {
         [JSON.stringify({ ...settings, nextNumber: nextInvoiceNumber(number) })],
       );
     }
+    const { dueDays } = await invoiceSettings(c);
+    // An invoice to pay is due dueDays (14) after it's issued.
     await c.query(
-      "UPDATE payments SET invoice_number = $2, invoiced_at = COALESCE(invoiced_at, now()) WHERE id = $1",
-      [paymentId, number],
+      `UPDATE payments SET invoice_number = $2, invoiced_at = COALESCE(invoiced_at, now()),
+         due_on = CASE WHEN paid_on IS NULL THEN COALESCE(due_on, (now() AT TIME ZONE 'Europe/Prague')::date + $3::int) END
+       WHERE id = $1`,
+      [paymentId, number, dueDays],
     );
     return number;
   });
+}
+
+// ---- Invoices to pay later ---------------------------------------------------------------
+
+/** The client's variable symbol, given one if they don't have it yet. */
+export async function ensureVariableSymbol(requestId: string, db: Queryable = pool): Promise<string> {
+  const { rows } = await db.query<{ variable_symbol: string }>(
+    `UPDATE support_requests SET variable_symbol = COALESCE(variable_symbol, nextval('client_vs_seq')::text)
+     WHERE id = $1 RETURNING variable_symbol`,
+    [requestId],
+  );
+  return rows[0].variable_symbol;
+}
+
+/**
+ * Issues an invoice to pay for sessions that are neither paid nor on another invoice. It gets its
+ * number now and is due 14 days from today. Returns its id, or null if there was nothing to invoice.
+ */
+export async function createInvoiceToPay(p: {
+  requestId: string;
+  sessionIds: string[];
+  amount: number | null;
+  staffId: string | null;
+  period?: string;
+}): Promise<string | null> {
+  const id = await inTransaction(async (c) => {
+    const { rows: sessions } = await c.query<{ id: string; price_czk: number | null }>(
+      `SELECT id, price_czk FROM client_sessions
+       WHERE request_id = $1 AND id = ANY($2::uuid[]) AND paid_at IS NULL AND payment_id IS NULL FOR UPDATE`,
+      [p.requestId, p.sessionIds],
+    );
+    if (!sessions.length) return null;
+    const amount = p.amount ?? sessions.reduce((sum, s) => sum + (s.price_czk ?? 0), 0);
+    const { rows } = await c.query<{ id: string }>(
+      `INSERT INTO payments (request_id, amount_czk, paid_on, method, period, staff_id)
+       VALUES ($1, $2, NULL, 'Bank transfer', $3, $4) RETURNING id`,
+      [p.requestId, amount, p.period ?? null, p.staffId],
+    );
+    await c.query("UPDATE client_sessions SET payment_id = $2 WHERE id = ANY($1::uuid[])", [
+      sessions.map((s) => s.id),
+      rows[0].id,
+    ]);
+    await ensureVariableSymbol(p.requestId, c);
+    return rows[0].id;
+  });
+  if (id) await issueInvoice(id);
+  return id;
+}
+
+/** Records that an invoice was paid: its sessions become paid on that date. */
+export async function markInvoicePaid(requestId: string, paymentId: string, paidOn: string, method: string): Promise<boolean> {
+  return inTransaction(async (c) => {
+    const { rowCount } = await c.query(
+      "UPDATE payments SET paid_on = $3, method = $4 WHERE id = $1 AND request_id = $2 AND paid_on IS NULL",
+      [paymentId, requestId, paidOn, method],
+    );
+    if (!rowCount) return false;
+    await c.query("UPDATE client_sessions SET paid_at = $2::date WHERE payment_id = $1", [paymentId, paidOn]);
+    return true;
+  });
+}
+
+export type MonthlyInvoiceResult = { requestId: string; firstName: string; paymentId: string; sessions: number; amount: number };
+
+/**
+ * One invoice per private client for the sessions held in `month` (late cancellations included)
+ * that aren't paid or invoiced yet. Sessions without a price are left out and reported.
+ */
+export async function createMonthlyInvoices(
+  month: string,
+  staffId: string,
+): Promise<{ created: MonthlyInvoiceResult[]; withoutPrice: { requestId: string; firstName: string; sessions: number }[] }> {
+  const { rows } = await pool.query<{ request_id: string; first_name: string; ids: string[]; no_price: number }>(
+    `SELECT r.id AS request_id, r.first_name,
+       COALESCE(array_agg(cs.id ORDER BY cs.starts_at) FILTER (WHERE cs.price_czk IS NOT NULL), '{}') AS ids,
+       count(*) FILTER (WHERE cs.price_czk IS NULL)::int AS no_price
+     FROM client_sessions cs JOIN support_requests r ON r.id = cs.request_id
+     WHERE r.kind = 'private' AND cs.done_at IS NOT NULL AND cs.paid_at IS NULL AND cs.payment_id IS NULL
+       AND to_char(cs.starts_at AT TIME ZONE 'Europe/Prague', 'YYYY-MM') = $1
+     GROUP BY r.id ORDER BY r.first_name`,
+    [month],
+  );
+  const created: MonthlyInvoiceResult[] = [];
+  for (const r of rows) {
+    if (!r.ids.length) continue;
+    const paymentId = await createInvoiceToPay({ requestId: r.request_id, sessionIds: r.ids, amount: null, staffId, period: month });
+    if (!paymentId) continue;
+    const { rows: p } = await pool.query<{ amount_czk: number }>("SELECT amount_czk FROM payments WHERE id = $1", [paymentId]);
+    created.push({ requestId: r.request_id, firstName: r.first_name, paymentId, sessions: r.ids.length, amount: p[0].amount_czk });
+  }
+  return {
+    created,
+    withoutPrice: rows.filter((r) => r.no_price > 0).map((r) => ({ requestId: r.request_id, firstName: r.first_name, sessions: r.no_price })),
+  };
+}
+
+export type OpenInvoice = {
+  id: string;
+  request_id: string;
+  first_name: string;
+  invoice_number: string;
+  amount_czk: number;
+  due_on: string;
+  overdue: boolean;
+};
+
+/** Invoices issued and not yet paid, overdue first. */
+export async function openInvoices(): Promise<OpenInvoice[]> {
+  const { rows } = await pool.query<OpenInvoice>(
+    `SELECT p.id, p.request_id, r.first_name, p.invoice_number, p.amount_czk, to_char(p.due_on, 'YYYY-MM-DD') AS due_on,
+       p.due_on < (now() AT TIME ZONE 'Europe/Prague')::date AS overdue
+     FROM payments p JOIN support_requests r ON r.id = p.request_id
+     WHERE p.paid_on IS NULL AND p.invoice_number IS NOT NULL
+     ORDER BY p.due_on, p.invoice_number`,
+  );
+  return rows;
+}
+
+/** The Czech QR Platba (Short Payment Descriptor) text for paying an invoice. */
+export function qrPlatba(p: { iban: string; amountCzk: number; variableSymbol: string; message: string }): string {
+  const clean = (t: string) => t.replace(/\*/g, " ").normalize("NFD").replace(/[\u0300-\u036f]/g, "").slice(0, 60);
+  return [
+    "SPD*1.0",
+    `ACC:${p.iban.replace(/\s+/g, "").toUpperCase()}`,
+    `AM:${p.amountCzk.toFixed(2)}`,
+    "CC:CZK",
+    `X-VS:${p.variableSymbol.replace(/\D/g, "").slice(0, 10)}`,
+    `MSG:${clean(p.message)}`,
+  ].join("*");
 }

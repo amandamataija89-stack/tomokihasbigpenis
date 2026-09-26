@@ -32,7 +32,7 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
        GROUP BY r.id ORDER BY amount DESC`,
     ),
   ]);
-  const price = (service: string) => prices.find((p) => p.service === service)?.price_czk ?? null;
+  const range = (service: string) => prices.find((p) => p.service === service);
   const owed = owing.reduce((a, o) => a + o.amount, 0);
 
   return (
@@ -42,7 +42,9 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
         <p className="lede">For private clients. EAP sessions are paid by the employer and aren&apos;t invoiced here.</p>
       </div>
       {sp.saved && <p className="flash" role="status">Saved.</p>}
-      {sp.error === "price" && <p className="err" role="alert">Enter prices as whole numbers of CZK, e.g. 1500, or leave them empty.</p>}
+      {sp.error === "price" && (
+        <p className="err" role="alert">Enter prices as whole numbers of CZK, e.g. 900 to 2300, with &quot;to&quot; not lower than &quot;from&quot;.</p>
+      )}
       {sp.error === "number" && <p className="err" role="alert">The next invoice number must end in a digit, e.g. 2026001.</p>}
 
       <section className="card load-summary">
@@ -68,13 +70,19 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
       <form action={savePriceList} className="card form">
         <h2>Price list</h2>
         <p className="small">
-          The price per session for each kind of support. A client&apos;s own price (on their page, under Price and
-          invoicing) overrides it.
+          Price per session <b>without VAT</b>, from … to …. Each client&apos;s counsellor picks their price from this
+          range (in steps of 100 CZK) on the client&apos;s page; {settings.vatPayer ? `${settings.vatRate} % VAT is added on top.` : "no VAT is added."}{" "}
+          For a single price, fill in only &quot;from&quot;.
         </p>
         {SERVICES.map((s) => (
           <div className="field" key={s}>
-            <label htmlFor={`price-${s}`}>{s}, CZK</label>
-            <input id={`price-${s}`} name={`price:${s}`} type="text" inputMode="numeric" className="price-input" defaultValue={price(s) ?? ""} />
+            <b>{s}</b>
+            <div className="pay-fields">
+              <label><span className="small">From, CZK</span>
+                <input name={`min:${s}`} type="text" inputMode="numeric" className="price-input" defaultValue={range(s)?.min_net_czk ?? ""} /></label>
+              <label><span className="small">To, CZK</span>
+                <input name={`max:${s}`} type="text" inputMode="numeric" className="price-input" defaultValue={range(s)?.max_net_czk ?? ""} /></label>
+            </div>
           </div>
         ))}
         <div className="actions"><button type="submit">Save prices</button></div>
@@ -102,9 +110,27 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
         <div className="field"><label htmlFor="registration">Registration (commercial register entry)</label>
           <input id="registration" name="registration" type="text" defaultValue={settings.registration}
             placeholder="Zapsáno v obchodním rejstříku vedeném Městským soudem v Praze, oddíl C, vložka …" /></div>
-        <div className="field"><label htmlFor="note">Note at the bottom</label>
-          <input id="note" name="note" type="text" defaultValue={settings.note} />
-          <span className="small">For example your VAT status. The default says you&apos;re not a VAT payer: change it if you are.</span></div>
+        <div className="field">
+          <label className="consent">
+            <input type="checkbox" name="vatPayer" value="yes" defaultChecked={settings.vatPayer} />
+            <span>We are a VAT payer (invoices are tax documents, &quot;daňový doklad&quot;, showing VAT)</span>
+          </label>
+          <label htmlFor="vatRate">VAT rate</label>
+          <select id="vatRate" name="vatRate" defaultValue={String(settings.vatRate)} className="price-input">
+            <option value="21">21 %</option>
+            <option value="12">12 %</option>
+            <option value="0">0 %</option>
+          </select>
+          <span className="small">
+            The price list is without VAT; session prices and invoices show what the client pays, with VAT
+            (e.g. 1,500 CZK + 21 % = 1,815 CZK).
+          </span>
+          {settings.vatPayer && !settings.dic && (
+            <span className="err">Enter your DIČ above: a VAT invoice must show it.</span>
+          )}
+        </div>
+        <div className="field"><label htmlFor="note">Note at the bottom (optional)</label>
+          <input id="note" name="note" type="text" defaultValue={settings.note} /></div>
         <div className="field"><label htmlFor="nextNumber">Next invoice number</label>
           <input id="nextNumber" name="nextNumber" type="text" className="price-input" defaultValue={settings.nextNumber} />
           <span className="small">Goes up by one for each new invoice. Set it to continue your current numbering.</span></div>

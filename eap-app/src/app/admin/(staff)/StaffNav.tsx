@@ -12,6 +12,7 @@ export function StaffNav({ role }: { role: Role }) {
     { href: "/admin/availability", label: "My availability", show: true },
     { href: "/admin/team", label: "Team", show: manager },
     { href: "/admin/companies", label: "Companies", show: manager },
+    { href: "/admin/billing", label: "Monthly billing", show: manager },
     { href: "/admin/pricing", label: "Pricing & invoices", show: manager },
     { href: "/admin/feedback", label: "Feedback", show: role === "admin" },
   ].filter((l) => l.show);

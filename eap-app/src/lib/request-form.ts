@@ -39,6 +39,7 @@ export type RequestInput = {
   gender: string;
   location: string;
   service: string; // private clients only; "" for EAP
+  address: string; // private clients only (residential address, for invoices); "" for EAP
 };
 
 export type FieldErrors = Partial<Record<keyof RequestInput | "consent" | "consentContact", string>>;
@@ -57,8 +58,12 @@ function text(form: FormData, key: string, max: number): string {
   return typeof v === "string" ? v.trim().slice(0, max) : "";
 }
 
-/** `askService`: the private form also asks what kind of support they need. */
-export function validateRequest(form: FormData, askService = false): ValidationResult {
+/**
+ * `isPrivate`: the private form also asks what kind of support they need, and requires their full
+ * name and residential address (their invoices are made out to them).
+ */
+export function validateRequest(form: FormData, isPrivate = false): ValidationResult {
+  const askService = isPrivate;
   const crisisAnswer = text(form, "crisis", 3);
   const values: Omit<RequestInput, "crisis"> = {
     firstName: text(form, "firstName", 80),
@@ -76,11 +81,16 @@ export function validateRequest(form: FormData, askService = false): ValidationR
     gender: text(form, "gender", 40),
     location: text(form, "location", 120),
     service: askService ? text(form, "service", 60) : "",
+    address: isPrivate ? text(form, "address", 300) : "",
   };
   const errors: FieldErrors = {};
 
   if (askService && !(SERVICES as readonly string[]).includes(values.service))
     errors.service = "Choose the kind of support you need.";
+  if (isPrivate && values.fullName.split(/\s+/).filter(Boolean).length < 2)
+    errors.fullName = "Enter your first name and surname, as they should appear on your invoices.";
+  if (isPrivate && values.address.length < 8)
+    errors.address = "Enter your residential address: street and number, postcode and town.";
   if (!values.firstName) errors.firstName = "Enter a nickname: any name you'd like us to call you.";
   if (!EMAIL_RE.test(values.email)) errors.email = "Enter an email address like name@example.com.";
   if (!(CONTACT_METHODS as readonly string[]).includes(values.contactMethod))

@@ -41,10 +41,36 @@ Everything else is the same: consents, messages, session emails and reminders, c
 - **Invoices**: every payment can be turned into a PDF invoice in Czech and English (**Invoice PDF**), or
   emailed to the client with the PDF attached (**Email invoice**). Numbers are given automatically from
   **Next invoice number** on the Pricing & invoices page, unless you type one in when recording the payment.
-  Fill in the company's IČO, bank account and register entry there first, and check the VAT note with your
-  accountant: the default says Prague Integration is not a VAT payer. Invoices are marked as already paid.
+  Fill in the company's IČO, DIČ, bank account and register entry there first. Invoices are marked as already paid.
+- **VAT**: Prague Integration is a VAT payer, so invoices are tax documents ("Faktura – daňový doklad") at
+  the VAT rate set on the Pricing page (21 % by default). Prices include VAT; the invoice shows the tax base,
+  the VAT and the total, and the tax point (DUZP): the earlier of the payment date and the last session it
+  covers (for a package, the payment date). Have your accountant confirm the rate and the tax point.
 - The Pricing & invoices page also shows money received this month and last, unpaid sessions per
   client, and recent payments.
+
+### Invoicing workflow (private clients)
+
+1. **Type of counselling** (on the client's page; the client also picks it when signing up).
+2. **Price**: the counsellor picks the client's price from the type's range in the dropdown (without VAT;
+   e.g. Individual 900–2,300, Couples 2,000–3,000, Children/teenagers 1,400–1,600 CZK, all + 21 % VAT).
+   It applies to new sessions and to booked sessions not yet paid.
+3. **Invoices**:
+   - **Monthly billing** page → **Create monthly invoices**: one invoice per client for the month's sessions
+     held (late cancellations included) that aren't paid or invoiced yet. Each shows the item
+     "Mental Health Counselling Services – Individual/Couples/…", the number of sessions × the client's
+     price, the session dates, the client's **variable symbol**, a **QR Platba** code, and is **due 14 days**
+     after it's created. Then **Email invoices to clients** (PDF and QR code attached).
+   - Or on a client's page: tick sessions → **Create invoice to pay**, or **Record payment received**.
+   - **Mark as paid** on the invoice when the money arrives.
+   - **Late payment**: an unpaid invoice past its due date shows in red on the client's page and on
+     Monthly billing; the hourly job emails the client one payment reminder (with the QR code) and tells
+     the coordinator.
+   - **Export**: all invoices for a month (Monthly billing) or a client (their page) as one PDF, and a CSV
+     list for the accountant (number, customer, variable symbol, dates, base, VAT, total, status).
+- Each private client gets their own **variable symbol** (from 100001), used on all their invoices so
+  their payments can be matched. Invoices are made out to the client's full name and residential address
+  from the sign-up form, unless other invoice details are entered on their page.
 Private clients have a **Private** tag; the **Private clients** tab lists them. Counsellors don't see
 unassigned private clients in the pool.
 

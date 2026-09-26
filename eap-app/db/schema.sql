@@ -235,3 +235,41 @@ CREATE TABLE IF NOT EXISTS packages (
 -- paid_at stays the "is it paid" flag; these say which payment or package paid for the session.
 ALTER TABLE client_sessions ADD COLUMN IF NOT EXISTS payment_id uuid REFERENCES payments(id) ON DELETE SET NULL;
 ALTER TABLE client_sessions ADD COLUMN IF NOT EXISTS package_id uuid REFERENCES packages(id) ON DELETE SET NULL;
+
+-- Price ranges without VAT, per kind of support: the counsellor picks each client's price from it.
+ALTER TABLE price_list ADD COLUMN IF NOT EXISTS min_net_czk integer CHECK (min_net_czk IS NULL OR min_net_czk >= 0);
+ALTER TABLE price_list ADD COLUMN IF NOT EXISTS max_net_czk integer CHECK (max_net_czk IS NULL OR max_net_czk >= 0);
+UPDATE price_list SET min_net_czk = 900, max_net_czk = 2300
+  WHERE service = 'Individual counselling' AND min_net_czk IS NULL AND max_net_czk IS NULL;
+UPDATE price_list SET min_net_czk = 2000, max_net_czk = 3000
+  WHERE service = 'Couple counselling' AND min_net_czk IS NULL AND max_net_czk IS NULL;
+UPDATE price_list SET min_net_czk = 1400, max_net_czk = 1600
+  WHERE service = 'Children or teenager counselling' AND min_net_czk IS NULL AND max_net_czk IS NULL;
+-- The client's price without VAT, as chosen by their counsellor (session_price_czk is the same with VAT).
+ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS session_price_net_czk integer
+  CHECK (session_price_net_czk IS NULL OR session_price_net_czk >= 0);
+
+-- Invoices to pay later: a payment row with no paid_on yet is an issued invoice awaiting payment.
+ALTER TABLE payments ALTER COLUMN paid_on DROP NOT NULL;
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS due_on date;
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS period text; -- 'YYYY-MM' for a monthly invoice
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS emailed_at timestamptz;
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS overdue_reminded_at timestamptz;
+CREATE INDEX IF NOT EXISTS payments_unpaid_idx ON payments (due_on) WHERE paid_on IS NULL;
+
+-- Each private client has their own variable symbol, used on all their invoices.
+CREATE SEQUENCE IF NOT EXISTS client_vs_seq START 100001;
+ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS variable_symbol text;
+CREATE UNIQUE INDEX IF NOT EXISTS support_requests_vs_idx ON support_requests (variable_symbol);
+UPDATE support_requests SET variable_symbol = nextval('client_vs_seq')::text
+  WHERE kind = 'private' AND variable_symbol IS NULL;
+
+-- Prague Integration's company details, filled in where they haven't been set yet.
+UPDATE app_state SET value = (value::jsonb || jsonb_build_object(
+    'supplierName', 'Prague Integration s.r.o.', 'supplierAddress', E'Olšanská 4E\n130 00 Praha 3',
+    'ico', '21048428', 'dic', 'CZ21048428', 'bankAccount', '5454387003/5500', 'iban', 'CZ4555000000005454387003',
+    'dueDays', 14))::text
+  WHERE key = 'invoice_settings' AND COALESCE(value::jsonb->>'ico', '') = '';
+
+-- Private clients' residential address, from the sign-up form (their invoices are made out to them).
+ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS address text NOT NULL DEFAULT '';
