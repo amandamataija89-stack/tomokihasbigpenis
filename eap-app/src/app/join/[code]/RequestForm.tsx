@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { AGE_RANGES, CONTACT_METHODS, FORMATS, GENDERS, LANGUAGES, TOPICS } from "@/lib/request-form";
+import { AGE_RANGES, CONTACT_METHODS, FORMATS, GENDERS, LANGUAGES, SERVICES, TOPICS } from "@/lib/request-form";
 import { submitRequest, type SubmitState } from "./actions";
 
 /** code: the company's code for an EAP request, or null for a private client. */
@@ -47,6 +47,20 @@ export function RequestForm({ code }: { code: string | null }) {
 
       <section className="form-section">
         <h2>What&apos;s going on</h2>
+        {code === null && (
+          <fieldset {...invalid("service")}>
+            <legend>What kind of support do you need?</legend>
+            <div className="choices">
+              {SERVICES.map((sv) => (
+                <label className="choice" key={sv}>
+                  <input type="radio" name="service" value={sv} defaultChecked={v.service === sv} />
+                  <span>{sv}</span>
+                </label>
+              ))}
+            </div>
+            {err("service")}
+          </fieldset>
+        )}
         <fieldset className="urgent-q" {...invalid("crisis")}>
           <legend>Do you need help urgently?</legend>
           <div className="choices">

@@ -111,6 +111,11 @@ export default async function RequestPage({
           <section className="card stack">
             <h2>Request</h2>
             <dl className="facts">
+              {r.service && (
+                <>
+                  <dt>Support needed</dt><dd><b>{r.service}</b></dd>
+                </>
+              )}
               <dt>Urgent?</dt><dd>{r.crisis ? <b className="overdue">Yes, crisis</b> : "No"}</dd>
               <dt>Nickname</dt><dd>{r.first_name}</dd>
               <dt>Full name</dt><dd>{r.full_name || <span className="small">Not given</span>}</dd>
@@ -169,7 +174,7 @@ export default async function RequestPage({
                   <span>Already agreed with them (no need to accept)</span>
                 </label>
                 <span className="small">
-                  Otherwise they&apos;re emailed and have 4 office hours (30 minutes for a crisis) to accept, before it passes
+                  Otherwise they&apos;re emailed and have 24 working hours (30 minutes for a crisis) to accept, before it passes
                   to the next available counsellor.
                 </span>
               </div>

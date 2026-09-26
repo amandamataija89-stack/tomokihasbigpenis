@@ -30,11 +30,14 @@ describe("addOfficeHours (Mon–Fri 08:00–18:00)", () => {
 
 describe("offers and contact, counted from when the client submits", () => {
   const monday10 = new Date("2026-09-28T08:00:00Z");
-  it("normal: accept by 14:00 (reminder 12:00), contact reminder Tue 04:00, due Tue 10:00", () => {
-    expect(iso(respondBy(monday10, false))).toBe("2026-09-28T12:00:00.000Z");
-    expect(iso(offerReminderAt(monday10, false))).toBe("2026-09-28T10:00:00.000Z");
+  it("normal: accept by Tue 10:00 (reminder Mon 22:00), contact reminder Tue 04:00, due Tue 10:00", () => {
+    expect(iso(respondBy(monday10, false))).toBe("2026-09-29T08:00:00.000Z");
+    expect(iso(offerReminderAt(monday10, false))).toBe("2026-09-28T20:00:00.000Z");
     expect(iso(contactReminderAt(monday10, false))).toBe("2026-09-29T02:00:00.000Z");
     expect(iso(contactDue(monday10, false))).toBe("2026-09-29T08:00:00.000Z");
+  });
+  it("offered Friday 16:00: accept by Monday 16:00 (weekend skipped)", () => {
+    expect(iso(respondBy(new Date("2026-09-25T14:00:00Z"), false))).toBe("2026-09-28T14:00:00.000Z");
   });
   it("crisis: 30 minutes to accept, contact reminder after 1 hour, due after 2, even at the weekend", () => {
     const saturday = new Date("2026-09-26T10:00:00Z");

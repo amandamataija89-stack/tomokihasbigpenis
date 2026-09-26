@@ -64,10 +64,10 @@ the promise the client is given: **contact within 24 working hours**
 1. **Offer.** The moment a client submits, they're offered automatically to
    the available counsellor with the fewest new clients this month who works
    in their language. That counsellor is emailed a link.
-2. **Accept or decline within 4 office hours** (Monday to Friday,
-   08:00–18:00; crisis: 30 minutes), with a reminder email halfway. For
-   example, offered Monday 10:00, answer by 14:00; offered Monday 20:00,
-   answer by Tuesday 12:00. Booking a session or changing the status also
+2. **Accept or decline within 24 working hours** (Monday to Friday, weekends
+   skipped; crisis: 30 minutes), with a reminder email halfway. For example,
+   offered Monday 10:00, answer by Tuesday 10:00; offered Friday 16:00,
+   answer by Monday 16:00. Booking a session or changing the status also
    counts as accepting.
 3. **Decline or no answer: straight to the next available counsellor**,
    automatically and with an email to them, as many times as needed. Nobody
@@ -197,8 +197,8 @@ Stack: Next.js 15, Postgres (plain SQL, no ORM), Resend for email.
 unanswered offers to the next counsellor, offers waiting clients when someone
 becomes available, sends first-contact reminders and missed-promise alerts,
 the coordinator's daily summary and the clients' 48-hour session reminders.
-Because offers last 4 office hours (30 minutes for a crisis), running it
-every 15 minutes is better if your scheduler allows it.
+Because crisis offers last 30 minutes, running it every 15 minutes is better
+if your scheduler allows it.
 
 `vercel.json` asks Vercel to call it hourly with the `CRON_SECRET`
 environment variable (set it to any long random string). **Vercel's free
@@ -253,7 +253,7 @@ Checks: `npm run lint` (TypeScript) and `npm test` (unit tests).
 
 - **Response times (confirmed):** clients are promised contact within 24
   working hours (Monday to Friday), or as soon as possible if urgent; offers
-  last 4 office hours (08:00–18:00). Only weekends are skipped, not public
+  last 24 working hours (30 minutes for a crisis). Only weekends are skipped, not public
   holidays.
 - **Cancellation policy (confirmed):** sessions cancelled with less than 48
   hours' notice count as one of the 5. Make sure client contracts say the
