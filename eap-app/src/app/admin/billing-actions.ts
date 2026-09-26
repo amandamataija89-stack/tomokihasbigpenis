@@ -239,11 +239,28 @@ export async function emailInvoice(requestId: string, paymentId: string) {
 
 /** An invoice to pay for the ticked sessions, due in 14 days; emailed straight away if asked. */
 export async function createInvoiceAction(requestId: string, formData: FormData) {
+  return createInvoice(requestId, formData, false);
+}
+
+/** "Create invoice and download PDF": creates it without emailing and offers the PDF on the page. */
+export async function createInvoiceAndDownloadAction(requestId: string, formData: FormData) {
+  return createInvoice(requestId, formData, true);
+}
+
+async function createInvoice(requestId: string, formData: FormData, download: boolean) {
   const staff = await requireBillingManager(requestId);
   const sessionIds = formData.getAll("session").map(String).filter((id) => /^[0-9a-f-]{36}$/i.test(id));
   if (!sessionIds.length) back(requestId, "nosessions");
   const amount = parsePrice(formData.get("amount"));
   if (amount === undefined) back(requestId, "amount");
+  // Without a typed amount, every ticked session needs a price, or the invoice would be for 0 CZK.
+  if (amount === null) {
+    const { rowCount } = await pool.query(
+      "SELECT 1 FROM client_sessions WHERE request_id = $1 AND id = ANY($2::uuid[]) AND price_czk IS NULL",
+      [requestId, sessionIds],
+    );
+    if (rowCount) back(requestId, "noprice");
+  }
   const id = await createInvoiceToPay({ requestId, sessionIds, amount: amount ?? null, staffId: staff.id });
   if (!id) back(requestId, "nosessions");
   const { rows } = await pool.query<{ invoice_number: string; amount_czk: number }>(
@@ -251,6 +268,8 @@ export async function createInvoiceAction(requestId: string, formData: FormData)
     [id],
   );
   await note(requestId, staff.id, `Invoice ${rows[0].invoice_number} issued for ${czk(rows[0].amount_czk)}, to pay within 14 days.`);
+  // "Create invoice and download PDF": back to the page with the download button, without emailing it.
+  if (download) redirect(`/admin/requests/${requestId}?billing=created&pdf=${id}#payments`);
   if (formData.get("send") === "yes") await emailOrFlag(requestId, id!);
   back(requestId, "invoiced");
 }

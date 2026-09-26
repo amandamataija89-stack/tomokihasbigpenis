@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { therapistLoads } from "@/lib/assign";
 import { requireManager, ROLE_LABELS, ROLES, type Role } from "@/lib/auth";
 import { pool } from "@/lib/db";
@@ -86,7 +87,7 @@ export default async function TeamPage({
             <div key={t.id} className="card therapist">
               <div className="therapist-head">
                 <div>
-                  <h2>{t.name}</h2>
+                  <h2><Link href={`/admin/team/${t.id}`}>{t.name}</Link></h2>
                   <span className="small">{t.email}</span>
                 </div>
                 <span className={`pill ${!available(t.id) ? "pill-closed" : full ? "pill-new" : "pill-scheduled"}`}>
@@ -97,6 +98,7 @@ export default async function TeamPage({
                     : `${t.assignedThisMonth} / ${t.capacity}${full ? " · full" : ""}`}
                 </span>
               </div>
+              <p className="small"><Link href={`/admin/team/${t.id}`}>See their clients and month →</Link></p>
               {m.invited && (
                 <form action={resendInvite.bind(null, t.id)} className="actions invite-pending">
                   <span className="small">Hasn&apos;t set a password yet.</span>

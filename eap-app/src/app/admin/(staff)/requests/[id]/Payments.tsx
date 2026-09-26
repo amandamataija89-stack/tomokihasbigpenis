@@ -2,6 +2,7 @@ import type { ClientSession } from "@/lib/data";
 import { PAYMENT_METHODS, type PackageState, type Payment } from "@/lib/billing";
 import {
   createInvoiceAction,
+  createInvoiceAndDownloadAction,
   emailInvoice,
   markPaidAction,
   addItemAction,
@@ -30,7 +31,8 @@ const FLASH: Record<string, [ok: boolean, text: string]> = {
   saved: [true, "Invoice details saved."],
   pricechosen: [true, "Price chosen."],
   range: [false, "Choose one of the prices shown."],
-  nosessions: [false, "Tick at least one unpaid session."],
+  nosessions: [false, "Tick at least one session in the list below (upcoming sessions aren't ticked automatically)."],
+  noprice: [false, "A ticked session has no price yet. Choose the client's price under Session price first, or type the amount."],
   amount: [false, "Enter the amount as a whole number of CZK, e.g. 4500."],
   price: [false, "Enter the price as a whole number of CZK, e.g. 1500, or leave it empty."],
   email: [false, "Enter the invoice email like name@example.com, or leave it empty."],
@@ -69,6 +71,7 @@ export function Payments({
   packages,
   flash,
   why,
+  pdf,
   manager,
 }: {
   requestId: string;
@@ -77,6 +80,7 @@ export function Payments({
   packages: PackageState[];
   flash?: string;
   why?: string;
+  pdf?: string; // an invoice just created, to offer for download
   manager: boolean; // counsellors see the amounts only, not invoices
 }) {
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Prague" }).format(new Date());
@@ -126,6 +130,15 @@ export function Payments({
         </span>
       </div>
       {text && <p className={ok ? "flash" : "err"} role={ok ? "status" : "alert"}>{text}</p>}
+      {flash === "created" && pdf && /^[0-9a-f-]{36}$/i.test(pdf) && (
+        <div className="flash actions" role="status" style={{ justifyContent: "space-between", gap: 8 }}>
+          <span>Invoice created (not emailed).</span>
+          <span className="actions" style={{ gap: 8 }}>
+            <a className="button small-btn" href={`/admin/invoices/${pdf}?download=1`} download>Download invoice PDF</a>
+            <a className="button ghost small-btn" href={`/admin/invoices/${pdf}`} target="_blank" rel="noopener">Open</a>
+          </span>
+        </div>
+      )}
       {overdue.length > 0 && (
         <p className="err" role="alert">
           <b>Late payment:</b> {overdue.map((p) => `invoice ${p.invoice_number} (${czk(p.amount_czk)}, due ${formatDay(p.due_on!)})`).join(", ")}{" "}
@@ -169,9 +182,13 @@ export function Payments({
                 <input type="checkbox" name="send" value="yes" defaultChecked />
                 <span>Email the invoice with the QR payment code to the client now</span>
               </label>
-              <div className="actions">
+              <div className="actions" style={{ gap: 8 }}>
                 <button formAction={createInvoiceAction.bind(null, requestId)}>Create invoice to pay (due in 14 days)</button>
+                <button formAction={createInvoiceAndDownloadAction.bind(null, requestId)} className="ghost">
+                  Create invoice and download PDF
+                </button>
               </div>
+              <span className="small">&quot;Download&quot; opens the PDF to save or print, without emailing it.</span>
             </div>
             <div className="pay-choice">
               <h3>Already paid</h3>
@@ -292,8 +309,13 @@ export function Payments({
               </div>
               <form className="actions" style={{ gap: 8 }}>
                 <a className="button ghost small-btn" href={`/admin/invoices/${p.id}`} target="_blank" rel="noopener">
-                  {p.invoice_number ? "Invoice PDF" : p.paid_on ? "Create invoice PDF" : "Preview PDF"}
+                  {p.invoice_number ? "Open invoice" : p.paid_on ? "Create invoice PDF" : "Preview PDF"}
                 </a>
+                {p.invoice_number && (
+                  <a className="button ghost small-btn" href={`/admin/invoices/${p.id}?download=1`} download>
+                    Download invoice
+                  </a>
+                )}
                 {(p.invoice_number || p.paid_on) && (
                   <button formAction={emailInvoice.bind(null, requestId, p.id)} className="ghost small-btn">
                     Email invoice

@@ -4,7 +4,7 @@ import { invoiceFileName, loadInvoice, renderInvoice } from "@/lib/invoice-pdf";
 
 // The invoice PDF for a payment, for staff who can see the client's case. The first download gives
 // the payment its invoice number.
-export async function GET(_req: Request, { params }: { params: Promise<{ paymentId: string }> }) {
+export async function GET(req: Request, { params }: { params: Promise<{ paymentId: string }> }) {
   const staff = await currentStaff();
   if (!staff) return new Response("Please sign in.", { status: 401 });
   // Invoices are for coordinators and admins; counsellors only see amounts on the client's page.
@@ -22,7 +22,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ payment
   return new Response(Buffer.from(pdf), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="${invoiceFileName(data.number)}"`,
+      // ?download=1 saves the file; otherwise it opens in the browser.
+      "Content-Disposition": `${new URL(req.url).searchParams.get("download") ? "attachment" : "inline"}; filename="${invoiceFileName(data.number)}"`,
       "Cache-Control": "private, no-store",
     },
   });
