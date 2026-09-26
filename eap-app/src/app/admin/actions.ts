@@ -6,7 +6,7 @@ import { endSession, isManager, requireManager, requireStaff, ROLES, startSessio
 import { inviteFeedback } from "@/lib/feedback";
 import { assignWaitingAndNotify, DEFAULT_MONTHLY_CAPACITY, offerToNext } from "@/lib/assign";
 import { generateCompanyCode } from "@/lib/codes";
-import { SESSIONS_PER_CLIENT, STATUSES, STATUS_LABELS, type Status } from "@/lib/data";
+import { sessionLimit, STATUSES, STATUS_LABELS, type ClientKind, type Status } from "@/lib/data";
 import { pool } from "@/lib/db";
 import { LATE_CANCEL_HOURS } from "@/lib/deadlines";
 import { emailProblem, sendEmail, sessionConfirmation, therapistAlert, type SessionEmail } from "@/lib/email";
@@ -85,8 +85,8 @@ export async function updateRequest(requestId: string, formData: FormData) {
   await acceptIfPending(requestId, c);
 
   const crisis = formData.get("crisis") === "yes";
-  const { rows } = await pool.query<{ status: Status; assigned_to: string | null; crisis: boolean }>(
-    "SELECT status, assigned_to, crisis FROM support_requests WHERE id = $1",
+  const { rows } = await pool.query<{ status: Status; assigned_to: string | null; crisis: boolean; kind: ClientKind }>(
+    "SELECT status, assigned_to, crisis, kind FROM support_requests WHERE id = $1",
     [requestId],
   );
   if (!rows[0]) redirect("/admin");
@@ -127,6 +127,8 @@ export async function updateRequest(requestId: string, formData: FormData) {
       staff.id,
       `Status changed from ${STATUS_LABELS[rows[0].status]} to ${STATUS_LABELS[status]}.`,
     ]);
+    // Private clients have no session limit, so staff complete their case by hand.
+    if (status === "completed" && rows[0].kind === "private") await sendFeedbackOnce(requestId, staff.id);
   }
   revalidatePath(`/admin/requests/${requestId}`);
   redirect(`/admin/requests/${requestId}?saved=1`);
@@ -335,10 +337,11 @@ const pragueLabel = (local: string) =>
   `, ${local.slice(11)}`;
 
 // Keeps the case status in step with its sessions: Contacted once a session is booked,
-// In progress once one is done, Completed once all are done. A Closed case is left alone.
+// In progress once one is done, Completed once all are done (EAP only: private clients have no
+// limit, so staff complete their case by hand). A Closed case is left alone.
 async function syncStatusWithSessions(requestId: string, staffId: string) {
-  const { rows } = await pool.query<{ status: Status; total: number; done: number }>(
-    `SELECT r.status,
+  const { rows } = await pool.query<{ status: Status; kind: ClientKind; total: number; done: number }>(
+    `SELECT r.status, r.kind,
        (SELECT count(*)::int FROM client_sessions WHERE request_id = r.id) AS total,
        (SELECT count(*)::int FROM client_sessions WHERE request_id = r.id AND done_at IS NOT NULL) AS done
      FROM support_requests r WHERE r.id = $1`,
@@ -348,7 +351,9 @@ async function syncStatusWithSessions(requestId: string, staffId: string) {
   if (!r) return;
   let next: Status = r.status;
   if (r.status === "closed") return;
-  if (r.done >= SESSIONS_PER_CLIENT) next = "completed";
+  const limit = sessionLimit(r.kind);
+  if (limit && r.done >= limit) next = "completed";
+  else if (limit === null && r.status === "completed") return;
   else if (r.done > 0) next = "in_progress";
   else if (r.status === "completed" || r.status === "in_progress") next = "contacted";
   else if (r.total > 0 && r.status === "new") next = "contacted";
@@ -358,17 +363,19 @@ async function syncStatusWithSessions(requestId: string, staffId: string) {
     requestId,
     staffId,
     next === "completed"
-      ? `All ${SESSIONS_PER_CLIENT} sessions done. Case marked Completed.`
+      ? `All ${limit} sessions done. Case marked Completed.`
       : `Status changed from ${STATUS_LABELS[r.status]} to ${STATUS_LABELS[next]}.`,
   );
-  // Only once per case, even if a session is undone and redone.
-  if (next === "completed") {
-    const { rows: sent } = await pool.query(
-      "SELECT 1 FROM request_notes WHERE request_id = $1 AND body LIKE 'Anonymous feedback link emailed%'",
-      [requestId],
-    );
-    if (!sent.length) await sendFeedbackLink(requestId, staffId);
-  }
+  if (next === "completed") await sendFeedbackOnce(requestId, staffId);
+}
+
+// The automatic feedback email goes once per case, even if it's completed, reopened and completed again.
+async function sendFeedbackOnce(requestId: string, staffId: string) {
+  const { rows: sent } = await pool.query(
+    "SELECT 1 FROM request_notes WHERE request_id = $1 AND body LIKE 'Anonymous feedback link emailed%'",
+    [requestId],
+  );
+  if (!sent.length) await sendFeedbackLink(requestId, staffId);
 }
 
 const whenFmt = new Intl.DateTimeFormat("en-GB", {
@@ -397,8 +404,9 @@ async function emailClient(
     therapist: string | null;
     starts_at: Date;
     number: number;
+    kind: ClientKind;
   }>(
-    `SELECT r.id AS request_id, r.email, r.first_name, r.format, s.name AS therapist, cs.starts_at,
+    `SELECT r.id AS request_id, r.email, r.first_name, r.format, r.kind, s.name AS therapist, cs.starts_at,
        (SELECT count(*)::int FROM client_sessions o WHERE o.request_id = r.id AND o.starts_at <= cs.starts_at) AS number
      FROM client_sessions cs
      JOIN support_requests r ON r.id = cs.request_id
@@ -416,7 +424,7 @@ async function emailClient(
         kind,
         when: whenFmt.format(r.starts_at),
         number: r.number,
-        total: SESSIONS_PER_CLIENT,
+        total: sessionLimit(r.kind),
         format: r.format,
         therapistName: r.therapist,
         messageLink: await clientMessageLink(r.request_id),
@@ -443,14 +451,19 @@ export async function addSession(requestId: string, formData: FormData) {
   await acceptIfPending(requestId, c);
   const startsAt = sessionDate(formData);
   if (!startsAt) redirect(`/admin/requests/${requestId}?session=date#sessions`);
-  const { rows } = await pool.query<{ n: number }>(
-    "SELECT count(*)::int AS n FROM client_sessions WHERE request_id = $1",
+  const { rows } = await pool.query<{ n: number; kind: ClientKind }>(
+    `SELECT (SELECT count(*)::int FROM client_sessions WHERE request_id = r.id) AS n, r.kind
+     FROM support_requests r WHERE r.id = $1`,
     [requestId],
   );
-  if (rows[0].n >= SESSIONS_PER_CLIENT) redirect(`/admin/requests/${requestId}?session=full#sessions`);
+  const limit = sessionLimit(rows[0].kind);
+  if (limit && rows[0].n >= limit) redirect(`/admin/requests/${requestId}?session=full#sessions`);
+  const price = rows[0].kind === "private" ? priceFrom(formData) : null;
+  if (price === undefined) redirect(`/admin/requests/${requestId}?session=price#sessions`);
   const { rows: created } = await pool.query<{ id: string }>(
-    "INSERT INTO client_sessions (request_id, starts_at) VALUES ($1, $2::timestamp AT TIME ZONE 'Europe/Prague') RETURNING id",
-    [requestId, startsAt],
+    `INSERT INTO client_sessions (request_id, starts_at, price_czk)
+     VALUES ($1, $2::timestamp AT TIME ZONE 'Europe/Prague', $3) RETURNING id`,
+    [requestId, startsAt, price],
   );
   const emailed = await emailClient(formData, created[0].id, "booked");
   await note(requestId, staff.id, `Session booked for ${pragueLabel(startsAt)}.${emailed}`);
@@ -484,11 +497,13 @@ export async function setSessionOutcome(sessionId: string, outcome: "done" | "la
     outcome === "undo" ? [sessionId] : [sessionId, outcome === "late"],
   );
   if (!rowCount) redirect(`/admin/requests/${requestId}#sessions`);
-  const { rows } = await pool.query<{ done: number }>(
-    "SELECT count(*)::int AS done FROM client_sessions WHERE request_id = $1 AND done_at IS NOT NULL",
+  const { rows } = await pool.query<{ done: number; kind: ClientKind }>(
+    `SELECT (SELECT count(*)::int FROM client_sessions WHERE request_id = r.id AND done_at IS NOT NULL) AS done, r.kind
+     FROM support_requests r WHERE r.id = $1`,
     [requestId],
   );
-  const counted = `${rows[0].done} of ${SESSIONS_PER_CLIENT}`;
+  const limit = sessionLimit(rows[0].kind);
+  const counted = limit ? `${rows[0].done} of ${limit}` : `${rows[0].done} so far`;
   await note(
     requestId,
     staff.id,
@@ -499,6 +514,42 @@ export async function setSessionOutcome(sessionId: string, outcome: "done" | "la
         : "Session no longer marked done or late-cancelled.",
   );
   await syncStatusWithSessions(requestId, staff.id);
+  redirect(`/admin/requests/${requestId}#sessions`);
+}
+
+// ---- Payment (private clients) ------------------------------------------------------
+
+/** The price typed in the form: a whole number of CZK, null when left empty, undefined when invalid. */
+function priceFrom(formData: FormData): number | null | undefined {
+  const raw = String(formData.get("price") ?? "").replace(/[\s,.]|CZK|Kč/gi, "");
+  if (!raw) return null;
+  return /^\d{1,6}$/.test(raw) ? Number(raw) : undefined;
+}
+
+export async function setSessionPrice(sessionId: string, formData: FormData) {
+  const requestId = await sessionRequest(sessionId);
+  const { staff } = await requireCase(requestId);
+  const price = priceFrom(formData);
+  if (price === undefined) redirect(`/admin/requests/${requestId}?session=price#sessions`);
+  await pool.query("UPDATE client_sessions SET price_czk = $2 WHERE id = $1", [sessionId, price]);
+  await note(requestId, staff.id, price === null ? "Session price removed." : `Session price set to ${price} CZK.`);
+  redirect(`/admin/requests/${requestId}#sessions`);
+}
+
+export async function setSessionPaid(sessionId: string, paid: boolean) {
+  const requestId = await sessionRequest(sessionId);
+  const { staff } = await requireCase(requestId);
+  // Only acts on a real change, so a double click can't add two notes.
+  const { rows } = await pool.query<{ price_czk: number | null }>(
+    paid
+      ? "UPDATE client_sessions SET paid_at = now() WHERE id = $1 AND paid_at IS NULL RETURNING price_czk"
+      : "UPDATE client_sessions SET paid_at = NULL WHERE id = $1 AND paid_at IS NOT NULL RETURNING price_czk",
+    [sessionId],
+  );
+  if (rows[0]) {
+    const amount = rows[0].price_czk === null ? "" : ` (${rows[0].price_czk} CZK)`;
+    await note(requestId, staff.id, paid ? `Session marked paid${amount}.` : `Session no longer marked paid${amount}.`);
+  }
   redirect(`/admin/requests/${requestId}#sessions`);
 }
 

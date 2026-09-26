@@ -53,13 +53,21 @@ export function emailProblem(err: unknown): string {
 
 
 // Deliberately contains nothing the person wrote: email is not where health information should travel.
-export function teamAlert(companyName: string, requestId: string, assignedName: string | null, crisis: boolean): Mail {
+/** companyName is null for a private client, who always needs a counsellor assigning. */
+export function teamAlert(
+  companyName: string | null,
+  requestId: string,
+  assignedName: string | null,
+  crisis: boolean,
+  to = process.env.TEAM_NOTIFY_EMAIL ?? "contact@pragueintegration.cz",
+): Mail {
   const who = assignedName ? `Assigned automatically to: ${assignedName}` : "Not assigned: someone needs to pick this up.";
   const urgent = crisis ? "URGENT: the person says they need help urgently. Contact them as soon as possible.\n\n" : "";
+  const what = companyName ? `New EAP request (${companyName})` : "New private client";
   return {
-    to: process.env.TEAM_NOTIFY_EMAIL ?? "contact@pragueintegration.cz",
-    subject: `${crisis ? "URGENT – " : ""}New EAP request (${companyName})${assignedName ? "" : " – needs assigning"}`,
-    text: `${urgent}A new support request has come in.\n\nCompany: ${companyName}\n${who}\n\nOpen it here to see the details and make contact within 24 working hours:\n${appUrl()}/admin/requests/${requestId}\n`,
+    to,
+    subject: `${crisis ? "URGENT – " : ""}${what}${assignedName ? "" : " – needs assigning"}`,
+    text: `${urgent}A new support request has come in.\n\n${companyName ? `Company: ${companyName}` : "Private client (not through an employer)"}\n${who}\n\nOpen it here to see the details and make contact within 24 working hours:\n${appUrl()}/admin/requests/${requestId}\n`,
   };
 }
 
@@ -78,8 +86,8 @@ export function therapistAlert(to: string, therapistName: string, requestId: str
   const by = respondBy ? formatDeadline(respondBy) : null;
   return {
     to,
-    subject: `${crisis ? "URGENT – " : ""}New EAP client offered to you: please accept or decline`,
-    text: `Hi ${therapistName},\n\nA new EAP client has been offered to you.${
+    subject: `${crisis ? "URGENT – " : ""}New client offered to you: please accept or decline`,
+    text: `Hi ${therapistName},\n\nA new client has been offered to you.${
       crisis ? " They say they need help urgently." : ""
     }\n\nPlease open it and press Accept or Decline${by ? ` by ${by} (Prague time)` : ""}. If you don't answer by then, the client is passed to the next available counsellor.${
       crisis ? " Once you accept, contact them as soon as possible today." : " Once you accept, please contact them as soon as you can: they were promised contact within 24 working hours of asking."
@@ -90,7 +98,7 @@ export function therapistAlert(to: string, therapistName: string, requestId: str
 export function offerReminder(to: string, therapistName: string, requestId: string, crisis: boolean, respondBy: Date): Mail {
   return {
     to,
-    subject: `${crisis ? "URGENT – " : ""}Reminder: please accept or decline your new EAP client`,
+    subject: `${crisis ? "URGENT – " : ""}Reminder: please accept or decline your new client`,
     text: `Hi ${therapistName},\n\nA new client offered to you is still waiting for your answer. Please sign in and press Accept or Decline by ${formatDeadline(respondBy)} (Prague time). After that the client is passed to the next available counsellor.\n\n${appUrl()}/admin/requests/${requestId}\n`,
   };
 }
@@ -107,7 +115,13 @@ export function offerReleased(to: string, therapistName: string, clientNickname:
   };
 }
 
-export function nobodyAvailable(to: string, clientNickname: string, requestId: string, crisis: boolean): Mail {
+export function nobodyAvailable(to: string, clientNickname: string, requestId: string, crisis: boolean, isPrivate = false): Mail {
+  if (isPrivate)
+    return {
+      to,
+      subject: `${crisis ? "URGENT – " : ""}Private client ${clientNickname} needs a new counsellor`,
+      text: `${clientNickname}${crisis ? ", who said they need help urgently," : ""} (a private client) was declined or not accepted in time. Private clients aren't offered automatically, so please assign another counsellor:\n${appUrl()}/admin/requests/${requestId}\n`,
+    };
   return {
     to,
     subject: `${crisis ? "URGENT – " : ""}No counsellor available for ${clientNickname}`,
@@ -119,7 +133,7 @@ export type Digest = { pool: number; crisisInPool: number; awaiting: number; ove
 
 export function dailyDigest(to: string, d: Digest): Mail {
   const lines = [
-    `Clients in the pool (nobody available): ${d.pool}${d.crisisInPool ? ` (${d.crisisInPool} crisis)` : ""}`,
+    `Clients waiting for a counsellor: ${d.pool}${d.crisisInPool ? ` (${d.crisisInPool} crisis)` : ""}`,
     `Offers waiting for a counsellor to accept: ${d.awaiting}`,
     `Not contacted by the promised time: ${d.overdue}`,
   ];
@@ -150,11 +164,11 @@ export function passwordReset(to: string, name: string, token: string): Mail {
 const messageLine = (link?: string) =>
   link ? `\n\nTo write to us, or to read and answer our messages, use your private page:\n${link}\n(Keep this link to yourself: anyone with it can read your messages.)` : "";
 
-export function employeeConfirmation(to: string, firstName: string, crisis = false, messageLink?: string): Mail {
+export function employeeConfirmation(to: string, firstName: string, crisis = false, messageLink?: string, isPrivate = false): Mail {
   return {
     to,
     subject: "We've received your request – Prague Integration",
-    text: `Hi ${firstName},\n\nThank you for reaching out. We've received your request and someone from our team will contact you ${crisis ? "as soon as possible" : "within 24 working hours (Monday to Friday)"}, in the way you asked.${messageLine(messageLink)}\n\nEverything you share with us is confidential. Your employer is not told who uses the programme.\n\nIf you need urgent help before we reach you, call 112 (emergency) or the Linka první psychické pomoci on 116 123 (free, 24/7).\n\nPrague Integration\n+420 608 573 256\ncontact@pragueintegration.cz\n`,
+    text: `Hi ${firstName},\n\nThank you for reaching out. We've received your request and someone from our team will contact you ${crisis ? "as soon as possible" : "within 24 working hours (Monday to Friday)"}, in the way you asked.${messageLine(messageLink)}\n\nEverything you share with us is confidential.${isPrivate ? "" : " Your employer is not told who uses the programme."}\n\nIf you need urgent help before we reach you, call 112 (emergency) or the Linka první psychické pomoci on 116 123 (free, 24/7).\n\nPrague Integration\n+420 608 573 256\ncontact@pragueintegration.cz\n`,
   };
 }
 
@@ -166,13 +180,18 @@ export type SessionEmail = {
   kind: "booked" | "moved" | "cancelled";
   when: string; // e.g. "Tuesday 30 September 2026 at 14:00"
   number: number;
-  total: number;
+  total: number | null; // null: no session limit (private clients)
   format: string;
   therapistName: string | null;
 };
 
-export const lateCancellationPolicy = (hours: number, total: number) =>
-  `Cancellation policy: if you need to cancel or move a session, please tell us at least ${hours} hours before it starts. A session cancelled with less notice counts as one of your ${total} sessions.`;
+// What a late cancellation costs: one of the EAP sessions, or the full fee for a private client.
+const lateCancelCost = (total: number | null) =>
+  total ? `counts as one of your ${total} sessions` : "is charged as a session";
+const sessionOf = (n: number, total: number | null) => (total ? `Session ${n} of ${total}` : `Session ${n}`);
+
+export const lateCancellationPolicy = (hours: number, total: number | null) =>
+  `Cancellation policy: if you need to cancel or move a session, please tell us at least ${hours} hours before it starts. A session cancelled with less notice ${lateCancelCost(total)}.`;
 
 // Contains only practical details, nothing about why the person is coming.
 export function sessionConfirmation(s: SessionEmail): Mail {
@@ -197,7 +216,7 @@ export function sessionConfirmation(s: SessionEmail): Mail {
   const body =
     s.kind === "cancelled"
       ? `\n\nWe'll be in touch to find a new time.`
-      : `\nSession ${s.number} of ${s.total}\n${where}${policy}`;
+      : `\n${sessionOf(s.number, s.total)}\n${where}${policy}`;
   return {
     to: s.to,
     subject: `${subject} – Prague Integration`,
@@ -248,7 +267,7 @@ export function sessionReminder(s: Omit<SessionEmail, "kind"> & { cancelBy: stri
   return {
     to: s.to,
     subject: `Reminder: your session on ${s.when} – Prague Integration`,
-    text: `Hi ${s.firstName},\n\nA reminder of your upcoming session${s.therapistName ? ` with ${s.therapistName}` : ""}:\n\n${s.when} (Prague time)\nSession ${s.number} of ${s.total}${where ? `\n${where}` : ""}\n\nIf you need to cancel or move it, please tell us by ${s.cancelBy}: ${s.messageLink ? `message us on your private page (${s.messageLink})` : "reply to this email"} or call +420 608 573 256. After that, a cancellation counts as one of your ${s.total} sessions.\n\nSee you soon,\nPrague Integration\n`,
+    text: `Hi ${s.firstName},\n\nA reminder of your upcoming session${s.therapistName ? ` with ${s.therapistName}` : ""}:\n\n${s.when} (Prague time)\n${sessionOf(s.number, s.total)}${where ? `\n${where}` : ""}\n\nIf you need to cancel or move it, please tell us by ${s.cancelBy}: ${s.messageLink ? `message us on your private page (${s.messageLink})` : "reply to this email"} or call +420 608 573 256. After that, a cancellation ${lateCancelCost(s.total)}.\n\nSee you soon,\nPrague Integration\n`,
   };
 }
 

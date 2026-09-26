@@ -45,8 +45,8 @@ export default async function RequestPage({
   const nameOf = (sid: string) => staff.find((s) => s.id === sid)?.name ?? "a former colleague";
   const label = (s: (typeof staff)[number]) => {
     if (s.id === r.assigned_to) return `${s.name} (current)`;
-    const load = `${s.assignedThisMonth}/${s.capacity} this month`;
-    const warn = s.assignedThisMonth >= s.capacity ? ", full" : !speaks(s, r.language) ? `, no ${r.language}` : "";
+    const load = `${s.assignedThisMonth}/${s.capacity} EAP this month`;
+    const warn = s.assignedThisMonth >= s.capacity && r.kind === "eap" ? ", full" : !speaks(s, r.language) ? `, no ${r.language}` : "";
     return `${s.name} (${load}${warn})`;
   };
 
@@ -56,6 +56,7 @@ export default async function RequestPage({
       <div className="actions" style={{ justifyContent: "space-between" }}>
         <h1 style={{ fontSize: 32 }}>{r.first_name}</h1>
         <span className="actions" style={{ gap: 8 }}>
+          {r.kind === "private" && <span className="pill pill-private">Private</span>}
           {r.crisis && <span className="pill pill-crisis">Crisis</span>}
           <span className={`pill pill-${r.status}`}>{STATUS_LABELS[r.status]}</span>
         </span>
@@ -88,7 +89,11 @@ export default async function RequestPage({
       {manager && r.status === "new" && (
         <p className="notice">
           {!r.assigned_to ? (
-            <><b>In the pool: nobody available.</b> Assign a counsellor below. It will also be offered automatically as soon as someone is available.</>
+            r.kind === "private" ? (
+              <><b>Private client: needs a counsellor.</b> Choose one under Follow-up below. Private clients aren&apos;t offered automatically.</>
+            ) : (
+              <><b>In the pool: nobody available.</b> Assign a counsellor below. It will also be offered automatically as soon as someone is available.</>
+            )
           ) : r.accepted_at ? (
             <><b>Accepted</b> by {r.assigned_name} on {formatDate(r.accepted_at)}.</>
           ) : (
@@ -109,7 +114,8 @@ export default async function RequestPage({
               <dt>Urgent?</dt><dd>{r.crisis ? <b className="overdue">Yes, crisis</b> : "No"}</dd>
               <dt>Nickname</dt><dd>{r.first_name}</dd>
               <dt>Full name</dt><dd>{r.full_name || <span className="small">Not given</span>}</dd>
-              <dt>Company</dt><dd>{r.company_name}</dd>
+              <dt>Client of</dt>
+              <dd>{r.company_name ? `EAP · ${r.company_name}` : <span className="pill pill-private">Private client</span>}</dd>
               <dt>Age</dt><dd>{r.age_range || "—"}</dd>
               <dt>Gender</dt><dd>{r.gender || "—"}</dd>
               <dt>Based in</dt><dd>{r.location || "—"}</dd>
@@ -137,7 +143,7 @@ export default async function RequestPage({
             )}
           </section>
           <Messages requestId={r.id} nickname={r.first_name} messages={messages} flash={sp.msg} />
-          <Sessions requestId={r.id} sessions={sessions} clientEmail={r.email} error={sp.session} />
+          <Sessions requestId={r.id} kind={r.kind} sessions={sessions} clientEmail={r.email} error={sp.session} />
         </div>
 
         <div className="stack" style={{ gap: 20 }}>
@@ -153,7 +159,9 @@ export default async function RequestPage({
               <div className="field">
                 <label htmlFor="assignedTo">Counsellor</label>
                 <select id="assignedTo" name="assignedTo" defaultValue={r.assigned_to ?? ""}>
-                  <option value="">Nobody: offer to the next available counsellor</option>
+                  <option value="">
+                    {r.kind === "private" ? "Nobody yet" : "Nobody: offer to the next available counsellor"}
+                  </option>
                   {staff.map((s) => <option key={s.id} value={s.id}>{label(s)}</option>)}
                 </select>
                 <label className="consent small-consent">

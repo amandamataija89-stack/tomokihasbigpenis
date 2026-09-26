@@ -67,6 +67,7 @@ export const UNASSIGNED_REASONS: Record<Exclude<Choice, { therapist: TherapistLo
 
 type Queryable = Pick<PoolClient, "query">;
 
+// The monthly limit is for new EAP clients; private clients are placed by the coordinator and don't count.
 export async function therapistLoads(db: Queryable = pool, onlyTakingClients = true): Promise<TherapistLoad[]> {
   const { rows } = await db.query<{
     id: string;
@@ -78,8 +79,8 @@ export async function therapistLoads(db: Queryable = pool, onlyTakingClients = t
     last_assigned_at: Date | null;
   }>(
     `SELECT s.id, s.name, s.email, s.monthly_capacity, s.languages,
-       count(r.id) FILTER (WHERE r.assigned_at >= ${MONTH_START_SQL})::int AS assigned,
-       max(r.assigned_at) AS last_assigned_at
+       count(r.id) FILTER (WHERE r.assigned_at >= ${MONTH_START_SQL} AND r.kind = 'eap')::int AS assigned,
+       max(r.assigned_at) FILTER (WHERE r.kind = 'eap') AS last_assigned_at
      FROM staff s LEFT JOIN support_requests r ON r.assigned_to = s.id
      ${
        onlyTakingClients
@@ -176,16 +177,26 @@ export function autoAssign(requestId: string, language: string, crisis: boolean)
 /**
  * After a decline or an unanswered offer: offers the client straight away to the next available
  * counsellor (never one who already declined them). If nobody is available the client waits in
- * the pool, marked so, and is offered as soon as someone is.
+ * the pool, marked so, and is offered as soon as someone is. Private clients aren't offered
+ * automatically: they go back to the coordinator to assign.
  */
 export function offerToNext(requestId: string): Promise<Assignment | null> {
   return withAssignLock(async (client) => {
-    const { rows } = await client.query<{ language: string; crisis: boolean; declined_by: string[] }>(
-      "SELECT language, crisis, declined_by FROM support_requests WHERE id = $1 AND assigned_to IS NULL AND status = 'new'",
+    const { rows } = await client.query<{ language: string; crisis: boolean; declined_by: string[]; kind: string }>(
+      `SELECT language, crisis, declined_by, kind FROM support_requests
+       WHERE id = $1 AND assigned_to IS NULL AND status = 'new'`,
       [requestId],
     );
     if (!rows[0]) return null;
     const r = rows[0];
+    if (r.kind === "private") {
+      await client.query("UPDATE support_requests SET in_pool = true WHERE id = $1", [requestId]);
+      await client.query("INSERT INTO request_notes (request_id, body) VALUES ($1, $2)", [
+        requestId,
+        "Private client: back with the coordinator to assign a counsellor.",
+      ]);
+      return null;
+    }
     const a = await assignOne(client, await therapistLoads(client), requestId, r.language, r.crisis, r.declined_by, false);
     if (!a) {
       await client.query("UPDATE support_requests SET in_pool = true WHERE id = $1", [requestId]);
@@ -199,14 +210,14 @@ export function offerToNext(requestId: string): Promise<Assignment | null> {
 }
 
 /**
- * Offers every client still waiting for a counsellor, oldest (and crisis) first, as places open:
+ * Offers every EAP client still waiting for a counsellor, oldest (and crisis) first, as places open:
  * a new month, a raised limit, someone back from being away or newly signed up.
  */
 export function assignWaiting(): Promise<Assignment[]> {
   return withAssignLock(async (client) => {
     const { rows } = await client.query<{ id: string; language: string; crisis: boolean; declined_by: string[] }>(
       `SELECT id, language, crisis, declined_by FROM support_requests
-       WHERE assigned_to IS NULL AND status = 'new'
+       WHERE assigned_to IS NULL AND status = 'new' AND kind = 'eap'
        ORDER BY crisis DESC, created_at`,
     );
     if (!rows.length) return [];

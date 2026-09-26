@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Brand, CrisisNotice, SiteFooter } from "@/components/Brand";
 import { normalizeCompanyCode } from "@/lib/codes";
@@ -53,6 +54,9 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ e
 
       <p className="reassure">
         Your employer is never told who uses the programme or what you talk about.
+      </p>
+      <p className="small">
+        Not coming through an employer? <Link href="/start">Ask for support as a private client.</Link>
       </p>
       <CrisisNotice />
       <SiteFooter />

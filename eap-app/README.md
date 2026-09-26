@@ -12,6 +12,22 @@ A web app for Prague Integration's Employee Assistance Programme.
 - **Prague Integration staff** sign in at `/admin`. What they see depends on
   their role.
 
+## Two kinds of client
+
+| | **EAP clients** | **Private clients** |
+| --- | --- | --- |
+| Who | Employees of a partner company | Prague Integration's own clients |
+| Where they sign up | `/join/<company code>` (or the code on `/`) | `/start`: put this link on your website |
+| Counsellor | Offered automatically (see below) | **The coordinator assigns** (they're emailed a "New private client – needs assigning" alert) |
+| Sessions | Up to 5; Completed automatically after the 5th | **No limit**; staff set the status to Completed when they finish |
+| Late cancellation | Counts as one of the 5 | Counts as a session and is charged |
+| Payment | None | Each session has a price (CZK) and a **Mark paid** button; unpaid sessions show on the case and in the list |
+| Monthly limit | Counts towards each counsellor's new-clients-per-month | Doesn't count |
+
+Everything else is the same: consents, messages, session emails and reminders, contact promise, feedback.
+Private clients have a **Private** tag; the **Private clients** tab lists them. Counsellors don't see
+unassigned private clients in the pool.
+
 ## Roles
 
 | Role | Sees | Can |
@@ -158,6 +174,7 @@ The number of sessions is `SESSIONS_PER_CLIENT` in `src/lib/data.ts`; the
 | --- | --- | --- |
 | `/` | Employee | Enter company code |
 | `/join/ABCD-EFGH` | Employee | Request form for that company |
+| `/start` | Private client | Request form without a company code |
 | `/feedback/<link>` | Client | One-use anonymous feedback form |
 | `/messages/<link>` | Client | Their private conversation with their counsellor |
 | `/admin` | Staff | My clients (counsellors) or all requests (coordinators, admins), plus the pool |
