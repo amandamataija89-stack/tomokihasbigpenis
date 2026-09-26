@@ -21,8 +21,12 @@ export function Brand({ href = "/" }: { href?: string }) {
 export function SiteFooter() {
   return (
     <footer className="site">
-      <span>Prague Integration s.r.o. · Mezibranská 4, 110 00 Prague 1</span>
+      <span>Prague Integration s.r.o. · Olšanská 4E, 130 00 Praha 3 · IČO 21048428</span>
       <span>+420 608 573 256 · contact@pragueintegration.cz</span>
+      <span>
+        <Link href="/privacy">Privacy Policy</Link> · <Link href="/terms">Terms of Service</Link> ·{" "}
+        <Link href="/cookies">Cookie Policy</Link>
+      </span>
     </footer>
   );
 }

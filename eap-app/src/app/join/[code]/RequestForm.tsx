@@ -231,7 +231,8 @@ export function RequestForm({ code }: { code: string | null }) {
         </div>
         <p className="small">
           You can withdraw your consent or ask for your information to be deleted at any time by writing to
-          contact@pragueintegration.cz.
+          contact@pragueintegration.cz. See our <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a> and{" "}
+          <a href="/terms" target="_blank" rel="noopener">Terms of Service</a>.
         </p>
       </fieldset>
 
