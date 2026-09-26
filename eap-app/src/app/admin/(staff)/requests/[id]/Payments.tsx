@@ -4,6 +4,11 @@ import {
   createInvoiceAction,
   emailInvoice,
   markPaidAction,
+  addItemAction,
+  issueNowAction,
+  removeItemAction,
+  sendReminderAction,
+  setInvoiceAmountAction,
   recordPackagePayment,
   recordSessionsPayment,
   removePayment,
@@ -16,6 +21,9 @@ const FLASH: Record<string, [ok: boolean, text: string]> = {
   paid: [true, "Payment recorded."],
   invoiced: [true, "Invoice created. It's due in 14 days."],
   markedpaid: [true, "Invoice marked paid."],
+  edited: [true, "Invoice updated. If it was already emailed, it will be sent again with the next invoice emails."],
+  reminded: [true, "Payment reminder emailed."],
+  item: [false, "Enter what the item is and its amount in CZK (with a minus sign for a discount)."],
   package: [true, "Package recorded. Booked sessions it covers are marked paid, and new bookings use what's left."],
   deleted: [true, "Payment deleted. Its sessions are unpaid again."],
   emailed: [true, "Invoice emailed."],
@@ -61,6 +69,7 @@ export function Payments({
   packages,
   flash,
   why,
+  manager,
 }: {
   requestId: string;
   sessions: ClientSession[];
@@ -68,6 +77,7 @@ export function Payments({
   packages: PackageState[];
   flash?: string;
   why?: string;
+  manager: boolean; // counsellors see the amounts only, not invoices
 }) {
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Prague" }).format(new Date());
   const number = new Map(sessions.map((s, i) => [s.id, i + 1]));
@@ -86,6 +96,26 @@ export function Payments({
   const noPrice = sessions.filter((s) => s.price_czk === null).length;
   const [ok, text] = flash === "emailfailed" ? [false, `The invoice couldn't be emailed. ${why ?? ""}`] : (FLASH[flash ?? ""] ?? [true, ""]);
 
+  const totals = (
+    <dl className="totals">
+      <div><dt>Sessions held</dt><dd>{held.length} · <b>{czk(sum(held))}</b></dd></div>
+      <div><dt>Paid</dt><dd><b>{czk(paidTotal)}</b></dd></div>
+      {manager && (
+        <div><dt>Invoiced, awaiting payment</dt><dd className={overdue.length ? "overdue" : undefined}>{open.length} · {czk(openTotal)}</dd></div>
+      )}
+      <div><dt>To pay for sessions held</dt><dd className={owed ? "overdue" : undefined}><b>{czk(owed)}</b></dd></div>
+      <div><dt>Booked ahead</dt><dd>{upcoming.length} · {czk(sum(upcoming))}</dd></div>
+    </dl>
+  );
+  if (!manager)
+    return (
+      <section className="card stack" id="payments">
+        <h2>Amounts</h2>
+        {totals}
+        <p className="small">Amounts include VAT. Invoices and payments are handled by the coordinator.</p>
+      </section>
+    );
+
   return (
     <section className="card stack" id="payments">
       <div className="actions" style={{ justifyContent: "space-between" }}>
@@ -99,16 +129,10 @@ export function Payments({
       {overdue.length > 0 && (
         <p className="err" role="alert">
           <b>Late payment:</b> {overdue.map((p) => `invoice ${p.invoice_number} (${czk(p.amount_czk)}, due ${formatDay(p.due_on!)})`).join(", ")}{" "}
-          {overdue.length === 1 ? "is" : "are"} overdue. The client is emailed a reminder the day after the due date.
+          {overdue.length === 1 ? "is" : "are"} overdue. Check the bank statement, then mark it paid or send the client a payment reminder below.
         </p>
       )}
-      <dl className="totals">
-        <div><dt>Sessions held</dt><dd>{held.length} · <b>{czk(sum(held))}</b></dd></div>
-        <div><dt>Paid</dt><dd><b>{czk(paidTotal)}</b></dd></div>
-        <div><dt>Invoiced, awaiting payment</dt><dd className={overdue.length ? "overdue" : undefined}>{open.length} · {czk(openTotal)}</dd></div>
-        <div><dt>To pay for sessions held</dt><dd className={owed ? "overdue" : undefined}><b>{czk(owed)}</b></dd></div>
-        <div><dt>Booked ahead</dt><dd>{upcoming.length} · {czk(sum(upcoming))}</dd></div>
-      </dl>
+      {totals}
       <p className="small">
         Amounts include VAT.
         {noPrice > 0 && <b className="overdue"> {noPrice} {noPrice === 1 ? "session has" : "sessions have"} no price yet: choose the client&apos;s price under Session price.</b>}
@@ -189,6 +213,8 @@ export function Payments({
                 <b>{czk(p.amount_czk)}</b>{" "}
                 {p.paid_on ? (
                   <span className="pill pill-paid">Paid {formatDay(p.paid_on)} · {p.method}</span>
+                ) : !p.invoice_number ? (
+                  <span className="pill pill-scheduled">Running invoice: issued on the 1st</span>
                 ) : p.due_on && p.due_on < today ? (
                   <span className="pill pill-crisis">Overdue since {formatDay(p.due_on)}</span>
                 ) : (
@@ -199,10 +225,62 @@ export function Payments({
                   {p.package_sessions
                     ? `Package of ${p.package_sessions} sessions`
                     : `Session${p.session_ids.length === 1 ? "" : "s"} ${p.session_ids.map((id) => number.get(id) ?? "?").join(", ")}`}
-                  {p.invoice_number ? ` · Invoice ${p.invoice_number}` : " · No invoice yet"}
+                  {p.invoice_number ? ` · Invoice ${p.invoice_number}` : p.paid_on ? " · No invoice yet" : " · sessions are added as they're completed"}
                   {p.emailed_at && ` · emailed ${formatDate(p.emailed_at)}`}
                 </div>
-                {!p.paid_on && (
+                {p.items.length > 0 && (
+                  <ul className="small invoice-items">
+                    {p.items.map((it) => (
+                      <li key={it.id}>
+                        {it.description}: {czk(it.amount_czk)}
+                        {!p.paid_on && (
+                          <form action={removeItemAction.bind(null, requestId, p.id, it.id)} style={{ display: "inline" }}>
+                            {" "}<button type="submit" className="linklike">remove</button>
+                          </form>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {!p.paid_on && !p.package_sessions && (
+                  <form action={addItemAction.bind(null, requestId, p.id)} className="actions mark-paid" style={{ gap: 8 }}>
+                    <input type="text" name="description" placeholder="Add an item, e.g. Written report" aria-label="Item" />
+                    <input type="text" name="itemAmount" inputMode="numeric" placeholder="CZK incl. VAT" aria-label="Item amount" className="price-input" />
+                    <button type="submit" className="ghost small-btn">Add to invoice</button>
+                  </form>
+                )}
+                {!p.paid_on && !p.invoice_number && (
+                  <form action={issueNowAction.bind(null, requestId, p.id)} className="actions mark-paid" style={{ gap: 8 }}>
+                    <label className="consent small-consent">
+                      <input type="checkbox" name="send" value="yes" defaultChecked />
+                      <span>and email it</span>
+                    </label>
+                    <button type="submit" className="ghost small-btn">Issue now</button>
+                  </form>
+                )}
+                {!p.paid_on && p.due_on && p.due_on < today && (
+                  <form action={sendReminderAction.bind(null, requestId, p.id)} className="actions mark-paid" style={{ gap: 8 }}>
+                    <button type="submit" className="small-btn">Send payment reminder</button>
+                    <span className="small">
+                      {p.client_reminded_at ? `Reminder sent ${formatDate(p.client_reminded_at)}.` : "Check the bank statement first."}
+                    </span>
+                  </form>
+                )}
+                {!p.paid_on && !p.package_sessions && (
+                  <form action={setInvoiceAmountAction.bind(null, requestId, p.id)} className="actions mark-paid" style={{ gap: 8 }}>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      name="invoiceAmount"
+                      aria-label="Invoice amount, CZK"
+                      placeholder="Amount"
+                      className="price-input"
+                    />
+                    <button type="submit" className="ghost small-btn">Change amount</button>
+                    <span className="small">Empty: follows the sessions automatically.</span>
+                  </form>
+                )}
+                {!p.paid_on && p.invoice_number && (
                   <form action={markPaidAction.bind(null, requestId, p.id)} className="actions mark-paid" style={{ gap: 8 }}>
                     <input type="date" name="paidOn" defaultValue={today} aria-label="Paid on" />
                     <select name="method" defaultValue="Bank transfer" aria-label="How">
@@ -214,11 +292,13 @@ export function Payments({
               </div>
               <form className="actions" style={{ gap: 8 }}>
                 <a className="button ghost small-btn" href={`/admin/invoices/${p.id}`} target="_blank" rel="noopener">
-                  {p.invoice_number ? "Invoice PDF" : "Create invoice PDF"}
+                  {p.invoice_number ? "Invoice PDF" : p.paid_on ? "Create invoice PDF" : "Preview PDF"}
                 </a>
-                <button formAction={emailInvoice.bind(null, requestId, p.id)} className="ghost small-btn">
-                  Email invoice
-                </button>
+                {(p.invoice_number || p.paid_on) && (
+                  <button formAction={emailInvoice.bind(null, requestId, p.id)} className="ghost small-btn">
+                    Email invoice
+                  </button>
+                )}
                 <button formAction={removePayment.bind(null, requestId, p.id)} className="ghost small-btn">
                   Delete
                 </button>

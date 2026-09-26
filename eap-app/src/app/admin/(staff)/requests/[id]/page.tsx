@@ -166,6 +166,7 @@ export default async function RequestPage({
           </section>
           <Messages requestId={r.id} nickname={r.first_name} messages={messages} flash={sp.msg} />
           <Sessions
+            manager={manager}
             requestId={r.id}
             kind={r.kind}
             sessions={sessions}
@@ -181,6 +182,7 @@ export default async function RequestPage({
               packages={packages}
               flash={sp.billing}
               why={sp.why}
+              manager={manager}
             />
           )}
         </div>

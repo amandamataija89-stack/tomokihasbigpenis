@@ -90,6 +90,7 @@ export function BillingProfile({
         <span className="small">Applies to new sessions and to booked sessions not yet paid.</span>
       </section>
 
+      {manager && (
       <form action={saveClientBilling.bind(null, r.id)} className="card form" id="billing">
         <h2>3. Invoices</h2>
         <p className="small">
@@ -129,6 +130,7 @@ export function BillingProfile({
         </div>
         <div className="actions"><button type="submit">Save</button></div>
       </form>
+      )}
     </>
   );
 }

@@ -22,7 +22,16 @@ import {
   setPasswordWithToken,
 } from "@/lib/staff-accounts";
 import { LANGUAGES } from "@/lib/request-form";
-import { defaultSessionPrice, parsePrice, recordPayment, unpaySession, useFromPackage } from "@/lib/billing";
+import {
+  addToMonthlyInvoice,
+  defaultSessionPrice,
+  parsePrice,
+  recomputeInvoice,
+  recordPayment,
+  removeFromInvoice,
+  unpaySession,
+  useFromPackage,
+} from "@/lib/billing";
 
 // Every action checks the session itself: server actions are reachable without the page.
 
@@ -459,7 +468,8 @@ export async function addSession(requestId: string, formData: FormData) {
   );
   const limit = sessionLimit(rows[0].kind);
   if (limit && rows[0].n >= limit) redirect(`/admin/requests/${requestId}?session=full#sessions`);
-  const typed = rows[0].kind === "private" ? priceFrom(formData) : null;
+  // Only coordinators type a session price; otherwise it's the client's chosen price.
+  const typed = rows[0].kind === "private" && isManager(staff) ? priceFrom(formData) : null;
   if (typed === undefined) redirect(`/admin/requests/${requestId}?session=price#sessions`);
   // Left empty: the client's price, else the price list for their kind of support.
   const price = rows[0].kind === "private" ? (typed ?? (await defaultSessionPrice(requestId))) : null;
@@ -505,6 +515,10 @@ export async function setSessionOutcome(sessionId: string, outcome: "done" | "la
     outcome === "undo" ? [sessionId] : [sessionId, outcome === "late"],
   );
   if (!rowCount) redirect(`/admin/requests/${requestId}#sessions`);
+  // A completed (or late-cancelled) private session goes straight onto the client's invoice for the month;
+  // one no longer held comes off it.
+  if (outcome === "undo") await removeFromInvoice(sessionId);
+  else await addToMonthlyInvoice(sessionId);
   const { rows } = await pool.query<{ done: number; kind: ClientKind }>(
     `SELECT (SELECT count(*)::int FROM client_sessions WHERE request_id = r.id AND done_at IS NOT NULL) AS done, r.kind
      FROM support_requests r WHERE r.id = $1`,
@@ -533,10 +547,15 @@ const priceFrom = (formData: FormData) => parsePrice(formData.get("price"));
 export async function setSessionPrice(sessionId: string, formData: FormData) {
   const requestId = await sessionRequest(sessionId);
   const { staff } = await requireCase(requestId);
+  if (!isManager(staff)) redirect(`/admin/requests/${requestId}#sessions`); // payments are for coordinators
   const price = priceFrom(formData);
   if (price === undefined) redirect(`/admin/requests/${requestId}?session=price#sessions`);
-  await pool.query("UPDATE client_sessions SET price_czk = $2 WHERE id = $1", [sessionId, price]);
+  const { rows } = await pool.query<{ payment_id: string | null }>(
+    "UPDATE client_sessions SET price_czk = $2 WHERE id = $1 RETURNING payment_id",
+    [sessionId, price],
+  );
   await note(requestId, staff.id, price === null ? "Session price removed." : `Session price set to ${price} CZK.`);
+  if (rows[0]?.payment_id) await recomputeInvoice(rows[0].payment_id); // its unpaid invoice follows
   redirect(`/admin/requests/${requestId}#sessions`);
 }
 
@@ -544,6 +563,7 @@ export async function setSessionPrice(sessionId: string, formData: FormData) {
 export async function setSessionPaid(sessionId: string, paid: boolean) {
   const requestId = await sessionRequest(sessionId);
   const { staff } = await requireCase(requestId);
+  if (!isManager(staff)) redirect(`/admin/requests/${requestId}#sessions`); // payments are for coordinators
   if (paid) {
     const amount = await recordPayment({
       requestId,
@@ -567,7 +587,11 @@ export async function removeSession(sessionId: string, formData: FormData) {
   const { staff } = await requireCase(requestId);
   // Email before deleting, while the session's details still exist.
   const emailed = await emailClient(formData, sessionId, "cancelled");
-  await pool.query("DELETE FROM client_sessions WHERE id = $1", [sessionId]);
+  const { rows: removed } = await pool.query<{ payment_id: string | null }>(
+    "DELETE FROM client_sessions WHERE id = $1 RETURNING payment_id",
+    [sessionId],
+  );
+  if (removed[0]?.payment_id) await recomputeInvoice(removed[0].payment_id); // taken off its unpaid invoice
   await note(requestId, staff.id, `Session removed.${emailed}`);
   await syncStatusWithSessions(requestId, staff.id);
   redirect(`/admin/requests/${requestId}#sessions`);

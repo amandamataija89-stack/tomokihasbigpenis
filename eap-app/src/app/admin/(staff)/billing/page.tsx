@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { requireManager } from "@/lib/auth";
 import { invoiceSettings, openInvoices, vatSplit } from "@/lib/billing";
-import { createMonthlyInvoicesAction, emailMonthlyInvoicesAction } from "../../billing-actions";
+import { createMonthlyInvoicesAction, emailMonthlyInvoicesAction, importStatementAction } from "../../billing-actions";
+import type { ImportResult } from "@/lib/bank-statement";
 import { pool } from "@/lib/db";
 
 const czk = (n: number) => `${n.toLocaleString("cs-CZ")} CZK`;
@@ -28,11 +29,22 @@ type Row = {
 };
 
 // Private clients' sessions held in a month (late cancellations included), per client and per counsellor.
-export default async function MonthlyBilling({ searchParams }: { searchParams: Promise<{ month?: string; created?: string; noprice?: string; emailed?: string; failed?: string }> }) {
+export default async function MonthlyBilling({ searchParams }: { searchParams: Promise<{
+    month?: string;
+    created?: string;
+    noprice?: string;
+    emailed?: string;
+    failed?: string;
+    bank?: string;
+    why?: string;
+  }> }) {
   await requireManager();
   const sp = await searchParams;
   const thisMonth = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Prague", year: "numeric", month: "2-digit" }).format(new Date());
   const month = /^\d{4}-\d{2}$/.test(sp.month ?? "") ? sp.month! : thisMonth;
+  const lastImport = await pool
+    .query<{ value: string }>("SELECT value FROM app_state WHERE key = 'last_bank_import'")
+    .then((r) => (r.rows[0] ? (JSON.parse(r.rows[0].value) as ImportResult & { at: string }) : null));
   const [settings, open, { rows: toEmail }, { rows }] = await Promise.all([
     invoiceSettings(),
     openInvoices(),
@@ -41,7 +53,8 @@ export default async function MonthlyBilling({ searchParams }: { searchParams: P
          (SELECT count(*)::int FROM payments WHERE period = $1 AND paid_on IS NULL AND emailed_at IS NULL AND invoice_number IS NOT NULL) AS n,
          (SELECT count(DISTINCT cs.request_id)::int FROM client_sessions cs JOIN support_requests r ON r.id = cs.request_id
           WHERE r.kind = 'private' AND cs.done_at IS NOT NULL AND cs.paid_at IS NULL AND cs.payment_id IS NULL
-            AND cs.price_czk IS NOT NULL AND to_char(cs.starts_at AT TIME ZONE 'Europe/Prague', 'YYYY-MM') = $1) AS to_invoice`,
+            AND cs.price_czk IS NOT NULL AND to_char(cs.starts_at AT TIME ZONE 'Europe/Prague', 'YYYY-MM') = $1)
+         + (SELECT count(*)::int FROM payments WHERE period = $1 AND paid_on IS NULL AND invoice_number IS NULL) AS to_invoice`,
       [month],
     ),
     pool.query<Row>(
@@ -111,13 +124,17 @@ export default async function MonthlyBilling({ searchParams }: { searchParams: P
       <section className="card stack">
         <h2>Invoices for {monthName(month)}</h2>
         <ol className="steps">
+          <li className="small" style={{ listStyle: "none", marginLeft: -20 }}>
+            <b>Automatic:</b> last month&apos;s invoices are created on the 1st and emailed to clients on the 3rd; you get
+            the PDF and CSV by email then. Use the buttons to do it sooner, or after changes.
+          </li>
           <li>
             <form action={createMonthlyInvoicesAction} className="actions" style={{ gap: 8 }}>
               <input type="hidden" name="month" value={month} />
-              <button type="submit" disabled={toEmail[0].to_invoice === 0}>Create monthly invoices</button>
+              <button type="submit" disabled={toEmail[0].to_invoice === 0}>Issue monthly invoices now</button>
               <span className="small">
                 {toEmail[0].to_invoice
-                  ? `${toEmail[0].to_invoice} client${toEmail[0].to_invoice === 1 ? "" : "s"} with sessions not invoiced yet. One invoice each, due in 14 days, with their variable symbol and a QR payment code.`
+                  ? `${toEmail[0].to_invoice} running invoice${toEmail[0].to_invoice === 1 ? "" : "s"} not issued yet. Issuing gives each a number, a due date 14 days later, the client's variable symbol and a QR payment code.`
                   : "Nothing left to invoice for this month."}
               </span>
             </form>
@@ -131,7 +148,7 @@ export default async function MonthlyBilling({ searchParams }: { searchParams: P
           </li>
           <li className="actions" style={{ gap: 8 }}>
             <a className="button ghost" href={`/admin/invoices/export?month=${month}`} target="_blank" rel="noopener">Export invoices (PDF)</a>
-            <a className="button ghost" href={`/admin/invoices/export?month=${month}&format=csv`}>Export list for the accountant (CSV)</a>
+            <a className="button ghost" href={`/admin/invoices/export?month=${month}&format=csv`}>Export list (CSV)</a>
           </li>
         </ol>
       </section>
@@ -197,6 +214,53 @@ export default async function MonthlyBilling({ searchParams }: { searchParams: P
         )}
       </div>
 
+      <section className="card stack" id="bank">
+        <h2>Bank statement</h2>
+        <p className="small">
+          In Raiffeisenbank online banking, export the account statement as <b>CSV</b> and upload it here. Payments with a
+          client&apos;s variable symbol and the invoice amount are marked paid automatically. Uploading the same statement
+          twice is safe.
+        </p>
+        {sp.bank === "nofile" && <p className="err" role="alert">Choose the statement file first.</p>}
+        {sp.bank === "toobig" && <p className="err" role="alert">That file is too big (over 5 MB). Export a shorter period.</p>}
+        {sp.bank === "error" && <p className="err" role="alert">{sp.why}</p>}
+        <form action={importStatementAction} className="actions" style={{ gap: 8 }}>
+          <input type="file" name="statement" accept=".csv,.txt,text/csv" aria-label="Bank statement CSV" />
+          <button type="submit">Upload and match payments</button>
+        </form>
+        {lastImport && (
+          <div className="stack" style={{ gap: 6 }}>
+            <p className={sp.bank === "done" ? "flash" : "small"} role="status">
+              Last upload {new Date(lastImport.at).toLocaleString("en-GB", { timeZone: "Europe/Prague" })}:{" "}
+              {lastImport.incoming} incoming payment{lastImport.incoming === 1 ? "" : "s"},{" "}
+              <b>{lastImport.paid.length} invoice{lastImport.paid.length === 1 ? "" : "s"} marked paid</b>
+              {lastImport.alreadyImported ? `, ${lastImport.alreadyImported} already uploaded before` : ""}
+              {lastImport.unmatched.length ? `, ${lastImport.unmatched.length} to check` : ""}.
+            </p>
+            {lastImport.paid.length > 0 && (
+              <ul className="small">
+                {lastImport.paid.map((p) => (
+                  <li key={p.invoice}>{p.firstName}: invoice {p.invoice}, {czk(p.amount)}, paid {p.date}</li>
+                ))}
+              </ul>
+            )}
+            {lastImport.unmatched.length > 0 && (
+              <>
+                <p className="small"><b>To check by hand</b> (then mark the invoice paid on the client&apos;s page):</p>
+                <ul className="small">
+                  {lastImport.unmatched.map((u, i) => (
+                    <li key={i}>
+                      {u.date} · {czk(u.amount)} · {u.counterparty || "unknown sender"}
+                      {u.vs ? ` · VS ${u.vs}` : ""}: {u.reason}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </div>
+        )}
+      </section>
+
       <section className="card stack">
         <h2>Invoices awaiting payment</h2>
         {open.length === 0 ? (
@@ -220,7 +284,7 @@ export default async function MonthlyBilling({ searchParams }: { searchParams: P
             ))}
           </ul>
         )}
-        <p className="small">Mark an invoice paid on the client&apos;s page when the money arrives. Clients get one reminder the day after the due date.</p>
+        <p className="small">Upload the bank statement below to mark paid invoices automatically. For anything still overdue, send the client a payment reminder from their page.</p>
       </section>
 
       {byCounsellor.size > 0 && (

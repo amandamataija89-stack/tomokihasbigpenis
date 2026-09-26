@@ -1,4 +1,5 @@
 import { Brand, CrisisNotice, SiteFooter } from "@/components/Brand";
+import { clientInvoices } from "@/lib/billing";
 import { conversationFor, listMessages } from "@/lib/messages";
 import { replyAsClient } from "./actions";
 
@@ -37,7 +38,7 @@ export default async function ClientMessages({
         <SiteFooter />
       </main>
     );
-  const messages = await listMessages(convo.requestId);
+  const [messages, invoices] = await Promise.all([listMessages(convo.requestId), clientInvoices(convo.requestId)]);
   return (
     <main className="wrap">
       <Brand />
@@ -65,6 +66,31 @@ export default async function ClientMessages({
           ))
         )}
       </section>
+
+      {invoices.length > 0 && (
+        <section className="card stack" aria-label="Invoices">
+          <h2 style={{ fontSize: 20 }}>Your invoices / Vaše faktury</h2>
+          <ul className="payments">
+            {invoices.map((i) => (
+              <li key={i.id} className="payment-row">
+                <span>
+                  <a href={`/messages/${token}/invoices/${i.id}`} target="_blank" rel="noopener">Invoice {i.invoice_number}</a>
+                  {i.period && <span className="small"> · {i.period}</span>}
+                </span>
+                <span>
+                  <b>{i.amount_czk.toLocaleString("cs-CZ")} CZK</b>{" "}
+                  {i.paid_on ? (
+                    <span className="pill pill-paid">Paid</span>
+                  ) : (
+                    <span className="pill pill-unpaid">To pay by {i.due_on}</span>
+                  )}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="small">Open an invoice to see the payment details and the QR code for your banking app.</p>
+        </section>
+      )}
 
       <form action={replyAsClient.bind(null, token)} className="card form" id="reply">
         <label htmlFor="message">Write a message</label>

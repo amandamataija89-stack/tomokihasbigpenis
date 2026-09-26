@@ -340,8 +340,42 @@ export function overdueInvoicesAlert(to: string, list: { firstName: string; numb
   return {
     to,
     subject: `Overdue invoices: ${list.length}`,
-    text: `These invoices are past their due date. The clients have been sent a payment reminder.\n\n${list
+    text: `These invoices are past their due date and not marked paid. Please check the bank statement (upload it on Monthly billing: paid invoices are marked automatically). For any still unpaid, press "Send payment reminder" on the client's page.\n\n${list
       .map((l) => `${l.firstName}: invoice ${l.number}, ${l.amount.toLocaleString("cs-CZ")} CZK, due ${l.dueOn}`)
       .join("\n")}\n\nSee them on Monthly billing:\n${appUrl()}/admin/billing\n`,
+  };
+}
+
+/** To a counsellor near the end of the month: admin to finish before invoices are made on the 1st. */
+export function monthEndReminder(
+  to: string,
+  name: string,
+  monthLabel: string,
+  items: { pastUnmarked: number; noType: number; noPrice: number },
+): Mail {
+  const lines = [
+    items.pastUnmarked && `${items.pastUnmarked} past session${items.pastUnmarked === 1 ? "" : "s"} not marked done, late-cancelled or removed`,
+    items.noType && `${items.noType} private client${items.noType === 1 ? "" : "s"} without a type of counselling`,
+    items.noPrice && `${items.noPrice} private client${items.noPrice === 1 ? "" : "s"} without a price`,
+  ].filter(Boolean);
+  return {
+    to,
+    subject: `Please finish ${monthLabel}'s admin by the end of the month`,
+    text: `Hi ${name},\n\nInvoices for ${monthLabel} are created automatically on the 1st, from what's in the app. Please finish these by the end of the month:\n\n${lines
+      .map((l) => `- ${l}`)
+      .join("\n")}\n\nYou'll find them at the top of My clients:\n${appUrl()}/admin\n`,
+  };
+}
+
+/** To the admin, once invoices for the month have gone out: the month's invoices as PDF and CSV. */
+export function monthlyExportEmail(to: string, monthLabel: string, count: number, pdfBase64: string, csvBase64: string, month: string): Mail {
+  return {
+    to,
+    subject: `Invoices for ${monthLabel}: ${count}`,
+    text: `The invoices for ${monthLabel} have been emailed to the clients. Attached: all ${count} invoices in one PDF, and the list as a CSV (opens in Excel).\n\nMonthly billing:\n${appUrl()}/admin/billing?month=${month}\n`,
+    attachments: [
+      { filename: `faktury-${month}.pdf`, content: pdfBase64 },
+      { filename: `faktury-${month}.csv`, content: csvBase64 },
+    ],
   };
 }

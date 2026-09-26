@@ -9,6 +9,7 @@ import {
   setSessionPrice,
   updateClientEmail,
 } from "../../../actions";
+import { takeOffInvoiceAction } from "../../../billing-actions";
 import { formatDate, formatDay, toPragueInput } from "../../../format";
 
 const NotifyBox = ({ label }: { label: string }) => (
@@ -21,7 +22,7 @@ const NotifyBox = ({ label }: { label: string }) => (
 const czk = (n: number) => `${n.toLocaleString("cs-CZ")} CZK`;
 
 // Price and paid tick for one session of a private client.
-function Payment({ s }: { s: ClientSession }) {
+function Payment({ s, requestId }: { s: ClientSession; requestId: string }) {
   return (
     <span className="payment">
       <input
@@ -40,10 +41,25 @@ function Payment({ s }: { s: ClientSession }) {
           <button formAction={setSessionPaid.bind(null, s.id, false)} className="ghost small-btn">Not paid</button>
         </>
       ) : s.payment_id ? (
-        <span className="pill pill-unpaid">Invoiced, awaiting payment</span>
+        <>
+          <span className="pill pill-unpaid">Invoiced, awaiting payment</span>
+          <button formAction={takeOffInvoiceAction.bind(null, requestId, s.id)} className="ghost small-btn">
+            Take off invoice
+          </button>
+        </>
       ) : (
         <button formAction={setSessionPaid.bind(null, s.id, true)} className="small-btn">Mark paid</button>
       )}
+    </span>
+  );
+}
+
+// What a counsellor sees about a private client's session: its price and whether it's paid.
+function PaidState({ s }: { s: ClientSession }) {
+  return (
+    <span className="payment">
+      <span className="small">{s.price_czk !== null ? czk(s.price_czk) : "No price yet"}</span>
+      {s.paid_at ? <span className="pill pill-paid">✓ Paid</span> : null}
     </span>
   );
 }
@@ -54,11 +70,13 @@ export function Sessions({
   sessions,
   clientEmail,
   defaultPrice = null,
+  manager = false,
   error,
 }: {
   requestId: string;
   kind: ClientKind;
   defaultPrice?: number | null; // private clients: the price a new session starts with
+  manager?: boolean; // coordinators and admins handle payments; counsellors see prices and paid status
   sessions: ClientSession[];
   clientEmail: string;
   error?: string;
@@ -117,7 +135,7 @@ export function Sessions({
         {limit ? <>it counts as one of the {limit} sessions.</> : <>it counts as a session and is charged.</>}{" "}
         Cancelled in time? Press <b>Remove</b>, and it doesn&apos;t count. Clients are emailed a reminder{" "}
         {LATE_CANCEL_HOURS} hours before each session.
-        {paying && <> Private client: add a price to each session and press <b>Mark paid</b> when they&apos;ve paid.</>}
+        {paying && manager && <> Private client: sessions use the client&apos;s price; the coordinator handles invoices and payments.</>}
       </p>
       {sessions.length > 0 && (
         <ol className="sessions">
@@ -138,7 +156,7 @@ export function Sessions({
                       <button formAction={setSessionOutcome.bind(null, s.id, "undo")} className="ghost small-btn">
                         Undo
                       </button>
-                      {paying && <Payment s={s} />}
+                      {paying && (manager ? <Payment s={s} requestId={requestId} /> : <PaidState s={s} />)}
                     </>
                   ) : (
                     <>
@@ -161,7 +179,7 @@ export function Sessions({
                         Remove (cancelled in time)
                       </button>
                       {missed && <span className="small overdue">Date has passed: mark it done or move it</span>}
-                      {paying && <Payment s={s} />}
+                      {paying && (manager ? <Payment s={s} requestId={requestId} /> : <PaidState s={s} />)}
                       <NotifyBox label="Email the client if I change or remove this session" />
                     </>
                   )}
@@ -177,7 +195,7 @@ export function Sessions({
           <label htmlFor="new-session">Book session {sessions.length + 1}</label>
           <div className="actions">
             <input id="new-session" type="datetime-local" name="startsAt" />
-            {paying && (
+            {paying && manager && (
               <input
                 type="text"
                 inputMode="numeric"

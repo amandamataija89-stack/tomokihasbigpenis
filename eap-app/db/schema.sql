@@ -273,3 +273,28 @@ UPDATE app_state SET value = (value::jsonb || jsonb_build_object(
 
 -- Private clients' residential address, from the sign-up form (their invoices are made out to them).
 ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS address text NOT NULL DEFAULT '';
+
+-- A coordinator's own amount on an invoice; otherwise the amount follows its sessions' prices.
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS amount_manual boolean NOT NULL DEFAULT false;
+-- When the coordinator sent the client a payment reminder for an overdue invoice.
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS client_reminded_at timestamptz;
+
+-- Transactions read from uploaded bank statements, so importing the same statement twice changes nothing.
+CREATE TABLE IF NOT EXISTS bank_transactions (
+  key         text PRIMARY KEY,
+  booked_on   date NOT NULL,
+  amount      numeric(12, 2) NOT NULL,
+  vs          text NOT NULL DEFAULT '',
+  payment_id  uuid REFERENCES payments(id) ON DELETE SET NULL,
+  imported_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- Extra lines a coordinator adds to an invoice (e.g. a report, a test fee), with VAT included.
+CREATE TABLE IF NOT EXISTS invoice_items (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  payment_id  uuid NOT NULL REFERENCES payments(id) ON DELETE CASCADE,
+  description text NOT NULL,
+  amount_czk  integer NOT NULL,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS invoice_items_payment_idx ON invoice_items (payment_id);
