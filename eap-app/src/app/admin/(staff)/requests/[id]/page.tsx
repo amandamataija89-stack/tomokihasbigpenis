@@ -28,6 +28,7 @@ export default async function RequestPage({
     msg?: string;
     billing?: string;
     why?: string;
+    pdf?: string;
   }>;
 }) {
   const { id } = await params;
@@ -182,6 +183,7 @@ export default async function RequestPage({
               packages={packages}
               flash={sp.billing}
               why={sp.why}
+              pdf={sp.pdf}
               manager={manager}
             />
           )}
