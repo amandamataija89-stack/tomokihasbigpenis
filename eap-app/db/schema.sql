@@ -188,3 +188,50 @@ ALTER TABLE client_sessions ADD COLUMN IF NOT EXISTS paid_at timestamptz;
 
 -- Private clients: the kind of support they asked for (individual, couple, children/teenager, ADHD testing).
 ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS service text NOT NULL DEFAULT '';
+
+-- ---- Billing for private clients ----------------------------------------------------
+-- Price list by support type; a client's own price (below) overrides it. NULL means no price set.
+CREATE TABLE IF NOT EXISTS price_list (
+  service    text PRIMARY KEY,
+  price_czk  integer CHECK (price_czk IS NULL OR price_czk >= 0),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+INSERT INTO price_list (service) VALUES
+  ('Individual counselling'), ('Couple counselling'), ('Children or teenager counselling'), ('ADHD testing')
+ON CONFLICT (service) DO NOTHING;
+
+-- The client's profile: their own session price and who the invoice is made out to.
+ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS session_price_czk integer CHECK (session_price_czk IS NULL OR session_price_czk >= 0);
+ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS billing_name text NOT NULL DEFAULT '';
+ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS billing_address text NOT NULL DEFAULT '';
+ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS billing_ico text NOT NULL DEFAULT '';
+ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS billing_dic text NOT NULL DEFAULT '';
+ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS billing_email text NOT NULL DEFAULT '';
+
+-- A payment covers one or more sessions, or buys a package of sessions. It can have one invoice.
+CREATE TABLE IF NOT EXISTS payments (
+  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  request_id     uuid NOT NULL REFERENCES support_requests(id) ON DELETE CASCADE,
+  amount_czk     integer NOT NULL CHECK (amount_czk >= 0),
+  paid_on        date NOT NULL,
+  method         text NOT NULL DEFAULT 'Bank transfer',
+  invoice_number text UNIQUE,
+  invoiced_at    timestamptz,
+  staff_id       uuid REFERENCES staff(id) ON DELETE SET NULL,
+  created_at     timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS payments_request_idx ON payments (request_id, paid_on);
+
+-- A prepaid package: its sessions are taken from it as they're booked.
+CREATE TABLE IF NOT EXISTS packages (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  request_id uuid NOT NULL REFERENCES support_requests(id) ON DELETE CASCADE,
+  sessions   integer NOT NULL CHECK (sessions > 0),
+  price_czk  integer NOT NULL CHECK (price_czk >= 0),
+  payment_id uuid NOT NULL REFERENCES payments(id) ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- paid_at stays the "is it paid" flag; these say which payment or package paid for the session.
+ALTER TABLE client_sessions ADD COLUMN IF NOT EXISTS payment_id uuid REFERENCES payments(id) ON DELETE SET NULL;
+ALTER TABLE client_sessions ADD COLUMN IF NOT EXISTS package_id uuid REFERENCES packages(id) ON DELETE SET NULL;

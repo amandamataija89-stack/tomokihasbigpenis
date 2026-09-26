@@ -9,7 +9,7 @@ import {
   setSessionPrice,
   updateClientEmail,
 } from "../../../actions";
-import { formatDate, toPragueInput } from "../../../format";
+import { formatDate, formatDay, toPragueInput } from "../../../format";
 
 const NotifyBox = ({ label }: { label: string }) => (
   <label className="consent small-consent">
@@ -36,7 +36,7 @@ function Payment({ s }: { s: ClientSession }) {
       <button formAction={setSessionPrice.bind(null, s.id)} className="ghost small-btn">Save price</button>
       {s.paid_at ? (
         <>
-          <span className="pill pill-paid">✓ Paid {formatDate(s.paid_at)}</span>
+          <span className="pill pill-paid">{s.package_id ? "✓ From package" : `✓ Paid ${formatDay(s.paid_at)}`}</span>
           <button formAction={setSessionPaid.bind(null, s.id, false)} className="ghost small-btn">Not paid</button>
         </>
       ) : (
@@ -51,10 +51,12 @@ export function Sessions({
   kind,
   sessions,
   clientEmail,
+  defaultPrice = null,
   error,
 }: {
   requestId: string;
   kind: ClientKind;
+  defaultPrice?: number | null; // private clients: the price a new session starts with
   sessions: ClientSession[];
   clientEmail: string;
   error?: string;
@@ -64,7 +66,6 @@ export function Sessions({
   const done = sessions.filter((s) => s.done_at).length;
   const unpaid = sessions.filter((s) => s.done_at && !s.paid_at);
   const owed = unpaid.reduce((sum, s) => sum + (s.price_czk ?? 0), 0);
-  const lastPrice = [...sessions].reverse().find((s) => s.price_czk !== null)?.price_czk ?? null;
   const now = Date.now();
   return (
     <section className="card stack" id="sessions">
@@ -181,7 +182,7 @@ export function Sessions({
                 name="price"
                 aria-label="Price in CZK"
                 placeholder="Price, CZK"
-                defaultValue={lastPrice ?? ""}
+                defaultValue={defaultPrice ?? ""}
                 className="price-input"
               />
             )}

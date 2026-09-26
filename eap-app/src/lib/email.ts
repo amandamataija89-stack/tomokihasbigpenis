@@ -2,7 +2,8 @@
 // Without RESEND_API_KEY the message is logged instead, for local development.
 import { appUrl } from "./app-url";
 
-type Mail = { to: string; subject: string; text: string };
+type Attachment = { filename: string; content: string }; // content: base64
+type Mail = { to: string; subject: string; text: string; attachments?: Attachment[] };
 
 /**
  * The Resend key from RESEND_API_KEY. Tolerates a key pasted with extras around it
@@ -20,17 +21,18 @@ export function keyHint(key = resendKey()): string {
   return `The key Vercel is using starts with "${key.slice(0, 6)}" and is ${key.length} characters long.`;
 }
 
-export async function sendEmail({ to, subject, text }: Mail): Promise<void> {
+export async function sendEmail({ to, subject, text, attachments }: Mail): Promise<void> {
   const key = resendKey();
   const from = process.env.EMAIL_FROM ?? "Prague Integration <contact@pragueintegration.cz>";
   if (!key) {
-    console.info(`[email not sent: RESEND_API_KEY unset] to=${to} subject=${subject}\n${text}`);
+    const files = attachments?.length ? `\n[attachments: ${attachments.map((a) => a.filename).join(", ")}]` : "";
+    console.info(`[email not sent: RESEND_API_KEY unset] to=${to} subject=${subject}\n${text}${files}`);
     return;
   }
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from, to: [to], subject, text }),
+    body: JSON.stringify({ from, to: [to], subject, text, ...(attachments?.length ? { attachments } : {}) }),
   });
   if (!res.ok) throw new Error(`Resend returned ${res.status}: ${await res.text()}`);
 }
@@ -285,5 +287,14 @@ export function newReplyForStaff(to: string, staffName: string, clientNickname: 
     to,
     subject: `New message from ${clientNickname}`,
     text: `Hi ${staffName},\n\n${clientNickname} has sent a message. Sign in to read and answer it:\n${appUrl()}/admin/requests/${requestId}#messages\n`,
+  };
+}
+
+export function invoiceEmail(to: string, firstName: string, number: string, pdfBase64: string, filename: string): Mail {
+  return {
+    to,
+    subject: `Faktura / Invoice ${number} – Prague Integration`,
+    text: `Dobrý den / Hello ${firstName},\n\nv příloze posíláme fakturu č. ${number}. Je již uhrazena, nic dalšího neplaťte.\nPlease find attached invoice no. ${number}. It has already been paid: there is nothing more to pay.\n\nDěkujeme / Thank you,\nPrague Integration\n+420 608 573 256\ncontact@pragueintegration.cz\n`,
+    attachments: [{ filename, content: pdfBase64 }],
   };
 }

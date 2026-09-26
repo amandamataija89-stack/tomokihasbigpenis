@@ -22,6 +22,7 @@ import {
   setPasswordWithToken,
 } from "@/lib/staff-accounts";
 import { LANGUAGES } from "@/lib/request-form";
+import { defaultSessionPrice, parsePrice, recordPayment, unpaySession, useFromPackage } from "@/lib/billing";
 
 // Every action checks the session itself: server actions are reachable without the page.
 
@@ -458,15 +459,22 @@ export async function addSession(requestId: string, formData: FormData) {
   );
   const limit = sessionLimit(rows[0].kind);
   if (limit && rows[0].n >= limit) redirect(`/admin/requests/${requestId}?session=full#sessions`);
-  const price = rows[0].kind === "private" ? priceFrom(formData) : null;
-  if (price === undefined) redirect(`/admin/requests/${requestId}?session=price#sessions`);
+  const typed = rows[0].kind === "private" ? priceFrom(formData) : null;
+  if (typed === undefined) redirect(`/admin/requests/${requestId}?session=price#sessions`);
+  // Left empty: the client's price, else the price list for their kind of support.
+  const price = rows[0].kind === "private" ? (typed ?? (await defaultSessionPrice(requestId))) : null;
   const { rows: created } = await pool.query<{ id: string }>(
     `INSERT INTO client_sessions (request_id, starts_at, price_czk)
      VALUES ($1, $2::timestamp AT TIME ZONE 'Europe/Prague', $3) RETURNING id`,
     [requestId, startsAt, price],
   );
+  const fromPackage = rows[0].kind === "private" && (await useFromPackage(requestId, created[0].id));
   const emailed = await emailClient(formData, created[0].id, "booked");
-  await note(requestId, staff.id, `Session booked for ${pragueLabel(startsAt)}.${emailed}`);
+  await note(
+    requestId,
+    staff.id,
+    `Session booked for ${pragueLabel(startsAt)}.${fromPackage ? " Paid from the client's package." : ""}${emailed}`,
+  );
   await syncStatusWithSessions(requestId, staff.id);
   redirect(`/admin/requests/${requestId}#sessions`);
 }
@@ -520,11 +528,7 @@ export async function setSessionOutcome(sessionId: string, outcome: "done" | "la
 // ---- Payment (private clients) ------------------------------------------------------
 
 /** The price typed in the form: a whole number of CZK, null when left empty, undefined when invalid. */
-function priceFrom(formData: FormData): number | null | undefined {
-  const raw = String(formData.get("price") ?? "").replace(/[\s,.]|CZK|Kč/gi, "");
-  if (!raw) return null;
-  return /^\d{1,6}$/.test(raw) ? Number(raw) : undefined;
-}
+const priceFrom = (formData: FormData) => parsePrice(formData.get("price"));
 
 export async function setSessionPrice(sessionId: string, formData: FormData) {
   const requestId = await sessionRequest(sessionId);
@@ -536,19 +540,24 @@ export async function setSessionPrice(sessionId: string, formData: FormData) {
   redirect(`/admin/requests/${requestId}#sessions`);
 }
 
+/** Quick "Mark paid" on one session: records a payment for it today. "Not paid" undoes that. */
 export async function setSessionPaid(sessionId: string, paid: boolean) {
   const requestId = await sessionRequest(sessionId);
   const { staff } = await requireCase(requestId);
-  // Only acts on a real change, so a double click can't add two notes.
-  const { rows } = await pool.query<{ price_czk: number | null }>(
-    paid
-      ? "UPDATE client_sessions SET paid_at = now() WHERE id = $1 AND paid_at IS NULL RETURNING price_czk"
-      : "UPDATE client_sessions SET paid_at = NULL WHERE id = $1 AND paid_at IS NOT NULL RETURNING price_czk",
-    [sessionId],
-  );
-  if (rows[0]) {
-    const amount = rows[0].price_czk === null ? "" : ` (${rows[0].price_czk} CZK)`;
-    await note(requestId, staff.id, paid ? `Session marked paid${amount}.` : `Session no longer marked paid${amount}.`);
+  if (paid) {
+    const amount = await recordPayment({
+      requestId,
+      sessionIds: [sessionId],
+      amount: null,
+      paidOn: new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Prague" }).format(new Date()),
+      method: "Bank transfer",
+      invoiceNumber: null,
+      staffId: staff.id,
+    });
+    if (amount !== null) await note(requestId, staff.id, `Session marked paid (${amount} CZK).`);
+  } else {
+    await unpaySession(sessionId);
+    await note(requestId, staff.id, "Session no longer marked paid.");
   }
   redirect(`/admin/requests/${requestId}#sessions`);
 }
