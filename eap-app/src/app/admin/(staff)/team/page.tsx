@@ -39,7 +39,7 @@ export default async function TeamPage({
         <h1 style={{ fontSize: 32 }}>Team</h1>
         <p className="lede">
           New clients are offered to the available counsellor with the fewest new clients this month who works in the
-          client&apos;s language. They have 4 office hours to accept (30 minutes for a crisis). A decline, or no
+          client&apos;s language. They have 24 working hours to accept (Monday to Friday; 30 minutes for a crisis). A decline, or no
           answer, passes the client straight to the next available counsellor. The coordinator is only emailed if
           nobody is available.
         </p>

@@ -9,7 +9,7 @@ export const CONTACT_REMINDER_AFTER_HOURS = 18; // working hours
 export const CRISIS_CONTACT_REMINDER_AFTER_HOURS = 1; // clock hours
 
 // How long a counsellor has to accept or decline an offer before it passes to the next counsellor.
-export const ACCEPT_WITHIN_OFFICE_HOURS = 4; // reminder halfway
+export const ACCEPT_WITHIN_WORKING_HOURS = 24; // Monday–Friday; reminder halfway
 export const CRISIS_ACCEPT_WITHIN_MINUTES = 30;
 export const OFFICE_OPENS = 8; // 08:00 Prague time
 export const OFFICE_CLOSES = 18; // 18:00 Prague time
@@ -69,10 +69,10 @@ export const contactReminderAt = (submittedAt: Date, crisis: boolean) =>
 export const respondBy = (offeredAt: Date, crisis: boolean) =>
   crisis
     ? new Date(offeredAt.getTime() + CRISIS_ACCEPT_WITHIN_MINUTES * 60_000)
-    : addOfficeHours(offeredAt, ACCEPT_WITHIN_OFFICE_HOURS);
+    : addWorkingHours(offeredAt, ACCEPT_WITHIN_WORKING_HOURS);
 
 /** When to remind a counsellor who hasn't answered an offer yet: halfway to the answer-by time. */
 export const offerReminderAt = (offeredAt: Date, crisis: boolean) =>
   crisis
     ? new Date(offeredAt.getTime() + (CRISIS_ACCEPT_WITHIN_MINUTES / 2) * 60_000)
-    : addOfficeHours(offeredAt, ACCEPT_WITHIN_OFFICE_HOURS / 2);
+    : addWorkingHours(offeredAt, ACCEPT_WITHIN_WORKING_HOURS / 2);

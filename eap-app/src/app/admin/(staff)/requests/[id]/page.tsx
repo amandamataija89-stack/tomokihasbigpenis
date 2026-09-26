@@ -169,7 +169,7 @@ export default async function RequestPage({
                   <span>Already agreed with them (no need to accept)</span>
                 </label>
                 <span className="small">
-                  Otherwise they&apos;re emailed and have 4 office hours (30 minutes for a crisis) to accept, before it passes
+                  Otherwise they&apos;re emailed and have 24 working hours (30 minutes for a crisis) to accept, before it passes
                   to the next available counsellor.
                 </span>
               </div>
