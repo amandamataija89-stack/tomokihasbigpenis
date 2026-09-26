@@ -9,6 +9,9 @@ import { formatDate } from "../../../format";
 import { listMessages, markClientMessagesRead } from "@/lib/messages";
 import { Messages } from "./Messages";
 import { Sessions } from "./Sessions";
+import { Payments } from "./Payments";
+import { BillingProfile } from "./BillingProfile";
+import { defaultSessionPrice, listPackages, listPayments, priceList } from "@/lib/billing";
 
 export default async function RequestPage({
   params,
@@ -23,6 +26,8 @@ export default async function RequestPage({
     accepted?: string;
     taken?: string;
     msg?: string;
+    billing?: string;
+    why?: string;
   }>;
 }) {
   const { id } = await params;
@@ -34,12 +39,18 @@ export default async function RequestPage({
   if (!r || (!manager && r.assigned_to !== me.id)) notFound();
   // The client's messages count as read once whoever looks after them opens the case.
   if (r.assigned_to === me.id || (!r.assigned_to && manager)) await markClientMessagesRead(id);
-  const [notes, staff, sessions, messages] = await Promise.all([
+  const isPrivate = r.kind === "private";
+  const [notes, staff, sessions, messages, payments, packages, prices, defaultPrice] = await Promise.all([
     listNotes(id),
     manager ? listStaffWithLoad(undefined, false) : Promise.resolve([]),
     listSessions(id),
     listMessages(id),
+    isPrivate ? listPayments(id) : Promise.resolve([]),
+    isPrivate ? listPackages(id) : Promise.resolve([]),
+    isPrivate ? priceList() : Promise.resolve([]),
+    isPrivate ? defaultSessionPrice(id) : Promise.resolve(null),
   ]);
+  const listPrice = prices.find((p) => p.service === r.service)?.price_czk ?? null;
   const pendingForMe = r.assigned_to === me.id && !r.accepted_at && r.status === "new";
   const due = contactDue(r.created_at, r.crisis);
   const nameOf = (sid: string) => staff.find((s) => s.id === sid)?.name ?? "a former colleague";
@@ -148,7 +159,24 @@ export default async function RequestPage({
             )}
           </section>
           <Messages requestId={r.id} nickname={r.first_name} messages={messages} flash={sp.msg} />
-          <Sessions requestId={r.id} kind={r.kind} sessions={sessions} clientEmail={r.email} error={sp.session} />
+          <Sessions
+            requestId={r.id}
+            kind={r.kind}
+            sessions={sessions}
+            clientEmail={r.email}
+            defaultPrice={defaultPrice}
+            error={sp.session}
+          />
+          {isPrivate && (
+            <Payments
+              requestId={r.id}
+              sessions={sessions}
+              payments={payments}
+              packages={packages}
+              flash={sp.billing}
+              why={sp.why}
+            />
+          )}
         </div>
 
         <div className="stack" style={{ gap: 20 }}>
@@ -185,6 +213,8 @@ export default async function RequestPage({
             </label>
             <div className="actions"><button type="submit">Save</button></div>
           </form>
+
+          {isPrivate && <BillingProfile r={r} listPrice={listPrice} />}
 
           <section className="card stack">
             <h2>Notes</h2>

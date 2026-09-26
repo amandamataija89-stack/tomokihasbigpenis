@@ -39,3 +39,8 @@ export function toPragueInput(d: Date): string {
   );
   return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
 }
+
+// A calendar date (no time), e.g. a payment date stored as YYYY-MM-DD or a date-only timestamp.
+const dayFmt = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+export const formatDay = (d: Date | string) =>
+  dayFmt.format(typeof d === "string" ? new Date(`${d}T00:00:00Z`) : d);

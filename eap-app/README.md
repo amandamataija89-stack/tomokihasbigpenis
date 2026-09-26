@@ -25,6 +25,26 @@ A web app for Prague Integration's Employee Assistance Programme.
 | Monthly limit | Counts towards each counsellor's new-clients-per-month | Doesn't count |
 
 Everything else is the same: consents, messages, session emails and reminders, contact promise, feedback.
+
+### Prices, payments and invoices (private clients)
+
+- **Price list** (Pricing & invoices page, coordinators and admins): a price per session for each kind of
+  support. A client's **own price** (on their page, under Price and invoicing) overrides it. New sessions
+  start with that price; a single session's price can still be changed.
+- **Billing details** on the client's page: name or company, address, IČO, DIČ and the email invoices go to.
+- **Payments** on the client's page:
+  - **Record a payment for sessions**: tick several sessions and record one payment (amount defaults to
+    their total). The quick **Mark paid** on a session records a payment for just that one.
+  - **Record a prepaid package** (e.g. 5 sessions for 6,000 CZK): unpaid sessions already booked are taken
+    from it first, then each new booking, until it's used up. The page shows how many are left.
+  - **Delete** a payment and its sessions are unpaid again.
+- **Invoices**: every payment can be turned into a PDF invoice in Czech and English (**Invoice PDF**), or
+  emailed to the client with the PDF attached (**Email invoice**). Numbers are given automatically from
+  **Next invoice number** on the Pricing & invoices page, unless you type one in when recording the payment.
+  Fill in the company's IČO, bank account and register entry there first, and check the VAT note with your
+  accountant: the default says Prague Integration is not a VAT payer. Invoices are marked as already paid.
+- The Pricing & invoices page also shows money received this month and last, unpaid sessions per
+  client, and recent payments.
 Private clients have a **Private** tag; the **Private clients** tab lists them. Counsellors don't see
 unassigned private clients in the pool.
 

@@ -68,6 +68,12 @@ export type RequestRow = {
   gender: string;
   location: string;
   service: string; // private clients: the kind of support they asked for
+  session_price_czk: number | null; // private clients: their own price, overriding the price list
+  billing_name: string;
+  billing_address: string;
+  billing_ico: string;
+  billing_dic: string;
+  billing_email: string;
   consent_at: Date;
   consent_contact_at: Date | null;
   status: Status;
@@ -190,11 +196,13 @@ export type ClientSession = {
   late_cancelled: boolean;
   price_czk: number | null;
   paid_at: Date | null;
+  payment_id: string | null;
+  package_id: string | null; // paid from a prepaid package
 };
 
 export async function listSessions(requestId: string): Promise<ClientSession[]> {
   const { rows } = await pool.query<ClientSession>(
-    `SELECT id, starts_at, done_at, late_cancelled, price_czk, paid_at FROM client_sessions
+    `SELECT id, starts_at, done_at, late_cancelled, price_czk, paid_at, payment_id, package_id FROM client_sessions
      WHERE request_id = $1 ORDER BY starts_at`,
     [requestId],
   );
