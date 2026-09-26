@@ -3,9 +3,24 @@
 
 type Mail = { to: string; subject: string; text: string };
 
+/**
+ * The Resend key from RESEND_API_KEY. Tolerates a key pasted with extras around it
+ * (spaces, quotes, line breaks, or "RESEND_API_KEY=" in front) by picking out the re_… part.
+ */
+export function resendKey(raw = process.env.RESEND_API_KEY): string | undefined {
+  if (!raw) return undefined;
+  return raw.match(/re_[A-Za-z0-9_-]+/)?.[0] ?? raw.replace(/["'\s]/g, "");
+}
+
+/** Enough to tell which key is in use without revealing it: its first characters and length. */
+export function keyHint(key = resendKey()): string {
+  if (!key) return "RESEND_API_KEY is empty in Vercel.";
+  if (!key.startsWith("re_")) return `The RESEND_API_KEY in Vercel doesn't start with "re_" (it's ${key.length} characters), so it isn't a Resend API key.`;
+  return `The key Vercel is using starts with "${key.slice(0, 6)}" and is ${key.length} characters long.`;
+}
+
 export async function sendEmail({ to, subject, text }: Mail): Promise<void> {
-  // Tolerates a key pasted with spaces, quotes or line breaks around it.
-  const key = process.env.RESEND_API_KEY?.replace(/["'\s]/g, "");
+  const key = resendKey();
   const from = process.env.EMAIL_FROM ?? "Prague Integration <contact@pragueintegration.cz>";
   if (!key) {
     console.info(`[email not sent: RESEND_API_KEY unset] to=${to} subject=${subject}\n${text}`);
@@ -23,15 +38,16 @@ export async function sendEmail({ to, subject, text }: Mail): Promise<void> {
 export function emailProblem(err: unknown): string {
   const msg = err instanceof Error ? err.message : String(err);
   const status = Number(msg.match(/Resend returned (\d+)/)?.[1]);
+  // Resend's own words, minus anything that looks like a key.
+  const said = (msg.match(/"message"\s*:\s*"([^"]*)"/)?.[1] ?? msg).replace(/re_[A-Za-z0-9_-]+/g, "[key]").slice(0, 300);
   if (status === 401 || /api key is invalid|missing api key/i.test(msg))
-    return "Resend didn't accept the RESEND_API_KEY in Vercel. Create a new API key in Resend, paste it into Vercel again, and redeploy.";
+    return `Resend didn't accept the RESEND_API_KEY in Vercel (Resend said: "${said}"). ${keyHint()} Compare that with the start of the key in Resend's API keys list. If they differ, paste the right key into Vercel and redeploy.`;
   if (/domain is not verified|not verified/i.test(msg))
     return "Resend says the sending domain isn't verified yet. Check it shows Verified in Resend, then try again.";
   if (status === 403)
     return "Resend refused to send: the API key may be limited to a different domain, or have no sending permission. Create a new key with Sending access for pragueintegration.cz.";
   if (status === 429) return "Resend is busy (too many emails at once). Wait a minute and try again.";
-  const detail = msg.replace(/re_[A-Za-z0-9_]+/g, "[key]").slice(0, 300);
-  return `The email couldn't be sent. Resend said: ${detail}`;
+  return `The email couldn't be sent. Resend said: "${said}"`;
 }
 
 const appUrl = () => process.env.APP_URL ?? "http://localhost:3000";
