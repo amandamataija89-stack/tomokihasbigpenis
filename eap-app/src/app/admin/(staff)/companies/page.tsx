@@ -3,12 +3,13 @@ import { requireManager } from "@/lib/auth";
 import { listCompanies } from "@/lib/data";
 import { setCompanyActive } from "../../actions";
 import { NewCompanyForm } from "./NewCompanyForm";
+import { appUrl } from "@/lib/app-url";
 
 export default async function CompaniesPage() {
   await requireManager();
   const companies = await listCompanies();
   const h = await headers();
-  const base = process.env.APP_URL ?? `${h.get("x-forwarded-proto") ?? "http"}://${h.get("host")}`;
+  const base = process.env.APP_URL ? appUrl() : `${h.get("x-forwarded-proto") ?? "http"}://${h.get("host")}`;
 
   return (
     <main className="stack" style={{ gap: 20 }}>
