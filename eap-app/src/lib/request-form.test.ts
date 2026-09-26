@@ -82,8 +82,17 @@ describe("private form", () => {
     const missing = validateRequest(form(valid), true);
     expect(missing.ok).toBe(false);
     if (!missing.ok) expect(missing.errors.service).toBeTruthy();
-    const ok = validateRequest(form({ ...valid, service: "Couple counselling" }), true);
+    const ok = validateRequest(
+      form({ ...valid, service: "Couple counselling", fullName: "Jana Nováková", address: "Vinohradská 12\n120 00 Praha 2" }),
+      true,
+    );
     expect(ok.ok && ok.data.service).toBe("Couple counselling");
+    expect(ok.ok && ok.data.address).toBe("Vinohradská 12\n120 00 Praha 2");
+  });
+  it("requires first name and surname, and a residential address", () => {
+    const r = validateRequest(form({ ...valid, service: "Couple counselling", fullName: "Jana", address: "" }), true);
+    expect(!r.ok && r.errors.fullName).toBeTruthy();
+    expect(!r.ok && r.errors.address).toBeTruthy();
   });
   it("ignores it on the EAP form", () => {
     const r = validateRequest(form({ ...valid, service: "ADHD testing" }));

@@ -40,13 +40,13 @@ export async function findCompanyByCode(code: string): Promise<Company | null> {
 export async function insertRequest(companyId: string | null, r: RequestInput): Promise<string> {
   const { rows } = await pool.query<{ id: string }>(
     `INSERT INTO support_requests
-       (kind, in_pool, company_id, first_name, full_name, email, phone, contact_method, language, format, topics,
-        message, crisis, age_range, gender, location, service, consent_at, consent_contact_at)
-     VALUES ($15, $15 = 'private', $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $16, now(), now())
+       (kind, in_pool, variable_symbol, company_id, first_name, full_name, email, phone, contact_method, language, format, topics,
+        message, crisis, age_range, gender, location, service, address, consent_at, consent_contact_at)
+     VALUES ($15, $15 = 'private', CASE WHEN $15 = 'private' THEN nextval('client_vs_seq')::text END, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $16, $17, now(), now())
      RETURNING id`,
     [
       companyId, r.firstName, r.fullName, r.email, r.phone, r.contactMethod, r.language, r.format, r.topics,
-      r.message, r.crisis, r.ageRange, r.gender, r.location, companyId ? "eap" : "private", r.service,
+      r.message, r.crisis, r.ageRange, r.gender, r.location, companyId ? "eap" : "private", r.service, r.address,
     ],
   );
   return rows[0].id;
@@ -68,7 +68,10 @@ export type RequestRow = {
   gender: string;
   location: string;
   service: string; // private clients: the kind of support they asked for
-  session_price_czk: number | null; // private clients: their own price, overriding the price list
+  session_price_czk: number | null; // private clients: their price with VAT (what they pay per session)
+  session_price_net_czk: number | null; // the same without VAT, as chosen by their counsellor
+  variable_symbol: string | null; // private clients: on all their invoices
+  address: string; // private clients: residential address from the sign-up form
   billing_name: string;
   billing_address: string;
   billing_ico: string;

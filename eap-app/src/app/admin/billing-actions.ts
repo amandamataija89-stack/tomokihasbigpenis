@@ -5,18 +5,24 @@ import { redirect } from "next/navigation";
 import { isManager, requireManager, requireStaff, type Staff } from "@/lib/auth";
 import {
   billingFrom,
+  createInvoiceToPay,
+  createMonthlyInvoices,
   deletePayment,
+  markInvoicePaid,
   invoiceSettings,
   parsePrice,
   PAYMENT_METHODS,
   recordPackage,
   recordPayment,
+  priceList,
+  priceSteps,
   saveInvoiceSettings,
-  setListPrice,
+  setPriceRange,
+  withVat,
   type InvoiceSettings,
 } from "@/lib/billing";
 import { pool } from "@/lib/db";
-import { emailProblem, invoiceEmail, sendEmail } from "@/lib/email";
+import { emailProblem } from "@/lib/email";
 import { SERVICES } from "@/lib/request-form";
 
 // Billing is for private clients, by staff who can see the case (their counsellor, coordinators, admins).
@@ -48,17 +54,78 @@ const methodFrom = (form: FormData) => {
 };
 const invoiceNumberFrom = (form: FormData) => String(form.get("invoiceNumber") ?? "").trim().slice(0, 40) || null;
 
-/** The client's own session price and their billing details. */
+/** Step 1: the kind of support. A chosen price outside the new type's range is cleared, to be picked again. */
+export async function setClientService(requestId: string, formData: FormData) {
+  const staff = await requirePrivateCase(requestId);
+  const service = String(formData.get("service") ?? "");
+  if (!(SERVICES as readonly string[]).includes(service)) redirect(`/admin/requests/${requestId}?billing=service#price`);
+  const { rows } = await pool.query<{ service: string; net: number | null }>(
+    "SELECT service, session_price_net_czk AS net FROM support_requests WHERE id = $1",
+    [requestId],
+  );
+  if (rows[0].service === service) redirect(`/admin/requests/${requestId}#price`);
+  const range = (await priceList()).find((p) => p.service === service);
+  const net = rows[0].net;
+  const fits =
+    net !== null && range?.min_net_czk != null && net >= range.min_net_czk && net <= (range.max_net_czk ?? range.min_net_czk);
+  await pool.query(
+    `UPDATE support_requests SET service = $2, updated_at = now(),
+       session_price_net_czk = CASE WHEN $3 THEN session_price_net_czk END,
+       session_price_czk = CASE WHEN $3 THEN session_price_czk END
+     WHERE id = $1`,
+    [requestId, service, fits],
+  );
+  await note(
+    requestId,
+    staff.id,
+    `Type of counselling set to ${service}${rows[0].service ? ` (was ${rows[0].service})` : ""}.${net !== null && !fits ? " The price no longer fits its range: please choose it again." : ""}`,
+  );
+  redirect(`/admin/requests/${requestId}?billing=service-saved#price`);
+}
+
+/**
+ * The counsellor picks the client's price (without VAT) from the range for their kind of support.
+ * It's used for their new sessions, and for booked sessions not yet paid.
+ */
+export async function chooseClientPrice(requestId: string, formData: FormData) {
+  const staff = await requirePrivateCase(requestId);
+  const net = Number(formData.get("net"));
+  const { rows } = await pool.query<{ service: string }>("SELECT service FROM support_requests WHERE id = $1", [requestId]);
+  const range = (await priceList()).find((p) => p.service === rows[0]?.service);
+  const allowed =
+    range?.min_net_czk != null && range.max_net_czk != null ? priceSteps(range.min_net_czk, range.max_net_czk) : [];
+  // Coordinators and admins may also type a price outside the range (e.g. a no-range service or a discount).
+  const custom = isManager(staff) ? parsePrice(formData.get("customNet")) : null;
+  const chosen = custom ?? (allowed.includes(net) ? net : undefined);
+  if (chosen === undefined || chosen === null) redirect(`/admin/requests/${requestId}?billing=range#price`);
+  const settings = await invoiceSettings();
+  const gross = withVat(chosen!, settings);
+  await pool.query(
+    "UPDATE support_requests SET session_price_net_czk = $2, session_price_czk = $3, updated_at = now() WHERE id = $1",
+    [requestId, chosen, gross],
+  );
+  const { rowCount } = await pool.query(
+    "UPDATE client_sessions SET price_czk = $2 WHERE request_id = $1 AND paid_at IS NULL",
+    [requestId, gross],
+  );
+  const vat = settings.vatPayer ? ` + ${settings.vatRate} % VAT = ${czk(gross)}` : "";
+  await note(
+    requestId,
+    staff.id,
+    `Price chosen: ${czk(chosen!)}${vat} per session.${rowCount ? ` Applied to ${rowCount} unpaid booked session${rowCount === 1 ? "" : "s"}.` : ""}`,
+  );
+  redirect(`/admin/requests/${requestId}?billing=pricechosen#price`);
+}
+
+/** Who the client's invoices are made out to. */
 export async function saveClientBilling(requestId: string, formData: FormData) {
   const staff = await requirePrivateCase(requestId);
-  const price = parsePrice(formData.get("sessionPrice"));
-  if (price === undefined) back(requestId, "price");
   const b = billingFrom(formData);
   if (b.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(b.email)) back(requestId, "email");
   await pool.query(
-    `UPDATE support_requests SET session_price_czk = $2, billing_name = $3, billing_address = $4, billing_ico = $5,
-       billing_dic = $6, billing_email = $7, updated_at = now() WHERE id = $1`,
-    [requestId, price ?? null, b.name, b.address, b.ico, b.dic, b.email],
+    `UPDATE support_requests SET billing_name = $2, billing_address = $3, billing_ico = $4,
+       billing_dic = $5, billing_email = $6, updated_at = now() WHERE id = $1`,
+    [requestId, b.name, b.address, b.ico, b.dic, b.email],
   );
   await note(requestId, staff.id, "Billing details updated.");
   back(requestId, "saved");
@@ -138,29 +205,94 @@ export async function removePayment(requestId: string, paymentId: string) {
   back(requestId, "deleted");
 }
 
-/** Emails the invoice PDF to the billing email, or the client's email. */
+/** Emails the invoice PDF (with the QR code if it's to pay) to the billing email, or the client's email. */
 export async function emailInvoice(requestId: string, paymentId: string) {
-  const staff = await requirePrivateCase(requestId);
-  const { rows } = await pool.query<{ to: string; first_name: string }>(
-    `SELECT COALESCE(NULLIF(r.billing_email, ''), r.email) AS to, r.first_name
-     FROM payments p JOIN support_requests r ON r.id = p.request_id WHERE p.id = $1 AND p.request_id = $2`,
-    [paymentId, requestId],
-  );
-  if (!rows[0]) back(requestId, "missing");
+  await requirePrivateCase(requestId);
+  const { rowCount } = await pool.query("SELECT 1 FROM payments WHERE id = $1 AND request_id = $2", [paymentId, requestId]);
+  if (!rowCount) back(requestId, "missing");
   // Loaded here so the fonts are only read when an invoice is actually made.
-  const { invoiceFileName, loadInvoice, renderInvoice } = await import("@/lib/invoice-pdf");
-  const data = await loadInvoice(paymentId);
-  const pdf = await renderInvoice(data);
+  const { sendInvoice } = await import("@/lib/invoice-mail");
   try {
-    await sendEmail(
-      invoiceEmail(rows[0].to, rows[0].first_name, data.number, Buffer.from(pdf).toString("base64"), invoiceFileName(data.number)),
-    );
+    await sendInvoice(paymentId);
   } catch (err) {
     console.error("EAP invoice email failed:", err);
     redirect(`/admin/requests/${requestId}?billing=emailfailed&why=${encodeURIComponent(emailProblem(err))}#payments`);
   }
-  await note(requestId, staff.id, `Invoice ${data.number} emailed to ${rows[0].to}.`);
   back(requestId, "emailed");
+}
+
+/** An invoice to pay for the ticked sessions, due in 14 days; emailed straight away if asked. */
+export async function createInvoiceAction(requestId: string, formData: FormData) {
+  const staff = await requirePrivateCase(requestId);
+  const sessionIds = formData.getAll("session").map(String).filter((id) => /^[0-9a-f-]{36}$/i.test(id));
+  if (!sessionIds.length) back(requestId, "nosessions");
+  const amount = parsePrice(formData.get("amount"));
+  if (amount === undefined) back(requestId, "amount");
+  const id = await createInvoiceToPay({ requestId, sessionIds, amount: amount ?? null, staffId: staff.id });
+  if (!id) back(requestId, "nosessions");
+  const { rows } = await pool.query<{ invoice_number: string; amount_czk: number }>(
+    "SELECT invoice_number, amount_czk FROM payments WHERE id = $1",
+    [id],
+  );
+  await note(requestId, staff.id, `Invoice ${rows[0].invoice_number} issued for ${czk(rows[0].amount_czk)}, to pay within 14 days.`);
+  if (formData.get("send") === "yes") await emailInvoice(requestId, id!);
+  back(requestId, "invoiced");
+}
+
+export async function markPaidAction(requestId: string, paymentId: string, formData: FormData) {
+  const staff = await requirePrivateCase(requestId);
+  const paidOn = dateFrom(formData);
+  if (!paidOn) back(requestId, "date");
+  if (await markInvoicePaid(requestId, paymentId, paidOn!, methodFrom(formData))) {
+    const { rows } = await pool.query<{ invoice_number: string; amount_czk: number }>(
+      "SELECT invoice_number, amount_czk FROM payments WHERE id = $1",
+      [paymentId],
+    );
+    await note(requestId, staff.id, `Invoice ${rows[0].invoice_number} marked paid (${czk(rows[0].amount_czk)}).`);
+  }
+  back(requestId, "markedpaid");
+}
+
+// ---- Monthly invoicing (coordinators and admins) -------------------------------------------
+
+const monthOf = (form: FormData) => {
+  const m = String(form.get("month") ?? "");
+  return /^\d{4}-\d{2}$/.test(m) ? m : null;
+};
+
+/** One invoice per private client for the month's sessions not yet paid or invoiced. */
+export async function createMonthlyInvoicesAction(formData: FormData) {
+  const staff = await requireManager();
+  const month = monthOf(formData);
+  if (!month) redirect("/admin/billing");
+  const { created, withoutPrice } = await createMonthlyInvoices(month!, staff.id);
+  for (const c of created)
+    await note(c.requestId, staff.id, `Monthly invoice for ${month} issued: ${c.sessions} session${c.sessions === 1 ? "" : "s"}, ${czk(c.amount)}.`);
+  redirect(`/admin/billing?month=${month}&created=${created.length}&noprice=${withoutPrice.length}`);
+}
+
+/** Emails every invoice for the month that's still to pay and hasn't been emailed yet. */
+export async function emailMonthlyInvoicesAction(formData: FormData) {
+  await requireManager();
+  const month = monthOf(formData);
+  if (!month) redirect("/admin/billing");
+  const { rows } = await pool.query<{ id: string }>(
+    "SELECT id FROM payments WHERE period = $1 AND paid_on IS NULL AND emailed_at IS NULL AND invoice_number IS NOT NULL",
+    [month],
+  );
+  const { sendInvoice } = await import("@/lib/invoice-mail");
+  let sent = 0;
+  let failed = 0;
+  for (const r of rows) {
+    try {
+      await sendInvoice(r.id);
+      sent++;
+    } catch (err) {
+      console.error("EAP invoice email failed:", err);
+      failed++;
+    }
+  }
+  redirect(`/admin/billing?month=${month}&emailed=${sent}&failed=${failed}`);
 }
 
 const isDuplicateInvoice = (err: unknown) =>
@@ -170,11 +302,15 @@ const isDuplicateInvoice = (err: unknown) =>
 
 export async function savePriceList(formData: FormData) {
   await requireManager();
-  for (const service of SERVICES) {
-    const price = parsePrice(formData.get(`price:${service}`));
-    if (price === undefined) redirect("/admin/pricing?error=price");
-    await setListPrice(service, price ?? null);
-  }
+  const ranges = SERVICES.map((service) => {
+    const min = parsePrice(formData.get(`min:${service}`));
+    const max = parsePrice(formData.get(`max:${service}`)) ?? min;
+    return { service, min, max: max ?? null };
+  });
+  // A single price is fine (leave "to" empty); a range must run from low to high.
+  if (ranges.some((r) => r.min === undefined || r.max === undefined || (r.min !== null && r.max !== null && r.max < r.min)))
+    redirect("/admin/pricing?error=price");
+  for (const r of ranges) await setPriceRange(r.service, r.min ?? null, r.max ?? null);
   revalidatePath("/admin/pricing");
   redirect("/admin/pricing?saved=prices");
 }

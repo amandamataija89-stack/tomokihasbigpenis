@@ -11,7 +11,7 @@ import { Messages } from "./Messages";
 import { Sessions } from "./Sessions";
 import { Payments } from "./Payments";
 import { BillingProfile } from "./BillingProfile";
-import { defaultSessionPrice, listPackages, listPayments, priceList } from "@/lib/billing";
+import { defaultSessionPrice, invoiceSettings, listPackages, listPayments, priceList } from "@/lib/billing";
 
 export default async function RequestPage({
   params,
@@ -50,7 +50,8 @@ export default async function RequestPage({
     isPrivate ? priceList() : Promise.resolve([]),
     isPrivate ? defaultSessionPrice(id) : Promise.resolve(null),
   ]);
-  const listPrice = prices.find((p) => p.service === r.service)?.price_czk ?? null;
+  const priceRange = prices.find((p) => p.service === r.service) ?? null;
+  const settings = isPrivate ? await invoiceSettings() : null;
   const pendingForMe = r.assigned_to === me.id && !r.accepted_at && r.status === "new";
   const due = contactDue(r.created_at, r.crisis);
   const nameOf = (sid: string) => staff.find((s) => s.id === sid)?.name ?? "a former colleague";
@@ -130,6 +131,11 @@ export default async function RequestPage({
               <dt>Urgent?</dt><dd>{r.crisis ? <b className="overdue">Yes, crisis</b> : "No"}</dd>
               <dt>Nickname</dt><dd>{r.first_name}</dd>
               <dt>Full name</dt><dd>{r.full_name || <span className="small">Not given</span>}</dd>
+              {r.address && (
+                <>
+                  <dt>Residential address</dt><dd style={{ whiteSpace: "pre-line" }}>{r.address}</dd>
+                </>
+              )}
               <dt>Client of</dt>
               <dd>{r.company_name ? `EAP · ${r.company_name}` : <span className="pill pill-private">Private client</span>}</dd>
               <dt>Age</dt><dd>{r.age_range || "—"}</dd>
@@ -214,7 +220,9 @@ export default async function RequestPage({
             <div className="actions"><button type="submit">Save</button></div>
           </form>
 
-          {isPrivate && <BillingProfile r={r} listPrice={listPrice} />}
+          {isPrivate && settings && (
+            <BillingProfile r={r} range={priceRange} vatPayer={settings.vatPayer} vatRate={settings.vatRate} manager={manager} flash={sp.billing} />
+          )}
 
           <section className="card stack">
             <h2>Notes</h2>

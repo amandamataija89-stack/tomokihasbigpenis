@@ -29,7 +29,7 @@ function Payment({ s }: { s: ClientSession }) {
         inputMode="numeric"
         name="price"
         aria-label="Price in CZK"
-        placeholder="Price, CZK"
+        placeholder="Price incl. VAT"
         defaultValue={s.price_czk ?? ""}
         className="price-input"
       />
@@ -39,6 +39,8 @@ function Payment({ s }: { s: ClientSession }) {
           <span className="pill pill-paid">{s.package_id ? "✓ From package" : `✓ Paid ${formatDay(s.paid_at)}`}</span>
           <button formAction={setSessionPaid.bind(null, s.id, false)} className="ghost small-btn">Not paid</button>
         </>
+      ) : s.payment_id ? (
+        <span className="pill pill-unpaid">Invoiced, awaiting payment</span>
       ) : (
         <button formAction={setSessionPaid.bind(null, s.id, true)} className="small-btn">Mark paid</button>
       )}
@@ -181,7 +183,7 @@ export function Sessions({
                 inputMode="numeric"
                 name="price"
                 aria-label="Price in CZK"
-                placeholder="Price, CZK"
+                placeholder="Price incl. VAT"
                 defaultValue={defaultPrice ?? ""}
                 className="price-input"
               />

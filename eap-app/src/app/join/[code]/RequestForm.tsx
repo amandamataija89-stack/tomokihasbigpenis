@@ -120,11 +120,29 @@ export function RequestForm({ code }: { code: string | null }) {
           </div>
           <div className="field">
             <label htmlFor="fullName">
-              Full name<span className="opt">optional</span>
+              {code === null ? "Full name (first name and surname)" : <>Full name<span className="opt">optional</span></>}
             </label>
-            <input id="fullName" name="fullName" type="text" autoComplete="name" defaultValue={v.fullName} />
-            <span className="small">Only needed if you want an invoice for insurance.</span>
+            <input id="fullName" name="fullName" type="text" autoComplete="name" defaultValue={v.fullName} {...invalid("fullName")} />
+            <span className="small">
+              {code === null ? "As it should appear on your invoices." : "Only needed if you want an invoice for insurance."}
+            </span>
+            {err("fullName")}
           </div>
+          {code === null && (
+            <div className="field">
+              <label htmlFor="address">Residential address</label>
+              <textarea
+                id="address"
+                name="address"
+                rows={3}
+                autoComplete="street-address"
+                defaultValue={v.address}
+                placeholder={"Street and number\nPostcode and town"}
+                {...invalid("address")}
+              />
+              {err("address")}
+            </div>
+          )}
         </div>
         <div className="row">{select("ageRange", "Age", AGE_RANGES)}</div>
         <div className="row">
