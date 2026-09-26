@@ -240,7 +240,9 @@ export type InvoiceSettings = {
   supplierAddress: string;
   ico: string;
   dic: string;
-  note: string; // printed at the bottom, e.g. the VAT status
+  vatPayer: boolean; // invoices are tax documents (daňový doklad) with VAT shown
+  vatRate: number; // percent; prices entered include VAT
+  note: string; // printed at the bottom
   bankAccount: string; // Czech format, e.g. 123456789/0800
   iban: string;
   registration: string; // e.g. "Registered in the Commercial Register kept by the Municipal Court in Prague, section C, file 12345"
@@ -255,7 +257,9 @@ export const DEFAULT_INVOICE_SETTINGS: InvoiceSettings = {
   supplierAddress: "Mezibranská 4\n110 00 Praha 1",
   ico: "",
   dic: "",
-  note: "Nejsme plátci DPH. / Not a VAT payer.",
+  vatPayer: true,
+  vatRate: 21,
+  note: "",
   bankAccount: "",
   iban: "",
   registration: "",
@@ -281,6 +285,16 @@ export async function saveInvoiceSettings(s: InvoiceSettings): Promise<void> {
      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
     [JSON.stringify(s)],
   );
+}
+
+/**
+ * Splits a price that includes VAT into base and VAT, in haléře (hundredths of a crown), the way
+ * Czech VAT law computes it from a gross price: VAT = price × rate / (100 + rate), rounded.
+ */
+export function vatSplit(grossCzk: number, ratePercent: number): { base: number; vat: number; gross: number } {
+  const gross = Math.round(grossCzk * 100);
+  const vat = Math.round((gross * ratePercent) / (100 + ratePercent));
+  return { base: gross - vat, vat, gross };
 }
 
 /** The number after `n`: the digits at its end go up by one, keeping their width ("2026009" → "2026010"). */

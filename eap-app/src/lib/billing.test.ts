@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { nextInvoiceNumber, parsePrice } from "./billing";
-import { invoiceLines, renderInvoice } from "./invoice-pdf";
+import { nextInvoiceNumber, parsePrice, vatSplit } from "./billing";
+import { invoiceLines, renderInvoice, taxDate } from "./invoice-pdf";
 import { DEFAULT_INVOICE_SETTINGS } from "./billing";
 
 describe("invoice numbers", () => {
@@ -42,6 +42,7 @@ describe("invoice", () => {
       number: "2026001",
       issuedOn: new Date("2026-10-13T10:00:00Z"),
       paidOn: "2026-10-12",
+      taxDate: "2026-10-12",
       method: "Bank transfer",
       customer: ["Jana Nováková", "Vinohradská 12", "120 00 Praha 2"],
       lines: invoiceLines("Individual counselling", 3000, null, sessions),
@@ -50,5 +51,20 @@ describe("invoice", () => {
     });
     expect(Buffer.from(pdf.slice(0, 5)).toString()).toBe("%PDF-");
     expect(pdf.length).toBeGreaterThan(5000);
+  });
+});
+
+describe("VAT", () => {
+  it("splits a price that includes 21 % VAT", () => {
+    expect(vatSplit(1500, 21)).toEqual({ base: 123967, vat: 26033, gross: 150000 });
+    expect(vatSplit(2600, 21)).toEqual({ base: 214876, vat: 45124, gross: 260000 });
+    expect(vatSplit(1000, 0)).toEqual({ base: 100000, vat: 0, gross: 100000 });
+  });
+  it("taxes a payment on the earlier of payment and the last session", () => {
+    const oct5 = new Date("2026-10-05T08:00:00Z");
+    const oct12 = new Date("2026-10-12T08:00:00Z");
+    expect(taxDate("2026-10-20", [oct5, oct12])).toBe("2026-10-12"); // paid after the sessions
+    expect(taxDate("2026-10-01", [oct5, oct12])).toBe("2026-10-01"); // paid in advance
+    expect(taxDate("2026-10-01", [])).toBe("2026-10-01"); // a package
   });
 });

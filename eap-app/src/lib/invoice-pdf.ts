@@ -2,7 +2,7 @@
 import fontkit from "@pdf-lib/fontkit";
 import { PDFDocument, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import { pool } from "./db";
-import { invoiceSettings, issueInvoice, type InvoiceSettings } from "./billing";
+import { invoiceSettings, issueInvoice, vatSplit, type InvoiceSettings } from "./billing";
 import { LIBERATION_SANS_BOLD, LIBERATION_SANS_REGULAR } from "./fonts/liberation-sans";
 
 export type InvoiceLine = { text: string; amount: number };
@@ -11,6 +11,7 @@ export type InvoiceData = {
   number: string;
   issuedOn: Date;
   paidOn: string; // YYYY-MM-DD
+  taxDate: string; // YYYY-MM-DD, datum uskutečnění zdanitelného plnění (DUZP)
   method: string;
   customer: string[]; // lines: name, address, IČO, DIČ
   lines: InvoiceLine[];
@@ -81,6 +82,7 @@ export async function loadInvoice(paymentId: string): Promise<InvoiceData> {
     number,
     issuedOn: p.invoiced_at,
     paidOn: p.paid_on,
+    taxDate: taxDate(p.paid_on, p.package_sessions ? [] : sessions.map((x) => x.starts_at)),
     method: p.method,
     customer,
     lines: invoiceLines(p.service, p.amount_czk, p.package_sessions ? { sessions: p.package_sessions } : null, sessions),
@@ -88,6 +90,21 @@ export async function loadInvoice(paymentId: string): Promise<InvoiceData> {
     supplier: await invoiceSettings(),
   };
 }
+
+const pragueDay = (d: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Prague" }).format(d);
+
+/**
+ * The tax point (DUZP): the earlier of payment and supply. A package or a payment in advance is taxed
+ * when paid; sessions paid for after they happened, on the day of the last one.
+ */
+export function taxDate(paidOn: string, sessionDates: Date[]): string {
+  if (!sessionDates.length) return paidOn;
+  const last = sessionDates.map(pragueDay).sort().pop()!;
+  return last < paidOn ? last : paidOn;
+}
+
+const hal = (h: number) =>
+  `${(h / 100).toLocaleString("cs-CZ", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace(/\u00a0/g, " ")} Kč`;
 
 const METHOD_CS: Record<string, string> = { "Bank transfer": "Bankovní převod", Cash: "Hotově", Card: "Kartou" };
 
@@ -126,10 +143,12 @@ export async function renderInvoice(d: InvoiceData): Promise<Uint8Array> {
   };
 
   // Header
-  text(page, "FAKTURA", L, 780, { font: bold, size: 22 });
-  text(page, "Invoice", L, 762, { size: 11, color: muted });
+  const vatPayer = d.supplier.vatPayer;
+  text(page, vatPayer ? "FAKTURA – DAŇOVÝ DOKLAD" : "FAKTURA", L, 780, { font: bold, size: vatPayer ? 18 : 22 });
+  text(page, vatPayer ? "Tax invoice" : "Invoice", L, 762, { size: 11, color: muted });
   right(`č. / No. ${d.number}`, R, 780, bold, 14);
   right(`Datum vystavení / Issued: ${day(d.issuedOn)}`, R, 762);
+  if (vatPayer) right(`DUZP / Tax point: ${isoDay(d.taxDate)}`, R, 748);
 
   // Supplier and customer
   let y = 715;
@@ -185,7 +204,7 @@ export async function renderInvoice(d: InvoiceData): Promise<Uint8Array> {
 
   // Items
   text(page, "Položka / Item", L, y, { font: bold, size: 9, color: muted });
-  right("Cena / Price", R, y, bold, 9);
+  right(vatPayer ? "Cena s DPH / Price incl. VAT" : "Cena / Price", R, y, bold, 9);
   y -= 8;
   page.drawLine({ start: { x: L, y }, end: { x: R, y }, thickness: 0.7, color: muted });
   y -= 16;
@@ -203,16 +222,32 @@ export async function renderInvoice(d: InvoiceData): Promise<Uint8Array> {
   }
   pg.drawLine({ start: { x: L, y: y + 2 }, end: { x: R, y: y + 2 }, thickness: 0.7, color: muted });
   y -= 18;
-  const total = czk(d.total);
-  text(pg, "Celkem / Total", 320, y, { font: bold, size: 12 });
+  if (vatPayer) {
+    // VAT recap: rate, base, VAT and total, in crowns and haléře.
+    const v = vatSplit(d.total, d.supplier.vatRate);
+    const cols: [string, string][] = [
+      ["Sazba DPH / VAT rate", `${d.supplier.vatRate} %`],
+      ["Základ daně / Tax base", hal(v.base)],
+      ["DPH / VAT", hal(v.vat)],
+    ];
+    for (const [k, val] of cols) {
+      text(pg, k, 320, y, { size: 9, color: muted });
+      text(pg, val, R - regular.widthOfTextAtSize(val, 10), y);
+      y -= 15;
+    }
+    y -= 6;
+  }
+  const total = vatPayer ? hal(Math.round(d.total * 100)) : czk(d.total);
+  text(pg, vatPayer ? "Celkem s DPH / Total incl. VAT" : "Celkem / Total", vatPayer ? 230 : 320, y, { font: bold, size: 12 });
   text(pg, total, R - bold.widthOfTextAtSize(total, 14), y, { font: bold, size: 14 });
   y -= 22;
   const paid = "UHRAZENO – NEPLAŤTE / PAID – NOTHING TO PAY";
   text(pg, paid, R - bold.widthOfTextAtSize(paid, 10), y, { font: bold, size: 10, color: green });
 
-  // Footer note (e.g. VAT status)
+  // Footer note
   let yf = 70;
-  for (const w of wrap(s.note, R - L, regular, 9)) {
+  const footer = vatPayer ? s.note : s.note || "Nejsme plátci DPH. / Not a VAT payer.";
+  for (const w of wrap(footer, R - L, regular, 9)) {
     text(pg, w, L, yf, { size: 9, color: muted });
     yf -= 12;
   }

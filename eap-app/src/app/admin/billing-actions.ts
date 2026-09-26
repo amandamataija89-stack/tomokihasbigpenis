@@ -198,6 +198,8 @@ export async function saveInvoiceSettingsAction(formData: FormData) {
     email: t("email", 200),
     phone: t("phone", 60),
     note: t("note", 500),
+    vatPayer: formData.get("vatPayer") === "yes",
+    vatRate: [0, 12, 21].includes(Number(formData.get("vatRate"))) ? Number(formData.get("vatRate")) : current.vatRate,
     nextNumber,
     dueDays: Number.isInteger(dueDays) && dueDays >= 0 && dueDays <= 90 ? dueDays : current.dueDays,
   });

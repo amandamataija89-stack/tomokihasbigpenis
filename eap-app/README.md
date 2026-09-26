@@ -41,8 +41,11 @@ Everything else is the same: consents, messages, session emails and reminders, c
 - **Invoices**: every payment can be turned into a PDF invoice in Czech and English (**Invoice PDF**), or
   emailed to the client with the PDF attached (**Email invoice**). Numbers are given automatically from
   **Next invoice number** on the Pricing & invoices page, unless you type one in when recording the payment.
-  Fill in the company's IČO, bank account and register entry there first, and check the VAT note with your
-  accountant: the default says Prague Integration is not a VAT payer. Invoices are marked as already paid.
+  Fill in the company's IČO, DIČ, bank account and register entry there first. Invoices are marked as already paid.
+- **VAT**: Prague Integration is a VAT payer, so invoices are tax documents ("Faktura – daňový doklad") at
+  the VAT rate set on the Pricing page (21 % by default). Prices include VAT; the invoice shows the tax base,
+  the VAT and the total, and the tax point (DUZP): the earlier of the payment date and the last session it
+  covers (for a package, the payment date). Have your accountant confirm the rate and the tax point.
 - The Pricing & invoices page also shows money received this month and last, unpaid sessions per
   client, and recent payments.
 Private clients have a **Private** tag; the **Private clients** tab lists them. Counsellors don't see

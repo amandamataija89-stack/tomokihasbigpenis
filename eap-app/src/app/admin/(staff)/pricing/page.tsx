@@ -102,9 +102,26 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
         <div className="field"><label htmlFor="registration">Registration (commercial register entry)</label>
           <input id="registration" name="registration" type="text" defaultValue={settings.registration}
             placeholder="Zapsáno v obchodním rejstříku vedeném Městským soudem v Praze, oddíl C, vložka …" /></div>
-        <div className="field"><label htmlFor="note">Note at the bottom</label>
-          <input id="note" name="note" type="text" defaultValue={settings.note} />
-          <span className="small">For example your VAT status. The default says you&apos;re not a VAT payer: change it if you are.</span></div>
+        <div className="field">
+          <label className="consent">
+            <input type="checkbox" name="vatPayer" value="yes" defaultChecked={settings.vatPayer} />
+            <span>We are a VAT payer (invoices are tax documents, &quot;daňový doklad&quot;, showing VAT)</span>
+          </label>
+          <label htmlFor="vatRate">VAT rate</label>
+          <select id="vatRate" name="vatRate" defaultValue={String(settings.vatRate)} className="price-input">
+            <option value="21">21 %</option>
+            <option value="12">12 %</option>
+            <option value="0">0 %</option>
+          </select>
+          <span className="small">
+            Prices on the price list and on sessions include VAT: a 1,500 CZK session is 1,239.67 CZK + 260.33 CZK VAT at 21 %.
+          </span>
+          {settings.vatPayer && !settings.dic && (
+            <span className="err">Enter your DIČ above: a VAT invoice must show it.</span>
+          )}
+        </div>
+        <div className="field"><label htmlFor="note">Note at the bottom (optional)</label>
+          <input id="note" name="note" type="text" defaultValue={settings.note} /></div>
         <div className="field"><label htmlFor="nextNumber">Next invoice number</label>
           <input id="nextNumber" name="nextNumber" type="text" className="price-input" defaultValue={settings.nextNumber} />
           <span className="small">Goes up by one for each new invoice. Set it to continue your current numbering.</span></div>
