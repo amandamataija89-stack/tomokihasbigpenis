@@ -171,3 +171,17 @@ CREATE TABLE IF NOT EXISTS message_links (
   request_id uuid NOT NULL REFERENCES support_requests(id) ON DELETE CASCADE,
   created_at timestamptz NOT NULL DEFAULT now()
 );
+
+-- Two kinds of client: 'eap' (through an employer's company code: 5 sessions, offered automatically)
+-- and 'private' (Prague Integration's own clients: no company, no session limit, assigned by the coordinator).
+ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS kind text NOT NULL DEFAULT 'eap';
+ALTER TABLE support_requests ALTER COLUMN company_id DROP NOT NULL;
+DO $$ BEGIN
+  ALTER TABLE support_requests ADD CONSTRAINT support_requests_kind_check
+    CHECK ((kind = 'eap' AND company_id IS NOT NULL) OR (kind = 'private' AND company_id IS NULL));
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+-- Payment for private clients' sessions: price in CZK and when it was paid.
+ALTER TABLE client_sessions ADD COLUMN IF NOT EXISTS price_czk integer CHECK (price_czk IS NULL OR price_czk >= 0);
+ALTER TABLE client_sessions ADD COLUMN IF NOT EXISTS paid_at timestamptz;

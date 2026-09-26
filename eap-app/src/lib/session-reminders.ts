@@ -1,7 +1,7 @@
 import { pool } from "./db";
 import { LATE_CANCEL_HOURS } from "./deadlines";
 import { formatDeadline, sendEmail, sessionReminder } from "./email";
-import { SESSIONS_PER_CLIENT } from "./data";
+import { sessionLimit, type ClientKind } from "./data";
 import { clientMessageLink } from "./messages";
 
 const whenFmt = new Intl.DateTimeFormat("en-GB", {
@@ -30,8 +30,9 @@ export async function sendSessionReminders(now = new Date()): Promise<number> {
     format: string;
     therapist: string | null;
     number: number;
+    kind: ClientKind;
   }>(
-    `SELECT cs.id, cs.request_id, cs.starts_at, r.email, r.first_name, r.format, s.name AS therapist,
+    `SELECT cs.id, cs.request_id, cs.starts_at, r.email, r.first_name, r.format, r.kind, s.name AS therapist,
        (SELECT count(*)::int FROM client_sessions o WHERE o.request_id = r.id AND o.starts_at <= cs.starts_at) AS number
      FROM client_sessions cs
      JOIN support_requests r ON r.id = cs.request_id
@@ -51,7 +52,7 @@ export async function sendSessionReminders(now = new Date()): Promise<number> {
           firstName: r.first_name,
           when: whenFmt.format(r.starts_at),
           number: r.number,
-          total: SESSIONS_PER_CLIENT,
+          total: sessionLimit(r.kind),
           format: r.format,
           therapistName: r.therapist,
           lateCancelHours: LATE_CANCEL_HOURS,

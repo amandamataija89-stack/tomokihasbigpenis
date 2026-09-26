@@ -5,7 +5,7 @@ import {
   filterCounts,
   FINISHED,
   listRequests,
-  SESSIONS_PER_CLIENT,
+  sessionLimit,
   STATUSES,
   STATUS_LABELS,
   type Filter,
@@ -23,12 +23,13 @@ export default async function RequestsPage({
   const me = await requireStaff();
   const manager = isManager(me);
   const filters: Filter[] = manager
-    ? ["open", "pool", "awaiting", ...STATUSES, "all"]
-    : ["open", "awaiting", ...STATUSES.filter((s) => s !== "scheduled"), "all", "pool"];
+    ? ["open", "pool", "awaiting", "private", ...STATUSES, "all"]
+    : ["open", "awaiting", "private", ...STATUSES.filter((s) => s !== "scheduled"), "all", "pool"];
   const labels: Record<Filter, string> = {
     open: "Open",
-    pool: manager ? "Pool: nobody available" : "Pool: clients anyone can take",
+    pool: manager ? "To assign" : "Pool: clients anyone can take",
     awaiting: manager ? "Waiting to accept" : "Waiting for my answer",
+    private: manager ? "Private clients" : "My private clients",
     ...STATUS_LABELS,
     all: "All",
   };
@@ -47,7 +48,7 @@ export default async function RequestsPage({
 
   const summary = manager
     ? [
-        counts.pool > 0 && `${counts.pool} in the pool with nobody available: please assign`,
+        counts.pool > 0 && `${counts.pool} waiting for you to assign a counsellor`,
         counts.awaiting > 0 && `${counts.awaiting} waiting for a counsellor to accept`,
       ].filter(Boolean)
     : [counts.awaiting > 0 && `${counts.awaiting} new ${counts.awaiting === 1 ? "client is" : "clients are"} waiting for you to accept or decline`].filter(Boolean);
@@ -91,7 +92,7 @@ export default async function RequestsPage({
               <thead>
                 <tr>
                   <th>Nickname</th>
-                  <th>Company</th>
+                  <th>Client of</th>
                   <th>Language</th>
                   <th>Status</th>
                   <th>Sessions</th>
@@ -113,11 +114,16 @@ export default async function RequestsPage({
                         </div>
                       )}
                     </td>
-                    <td>{r.company_name}</td>
+                    <td>{r.company_name ?? <span className="pill pill-private">Private</span>}</td>
                     <td>{r.language}</td>
                     <td><span className={`pill pill-${r.status}`}>{STATUS_LABELS[r.status]}</span></td>
                     <td className="age">
-                      {r.sessions_total === 0 ? <span className="small">—</span> : `${r.sessions_done} / ${SESSIONS_PER_CLIENT} done`}
+                      {r.sessions_total === 0 ? (
+                        <span className="small">—</span>
+                      ) : (
+                        `${r.sessions_done}${sessionLimit(r.kind) ? ` / ${sessionLimit(r.kind)}` : ""} done`
+                      )}
+                      {r.unpaid > 0 && <div className="overdue">{r.unpaid} unpaid</div>}
                       {r.next_session &&
                         (r.next_session.getTime() < now ? (
                           <div className="overdue">{formatDate(r.next_session)} not marked done</div>
@@ -148,7 +154,11 @@ export default async function RequestsPage({
 // Who has the case, and whether they've accepted it yet.
 function OfferState({ r, manager, now }: { r: RequestRow; manager: boolean; now: number }) {
   if (!r.assigned_to)
-    return FINISHED.includes(r.status) ? <span className="small">—</span> : <span className="overdue">In the pool</span>;
+    return FINISHED.includes(r.status) ? (
+      <span className="small">—</span>
+    ) : (
+      <span className="overdue">{r.kind === "private" ? "Needs assigning" : "In the pool"}</span>
+    );
   const who = manager ? r.assigned_name : "You";
   if (r.accepted_at) return <>{who}{r.status === "new" && <div className="small">accepted</div>}</>;
   const late = r.respond_by && r.respond_by.getTime() < now;

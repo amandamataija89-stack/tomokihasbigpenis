@@ -4,7 +4,8 @@ import { useActionState } from "react";
 import { AGE_RANGES, CONTACT_METHODS, FORMATS, GENDERS, LANGUAGES, TOPICS } from "@/lib/request-form";
 import { submitRequest, type SubmitState } from "./actions";
 
-export function RequestForm({ code }: { code: string }) {
+/** code: the company's code for an EAP request, or null for a private client. */
+export function RequestForm({ code }: { code: string | null }) {
   const [state, action, pending] = useActionState(submitRequest.bind(null, code), {} as SubmitState);
   const e = state.errors ?? {};
   const v = state.values ?? {};
@@ -190,8 +191,8 @@ export function RequestForm({ code }: { code: string }) {
             <input type="checkbox" name="consent" value="yes" {...invalid("consent")} />
             <span>
               I agree that Prague Integration s.r.o. may <b>store the information</b> in this form, including anything
-              about my wellbeing, and <b>share it with the counsellor and coordinator</b> who handle my request. It is
-              never shared with my employer.
+              about my wellbeing, and <b>share it with the counsellor and coordinator</b> who handle my request.
+              {code ? " It is never shared with my employer." : ""}
             </span>
           </label>
           {err("consent")}
