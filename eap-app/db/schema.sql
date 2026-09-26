@@ -185,3 +185,6 @@ END $$;
 -- Payment for private clients' sessions: price in CZK and when it was paid.
 ALTER TABLE client_sessions ADD COLUMN IF NOT EXISTS price_czk integer CHECK (price_czk IS NULL OR price_czk >= 0);
 ALTER TABLE client_sessions ADD COLUMN IF NOT EXISTS paid_at timestamptz;
+
+-- Private clients: the kind of support they asked for (individual, couple, children/teenager, ADHD testing).
+ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS service text NOT NULL DEFAULT '';

@@ -19,9 +19,8 @@ export default function StartPage() {
         </p>
         <h1>Ask for support</h1>
         <p className="lede">
-          Tell us a little about yourself and how you&apos;d like to be contacted. Someone from our team will get
-          back to you within 24 working hours (Monday to Friday) to arrange a first conversation, in English, Czech,
-          Russian, Spanish and more.
+          Tell us a little about yourself and how you&apos;d like to be contacted. One of our counsellors will
+          contact you within 24 hours.
         </p>
       </section>
       <p className="reassure">What you write here is read only by the Prague Integration team, and kept confidential.</p>

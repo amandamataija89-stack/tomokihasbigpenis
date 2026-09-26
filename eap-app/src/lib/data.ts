@@ -41,12 +41,12 @@ export async function insertRequest(companyId: string | null, r: RequestInput): 
   const { rows } = await pool.query<{ id: string }>(
     `INSERT INTO support_requests
        (kind, in_pool, company_id, first_name, full_name, email, phone, contact_method, language, format, topics,
-        message, crisis, age_range, gender, location, consent_at, consent_contact_at)
-     VALUES ($15, $15 = 'private', $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, now(), now())
+        message, crisis, age_range, gender, location, service, consent_at, consent_contact_at)
+     VALUES ($15, $15 = 'private', $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $16, now(), now())
      RETURNING id`,
     [
       companyId, r.firstName, r.fullName, r.email, r.phone, r.contactMethod, r.language, r.format, r.topics,
-      r.message, r.crisis, r.ageRange, r.gender, r.location, companyId ? "eap" : "private",
+      r.message, r.crisis, r.ageRange, r.gender, r.location, companyId ? "eap" : "private", r.service,
     ],
   );
   return rows[0].id;
@@ -67,6 +67,7 @@ export type RequestRow = {
   age_range: string;
   gender: string;
   location: string;
+  service: string; // private clients: the kind of support they asked for
   consent_at: Date;
   consent_contact_at: Date | null;
   status: Status;

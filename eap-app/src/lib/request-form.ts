@@ -5,6 +5,13 @@ export const LANGUAGES = ["English", "Czech", "Russian", "Spanish", "Other"] as 
 export const FORMATS = ["Online", "In person in Prague", "No preference"] as const;
 export const AGE_RANGES = ["18–24", "25–34", "35–44", "45–54", "55–64", "65 or over", "Prefer not to say"] as const;
 export const GENDERS = ["Woman", "Man", "Non-binary", "Another gender", "Prefer not to say"] as const;
+// Private clients choose the kind of support they're booking.
+export const SERVICES = [
+  "Individual counselling",
+  "Couple counselling",
+  "Children or teenager counselling",
+  "ADHD testing",
+] as const;
 export const TOPICS = [
   "Stress or burnout",
   "Anxiety",
@@ -31,6 +38,7 @@ export type RequestInput = {
   ageRange: string;
   gender: string;
   location: string;
+  service: string; // private clients only; "" for EAP
 };
 
 export type FieldErrors = Partial<Record<keyof RequestInput | "consent" | "consentContact", string>>;
@@ -49,7 +57,8 @@ function text(form: FormData, key: string, max: number): string {
   return typeof v === "string" ? v.trim().slice(0, max) : "";
 }
 
-export function validateRequest(form: FormData): ValidationResult {
+/** `askService`: the private form also asks what kind of support they need. */
+export function validateRequest(form: FormData, askService = false): ValidationResult {
   const crisisAnswer = text(form, "crisis", 3);
   const values: Omit<RequestInput, "crisis"> = {
     firstName: text(form, "firstName", 80),
@@ -66,9 +75,12 @@ export function validateRequest(form: FormData): ValidationResult {
     ageRange: text(form, "ageRange", 40),
     gender: text(form, "gender", 40),
     location: text(form, "location", 120),
+    service: askService ? text(form, "service", 60) : "",
   };
   const errors: FieldErrors = {};
 
+  if (askService && !(SERVICES as readonly string[]).includes(values.service))
+    errors.service = "Choose the kind of support you need.";
   if (!values.firstName) errors.firstName = "Enter a nickname: any name you'd like us to call you.";
   if (!EMAIL_RE.test(values.email)) errors.email = "Enter an email address like name@example.com.";
   if (!(CONTACT_METHODS as readonly string[]).includes(values.contactMethod))

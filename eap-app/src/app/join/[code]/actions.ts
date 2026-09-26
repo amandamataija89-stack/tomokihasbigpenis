@@ -30,7 +30,7 @@ export async function submitRequest(rawCode: string | null, _prev: SubmitState, 
   // Bots fill every field, people never see this one.
   if (formData.get("website")) redirect(thanks);
 
-  const result = validateRequest(formData);
+  const result = validateRequest(formData, !company);
   if (!result.ok) return { errors: result.errors, values: result.values };
 
   const id = await insertRequest(company?.id ?? null, result.data);

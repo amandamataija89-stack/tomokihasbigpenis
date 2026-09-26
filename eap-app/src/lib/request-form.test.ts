@@ -76,3 +76,17 @@ describe("validateRequest", () => {
     expect(!noContact.ok && Object.keys(noContact.errors)).toEqual(["consentContact"]);
   });
 });
+
+describe("private form", () => {
+  it("asks what kind of support they need", () => {
+    const missing = validateRequest(form(valid), true);
+    expect(missing.ok).toBe(false);
+    if (!missing.ok) expect(missing.errors.service).toBeTruthy();
+    const ok = validateRequest(form({ ...valid, service: "Couple counselling" }), true);
+    expect(ok.ok && ok.data.service).toBe("Couple counselling");
+  });
+  it("ignores it on the EAP form", () => {
+    const r = validateRequest(form({ ...valid, service: "ADHD testing" }));
+    expect(r.ok && r.data.service).toBe("");
+  });
+});

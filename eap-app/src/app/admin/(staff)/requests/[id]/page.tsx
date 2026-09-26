@@ -111,6 +111,11 @@ export default async function RequestPage({
           <section className="card stack">
             <h2>Request</h2>
             <dl className="facts">
+              {r.service && (
+                <>
+                  <dt>Support needed</dt><dd><b>{r.service}</b></dd>
+                </>
+              )}
               <dt>Urgent?</dt><dd>{r.crisis ? <b className="overdue">Yes, crisis</b> : "No"}</dd>
               <dt>Nickname</dt><dd>{r.first_name}</dd>
               <dt>Full name</dt><dd>{r.full_name || <span className="small">Not given</span>}</dd>
