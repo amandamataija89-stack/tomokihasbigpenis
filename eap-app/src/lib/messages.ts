@@ -1,9 +1,9 @@
 import { createHash, randomBytes } from "node:crypto";
 import { pool } from "./db";
 import { newMessageForClient, newReplyForStaff, sendEmail } from "./email";
+import { appUrl } from "./app-url";
 
 const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
-const appUrl = () => process.env.APP_URL ?? "http://localhost:3000";
 
 export const MAX_MESSAGE_LENGTH = 4000;
 // A link stops working this long after the case is completed or closed.

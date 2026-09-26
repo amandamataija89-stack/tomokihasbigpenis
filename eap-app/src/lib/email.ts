@@ -1,5 +1,6 @@
 // Sends mail through Resend (the same provider the outreach scripts use).
 // Without RESEND_API_KEY the message is logged instead, for local development.
+import { appUrl } from "./app-url";
 
 type Mail = { to: string; subject: string; text: string };
 
@@ -50,7 +51,6 @@ export function emailProblem(err: unknown): string {
   return `The email couldn't be sent. Resend said: "${said}"`;
 }
 
-const appUrl = () => process.env.APP_URL ?? "http://localhost:3000";
 
 // Deliberately contains nothing the person wrote: email is not where health information should travel.
 export function teamAlert(companyName: string, requestId: string, assignedName: string | null, crisis: boolean): Mail {
