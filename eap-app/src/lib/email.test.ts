@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { emailProblem, employeeConfirmation, newMessageForClient, newReplyForStaff, sessionConfirmation, sessionReminder } from "./email";
+import { emailProblem, keyHint, resendKey, employeeConfirmation, newMessageForClient, newReplyForStaff, sessionConfirmation, sessionReminder } from "./email";
 
 const base = {
   to: "jana@example.com",
@@ -77,5 +77,17 @@ describe("emailProblem", () => {
   });
   it("never shows a key", () => {
     expect(emailProblem(new Error("Resend returned 500: bad re_abc123XYZ"))).not.toContain("re_abc123XYZ");
+  });
+});
+
+describe("resendKey", () => {
+  it("picks the key out of a messy paste", () => {
+    expect(resendKey(' "RESEND_API_KEY=re_Ab12_cd34"\n')).toBe("re_Ab12_cd34");
+    expect(resendKey(" re_Ab12_cd34 ")).toBe("re_Ab12_cd34");
+  });
+  it("describes a key without revealing it", () => {
+    expect(keyHint("re_Ab12_cd34XYZ")).toContain('"re_Ab1"');
+    expect(keyHint("re_Ab12_cd34XYZ")).not.toContain("cd34");
+    expect(keyHint("prague-eap")).toMatch(/doesn't start with "re_"/);
   });
 });
