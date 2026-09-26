@@ -12,6 +12,7 @@ import {
   type RequestRow,
 } from "@/lib/data";
 import { takeCase } from "../actions";
+import { adminDeadline, counsellorMonth, currentMonth, monthLabel, openAdmin } from "@/lib/month-end";
 import { age, formatDate, isOverdue } from "../format";
 
 export default async function RequestsPage({
@@ -43,7 +44,12 @@ export default async function RequestsPage({
       })
     : [];
   const onlyFor = manager ? undefined : me.id;
-  const [requests, counts] = await Promise.all([listRequests(filter, onlyFor), filterCounts(onlyFor)]);
+  const [requests, counts, month, open] = await Promise.all([
+    listRequests(filter, onlyFor),
+    filterCounts(onlyFor),
+    manager ? null : counsellorMonth(me.id, currentMonth()),
+    manager ? null : openAdmin(me.id),
+  ]);
   const now = Date.now();
 
   const summary = manager
@@ -71,6 +77,8 @@ export default async function RequestsPage({
           counsellors now that places have opened.
         </p>
       )}
+
+      {month && open && <MyMonth month={month} open={open} />}
 
       <nav className="tabs" aria-label="Filter">
         {filters.map((f) => (
@@ -195,5 +203,54 @@ function PoolForCounsellors({ requests, now }: { requests: RequestRow[]; now: nu
         </form>
       ))}
     </div>
+  );
+}
+
+const czk = (n: number) => `${n.toLocaleString("cs-CZ")} CZK`;
+
+// A counsellor's month: their sessions and amounts, and the admin to finish before invoices are made on the 1st.
+function MyMonth({
+  month,
+  open,
+}: {
+  month: Awaited<ReturnType<typeof counsellorMonth>>;
+  open: Awaited<ReturnType<typeof openAdmin>>;
+}) {
+  const todo = open.pastUnmarked.length + open.noType.length + open.noPrice.length;
+  return (
+    <section className="card stack">
+      <h2>My month: {monthLabel(currentMonth())}</h2>
+      <dl className="totals">
+        <div><dt>EAP sessions held</dt><dd><b>{month.eapSessions}</b></dd></div>
+        <div><dt>Private sessions held</dt><dd><b>{month.privateSessions}</b> · {czk(month.privateAmount)}</dd></div>
+        <div><dt>Of which paid</dt><dd>{czk(month.paidAmount)}</dd></div>
+      </dl>
+      <p className="small">Amounts include VAT. Late cancellations count as sessions held.</p>
+      {todo === 0 ? (
+        <p className="flash">All your admin is done for now.</p>
+      ) : (
+        <div className="notice stack" style={{ gap: 6 }}>
+          <b>To finish by {adminDeadline()}: invoices are made from this on the 1st.</b>
+          <ul className="small" style={{ margin: 0 }}>
+            {open.pastUnmarked.map((p) => (
+              <li key={`${p.requestId}-${p.startsAt.toISOString()}`}>
+                <Link href={`/admin/requests/${p.requestId}#sessions`}>{p.firstName}</Link>: session on {formatDate(p.startsAt)}{" "}
+                not marked done, late cancellation or removed
+              </li>
+            ))}
+            {open.noType.map((c) => (
+              <li key={`t-${c.requestId}`}>
+                <Link href={`/admin/requests/${c.requestId}#price`}>{c.firstName}</Link>: choose the type of counselling
+              </li>
+            ))}
+            {open.noPrice.map((c) => (
+              <li key={`p-${c.requestId}`}>
+                <Link href={`/admin/requests/${c.requestId}#price`}>{c.firstName}</Link>: choose the session price
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </section>
   );
 }

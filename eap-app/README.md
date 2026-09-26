@@ -51,23 +51,31 @@ Everything else is the same: consents, messages, session emails and reminders, c
 
 ### Invoicing workflow (private clients)
 
-1. **Type of counselling** (on the client's page; the client also picks it when signing up).
-2. **Price**: the counsellor picks the client's price from the type's range in the dropdown (without VAT;
-   e.g. Individual 900–2,300, Couples 2,000–3,000, Children/teenagers 1,400–1,600 CZK, all + 21 % VAT).
-   It applies to new sessions and to booked sessions not yet paid.
-3. **Invoices**:
-   - **Monthly billing** page → **Create monthly invoices**: one invoice per client for the month's sessions
-     held (late cancellations included) that aren't paid or invoiced yet. Each shows the item
-     "Mental Health Counselling Services – Individual/Couples/…", the number of sessions × the client's
-     price, the session dates, the client's **variable symbol**, a **QR Platba** code, and is **due 14 days**
-     after it's created. Then **Email invoices to clients** (PDF and QR code attached).
-   - Or on a client's page: tick sessions → **Create invoice to pay**, or **Record payment received**.
-   - **Mark as paid** on the invoice when the money arrives.
-   - **Late payment**: an unpaid invoice past its due date shows in red on the client's page and on
-     Monthly billing; the hourly job emails the client one payment reminder (with the QR code) and tells
-     the coordinator.
-   - **Export**: all invoices for a month (Monthly billing) or a client (their page) as one PDF, and a CSV
-     list for the accountant (number, customer, variable symbol, dates, base, VAT, total, status).
+Who does what: **counsellors** choose each client's type of counselling and price, and mark sessions done
+(or late-cancelled) by the end of the month; they see their sessions and amounts, never invoices.
+**Coordinators and admins** handle invoices and payments.
+
+1. **Type of counselling** and **price** on the client's page (the price from the type's range, without VAT:
+   Individual 900–2,300, Couples 2,000–3,000, Children/teenagers 1,400–1,600 CZK, + 21 % VAT).
+2. **Running invoice**: each session marked done or late-cancelled goes straight onto the client's invoice
+   for that month (a draft, shown on their page with a PDF preview). Coordinators can **add any item**
+   (e.g. a report; a minus amount for a discount), change the amount, take a session off, or **Issue now**.
+   Unpaid invoices follow price and session changes automatically; one already emailed is sent again.
+3. **Month end**: counsellors see "My month" (sessions, amounts, and admin still to do) and get a reminder
+   email in the last 3 days of the month if anything's missing.
+4. **Automatically, from the 1st**: last month's invoices are issued (number, due date 14 days later, the
+   client's variable symbol, QR Platba code). **From the 3rd** they're emailed to the clients (PDF + QR),
+   appear on the client's private page, and the admin gets the month's invoices as one PDF and a CSV.
+   Automatic invoicing starts with the month it was switched on.
+5. **Payments**: upload the bank statement (CSV from Raiffeisenbank online banking) on Monthly billing:
+   payments with a client's variable symbol and the invoice amount mark invoices paid; uploading twice is
+   safe; anything else is listed to check. Invoices can also be marked paid by hand.
+6. **Late payment**: an invoice past its due date and not marked paid turns red, and the coordinator is
+   emailed to check the statement. For any still unpaid, **Send payment reminder** on the client's page emails
+   the client (with the QR code).
+
+Monthly billing also has buttons to issue and email invoices sooner, and exports (one PDF, or CSV) per month
+or per client.
 - Each private client gets their own **variable symbol** (from 100001), used on all their invoices so
   their payments can be matched. Invoices are made out to the client's full name and residential address
   from the sign-up form, unless other invoice details are entered on their page.

@@ -8,7 +8,14 @@ import {
   createInvoiceToPay,
   createMonthlyInvoices,
   deletePayment,
+  addHeldSessionsToInvoices,
+  addInvoiceItem,
+  issueInvoice,
   markInvoicePaid,
+  removeInvoiceItem,
+  recomputeClientInvoices,
+  removeFromInvoice,
+  setInvoiceAmount,
   invoiceSettings,
   parsePrice,
   PAYMENT_METHODS,
@@ -34,6 +41,13 @@ async function requirePrivateCase(requestId: string): Promise<Staff> {
   );
   const r = rows[0];
   if (!r || r.kind !== "private" || (!isManager(staff) && r.assigned_to !== staff.id)) redirect("/admin");
+  return staff;
+}
+
+// Invoices and payments are handled by coordinators and admins; counsellors only see the amounts.
+async function requireBillingManager(requestId: string): Promise<Staff> {
+  const staff = await requirePrivateCase(requestId);
+  if (!isManager(staff)) redirect(`/admin/requests/${requestId}`);
   return staff;
 }
 
@@ -108,6 +122,8 @@ export async function chooseClientPrice(requestId: string, formData: FormData) {
     "UPDATE client_sessions SET price_czk = $2 WHERE request_id = $1 AND paid_at IS NULL",
     [requestId, gross],
   );
+  await recomputeClientInvoices(requestId); // unpaid invoices follow the new price
+  await addHeldSessionsToInvoices(requestId); // completed sessions that were waiting for a price
   const vat = settings.vatPayer ? ` + ${settings.vatRate} % VAT = ${czk(gross)}` : "";
   await note(
     requestId,
@@ -119,7 +135,7 @@ export async function chooseClientPrice(requestId: string, formData: FormData) {
 
 /** Who the client's invoices are made out to. */
 export async function saveClientBilling(requestId: string, formData: FormData) {
-  const staff = await requirePrivateCase(requestId);
+  const staff = await requireBillingManager(requestId);
   const b = billingFrom(formData);
   if (b.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(b.email)) back(requestId, "email");
   await pool.query(
@@ -133,7 +149,7 @@ export async function saveClientBilling(requestId: string, formData: FormData) {
 
 /** One payment for several sessions at once (or just one). */
 export async function recordSessionsPayment(requestId: string, formData: FormData) {
-  const staff = await requirePrivateCase(requestId);
+  const staff = await requireBillingManager(requestId);
   const sessionIds = formData.getAll("session").map(String).filter((id) => /^[0-9a-f-]{36}$/i.test(id));
   if (!sessionIds.length) back(requestId, "nosessions");
   const amount = parsePrice(formData.get("amount"));
@@ -161,7 +177,7 @@ export async function recordSessionsPayment(requestId: string, formData: FormDat
 
 /** A prepaid package of sessions. */
 export async function recordPackagePayment(requestId: string, formData: FormData) {
-  const staff = await requirePrivateCase(requestId);
+  const staff = await requireBillingManager(requestId);
   const sessions = Number(formData.get("sessions"));
   const price = parsePrice(formData.get("packagePrice"));
   const paidOn = dateFrom(formData);
@@ -191,7 +207,7 @@ export async function recordPackagePayment(requestId: string, formData: FormData
 }
 
 export async function removePayment(requestId: string, paymentId: string) {
-  const staff = await requirePrivateCase(requestId);
+  const staff = await requireBillingManager(requestId);
   const { rows } = await pool.query<{ amount_czk: number; invoice_number: string | null }>(
     "SELECT amount_czk, invoice_number FROM payments WHERE id = $1 AND request_id = $2",
     [paymentId, requestId],
@@ -207,7 +223,7 @@ export async function removePayment(requestId: string, paymentId: string) {
 
 /** Emails the invoice PDF (with the QR code if it's to pay) to the billing email, or the client's email. */
 export async function emailInvoice(requestId: string, paymentId: string) {
-  await requirePrivateCase(requestId);
+  await requireBillingManager(requestId);
   const { rowCount } = await pool.query("SELECT 1 FROM payments WHERE id = $1 AND request_id = $2", [paymentId, requestId]);
   if (!rowCount) back(requestId, "missing");
   // Loaded here so the fonts are only read when an invoice is actually made.
@@ -223,7 +239,7 @@ export async function emailInvoice(requestId: string, paymentId: string) {
 
 /** An invoice to pay for the ticked sessions, due in 14 days; emailed straight away if asked. */
 export async function createInvoiceAction(requestId: string, formData: FormData) {
-  const staff = await requirePrivateCase(requestId);
+  const staff = await requireBillingManager(requestId);
   const sessionIds = formData.getAll("session").map(String).filter((id) => /^[0-9a-f-]{36}$/i.test(id));
   if (!sessionIds.length) back(requestId, "nosessions");
   const amount = parsePrice(formData.get("amount"));
@@ -235,12 +251,58 @@ export async function createInvoiceAction(requestId: string, formData: FormData)
     [id],
   );
   await note(requestId, staff.id, `Invoice ${rows[0].invoice_number} issued for ${czk(rows[0].amount_czk)}, to pay within 14 days.`);
-  if (formData.get("send") === "yes") await emailInvoice(requestId, id!);
+  if (formData.get("send") === "yes") await emailOrFlag(requestId, id!);
+  back(requestId, "invoiced");
+}
+
+// Emails an invoice; on failure, goes back to the page with the reason.
+async function emailOrFlag(requestId: string, paymentId: string) {
+  const { sendInvoice } = await import("@/lib/invoice-mail");
+  try {
+    await sendInvoice(paymentId);
+  } catch (err) {
+    console.error("EAP invoice email failed:", err);
+    redirect(`/admin/requests/${requestId}?billing=emailfailed&why=${encodeURIComponent(emailProblem(err))}#payments`);
+  }
+}
+
+/** Adds any line to an unpaid invoice (amount with VAT; a minus sign for a discount). */
+export async function addItemAction(requestId: string, paymentId: string, formData: FormData) {
+  const staff = await requireBillingManager(requestId);
+  const description = String(formData.get("description") ?? "").trim().slice(0, 200);
+  const raw = String(formData.get("itemAmount") ?? "").trim();
+  const negative = raw.startsWith("-");
+  const amount = parsePrice(raw.replace(/^-/, ""));
+  if (!description || amount === undefined || amount === null) back(requestId, "item");
+  const value = negative ? -amount! : amount!;
+  await addInvoiceItem(paymentId, description, value);
+  await note(requestId, staff.id, `Added to the invoice: ${description}, ${czk(value)}.`);
+  back(requestId, "edited");
+}
+
+export async function removeItemAction(requestId: string, paymentId: string, itemId: string) {
+  const staff = await requireBillingManager(requestId);
+  await removeInvoiceItem(paymentId, itemId);
+  await note(requestId, staff.id, "Removed a line from the invoice.");
+  back(requestId, "edited");
+}
+
+/** Issues a running monthly invoice now (instead of on the 1st), and emails it if asked. */
+export async function issueNowAction(requestId: string, paymentId: string, formData: FormData) {
+  const staff = await requireBillingManager(requestId);
+  const { rows } = await pool.query<{ amount_czk: number }>(
+    "SELECT amount_czk FROM payments WHERE id = $1 AND request_id = $2 AND paid_on IS NULL AND invoice_number IS NULL",
+    [paymentId, requestId],
+  );
+  if (!rows[0]) back(requestId, "missing");
+  const number = await issueInvoice(paymentId);
+  await note(requestId, staff.id, `Invoice ${number} issued early for ${czk(rows[0].amount_czk)}, to pay within 14 days.`);
+  if (formData.get("send") === "yes") await emailOrFlag(requestId, paymentId);
   back(requestId, "invoiced");
 }
 
 export async function markPaidAction(requestId: string, paymentId: string, formData: FormData) {
-  const staff = await requirePrivateCase(requestId);
+  const staff = await requireBillingManager(requestId);
   const paidOn = dateFrom(formData);
   if (!paidOn) back(requestId, "date");
   if (await markInvoicePaid(requestId, paymentId, paidOn!, methodFrom(formData))) {
@@ -251,6 +313,67 @@ export async function markPaidAction(requestId: string, paymentId: string, formD
     await note(requestId, staff.id, `Invoice ${rows[0].invoice_number} marked paid (${czk(rows[0].amount_czk)}).`);
   }
   back(requestId, "markedpaid");
+}
+
+/** After checking the bank statement: emails the client a payment reminder with the QR code. */
+export async function sendReminderAction(requestId: string, paymentId: string) {
+  await requireBillingManager(requestId);
+  const { rowCount } = await pool.query("SELECT 1 FROM payments WHERE id = $1 AND request_id = $2 AND paid_on IS NULL", [paymentId, requestId]);
+  if (!rowCount) back(requestId, "missing");
+  const { sendPaymentReminder } = await import("@/lib/invoice-mail");
+  try {
+    await sendPaymentReminder(paymentId);
+  } catch (err) {
+    console.error("EAP payment reminder failed:", err);
+    redirect(`/admin/requests/${requestId}?billing=emailfailed&why=${encodeURIComponent(emailProblem(err))}#payments`);
+  }
+  back(requestId, "reminded");
+}
+
+/** A coordinator sets an unpaid invoice's amount; empty lets it follow the sessions again. */
+export async function setInvoiceAmountAction(requestId: string, paymentId: string, formData: FormData) {
+  const staff = await requireBillingManager(requestId);
+  const amount = parsePrice(formData.get("invoiceAmount"));
+  if (amount === undefined) back(requestId, "amount");
+  const { rowCount } = await pool.query("SELECT 1 FROM payments WHERE id = $1 AND request_id = $2 AND paid_on IS NULL", [paymentId, requestId]);
+  if (!rowCount) back(requestId, "missing");
+  await setInvoiceAmount(paymentId, amount ?? null);
+  await note(requestId, staff.id, amount === null ? "Invoice amount set back to follow its sessions." : `Invoice amount set to ${czk(amount!)}.`);
+  back(requestId, "edited");
+}
+
+/** Takes one session off its unpaid invoice. */
+export async function takeOffInvoiceAction(requestId: string, sessionId: string) {
+  const staff = await requireBillingManager(requestId);
+  await removeFromInvoice(sessionId);
+  await note(requestId, staff.id, "Session taken off its invoice.");
+  redirect(`/admin/requests/${requestId}#sessions`);
+}
+
+// ---- Bank statement (coordinators and admins) ---------------------------------------------
+
+/** Reads an uploaded bank statement CSV and marks matching invoices paid. The result shows on Monthly billing. */
+export async function importStatementAction(formData: FormData) {
+  await requireManager();
+  const file = formData.get("statement");
+  if (!(file instanceof File) || file.size === 0) redirect("/admin/billing?bank=nofile");
+  if ((file as File).size > 5_000_000) redirect("/admin/billing?bank=toobig");
+  const { decodeStatement, importStatement, parseStatement } = await import("@/lib/bank-statement");
+  let result;
+  try {
+    const transactions = parseStatement(decodeStatement(new Uint8Array(await (file as File).arrayBuffer())));
+    result = await importStatement(transactions);
+  } catch (err) {
+    const why = err instanceof Error ? err.message : "The file couldn't be read.";
+    redirect(`/admin/billing?bank=error&why=${encodeURIComponent(why.slice(0, 300))}`);
+  }
+  await pool.query(
+    `INSERT INTO app_state (key, value) VALUES ('last_bank_import', $1)
+     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+    [JSON.stringify({ at: new Date().toISOString(), ...result })],
+  );
+  revalidatePath("/admin/billing");
+  redirect("/admin/billing?bank=done#bank");
 }
 
 // ---- Monthly invoicing (coordinators and admins) -------------------------------------------
@@ -265,10 +388,10 @@ export async function createMonthlyInvoicesAction(formData: FormData) {
   const staff = await requireManager();
   const month = monthOf(formData);
   if (!month) redirect("/admin/billing");
-  const { created, withoutPrice } = await createMonthlyInvoices(month!, staff.id);
+  const { created, updated, withoutPrice } = await createMonthlyInvoices(month!, staff.id);
   for (const c of created)
     await note(c.requestId, staff.id, `Monthly invoice for ${month} issued: ${c.sessions} session${c.sessions === 1 ? "" : "s"}, ${czk(c.amount)}.`);
-  redirect(`/admin/billing?month=${month}&created=${created.length}&noprice=${withoutPrice.length}`);
+  redirect(`/admin/billing?month=${month}&created=${created.length + updated.length}&noprice=${withoutPrice.length}`);
 }
 
 /** Emails every invoice for the month that's still to pay and hasn't been emailed yet. */

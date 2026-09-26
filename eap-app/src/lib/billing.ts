@@ -96,20 +96,24 @@ export type Payment = {
   period: string | null; // 'YYYY-MM' for a monthly invoice
   emailed_at: Date | null;
   overdue_reminded_at: Date | null;
+  client_reminded_at: Date | null;
   method: string;
   invoice_number: string | null;
   invoiced_at: Date | null;
   created_at: Date;
   package_sessions: number | null; // set when the payment bought a package
   session_ids: string[];
+  items: { id: string; description: string; amount_czk: number }[]; // extra lines added by a coordinator
 };
 
 export async function listPayments(requestId: string): Promise<Payment[]> {
   const { rows } = await pool.query<Payment>(
     `SELECT p.id, p.amount_czk, to_char(p.paid_on, 'YYYY-MM-DD') AS paid_on, to_char(p.due_on, 'YYYY-MM-DD') AS due_on,
-       p.period, p.emailed_at, p.overdue_reminded_at, p.method, p.invoice_number, p.invoiced_at, p.created_at,
+       p.period, p.emailed_at, p.overdue_reminded_at, p.client_reminded_at, p.method, p.invoice_number, p.invoiced_at, p.created_at,
        (SELECT sessions FROM packages WHERE payment_id = p.id LIMIT 1) AS package_sessions,
-       COALESCE((SELECT array_agg(id ORDER BY starts_at) FROM client_sessions WHERE payment_id = p.id), '{}') AS session_ids
+       COALESCE((SELECT array_agg(id ORDER BY starts_at) FROM client_sessions WHERE payment_id = p.id), '{}') AS session_ids,
+       COALESCE((SELECT json_agg(json_build_object('id', i.id, 'description', i.description, 'amount_czk', i.amount_czk)
+                 ORDER BY i.created_at) FROM invoice_items i WHERE i.payment_id = p.id), '[]') AS items
      FROM payments p WHERE p.request_id = $1 ORDER BY p.paid_on DESC, p.created_at DESC`,
     [requestId],
   );
@@ -392,6 +396,8 @@ export async function createInvoiceToPay(p: {
   staffId: string | null;
   period?: string;
 }): Promise<string | null> {
+  // A typed amount stays; otherwise the amount follows the sessions (see recomputeInvoice).
+  const manual = p.amount !== null;
   const id = await inTransaction(async (c) => {
     const { rows: sessions } = await c.query<{ id: string; price_czk: number | null }>(
       `SELECT id, price_czk FROM client_sessions
@@ -401,9 +407,9 @@ export async function createInvoiceToPay(p: {
     if (!sessions.length) return null;
     const amount = p.amount ?? sessions.reduce((sum, s) => sum + (s.price_czk ?? 0), 0);
     const { rows } = await c.query<{ id: string }>(
-      `INSERT INTO payments (request_id, amount_czk, paid_on, method, period, staff_id)
-       VALUES ($1, $2, NULL, 'Bank transfer', $3, $4) RETURNING id`,
-      [p.requestId, amount, p.period ?? null, p.staffId],
+      `INSERT INTO payments (request_id, amount_czk, paid_on, method, period, staff_id, amount_manual)
+       VALUES ($1, $2, NULL, 'Bank transfer', $3, $4, $5) RETURNING id`,
+      [p.requestId, amount, p.period ?? null, p.staffId, manual],
     );
     await c.query("UPDATE client_sessions SET payment_id = $2 WHERE id = ANY($1::uuid[])", [
       sessions.map((s) => s.id),
@@ -429,20 +435,100 @@ export async function markInvoicePaid(requestId: string, paymentId: string, paid
   });
 }
 
+/**
+ * Keeps an unpaid invoice in step with its sessions: its amount becomes the sum of their prices (unless a
+ * coordinator set the amount). An invoice left with no sessions is deleted if it was never emailed. An
+ * invoice already emailed whose amount changes is marked to be emailed again. Returns the new amount,
+ * or null if the invoice was deleted or isn't open.
+ */
+export async function recomputeInvoice(paymentId: string): Promise<number | null> {
+  const { rows } = await pool.query<{
+    request_id: string;
+    amount_czk: number;
+    amount_manual: boolean;
+    emailed_at: Date | null;
+    invoice_number: string | null;
+    sessions: number;
+    total: number;
+  }>(
+    `SELECT p.request_id, p.amount_czk, p.amount_manual, p.emailed_at, p.invoice_number,
+       (SELECT count(*)::int FROM client_sessions WHERE payment_id = p.id)
+         + (SELECT count(*)::int FROM invoice_items WHERE payment_id = p.id) AS sessions,
+       (SELECT COALESCE(sum(price_czk), 0)::int FROM client_sessions WHERE payment_id = p.id)
+         + (SELECT COALESCE(sum(amount_czk), 0)::int FROM invoice_items WHERE payment_id = p.id) AS total
+     FROM payments p WHERE p.id = $1 AND p.paid_on IS NULL
+       AND NOT EXISTS (SELECT 1 FROM packages WHERE payment_id = p.id)`,
+    [paymentId],
+  );
+  const p = rows[0];
+  if (!p) return null;
+  const say = (body: string) => pool.query("INSERT INTO request_notes (request_id, body) VALUES ($1, $2)", [p.request_id, body]);
+  if (p.sessions === 0 && !p.emailed_at && !p.amount_manual) {
+    await pool.query("DELETE FROM payments WHERE id = $1", [paymentId]);
+    if (p.invoice_number) await say(`Invoice ${p.invoice_number} deleted: it no longer covers any session.`);
+    return null;
+  }
+  const amount = p.amount_manual ? p.amount_czk : p.total;
+  if (amount === p.amount_czk) return amount;
+  await pool.query(
+    "UPDATE payments SET amount_czk = $2, emailed_at = NULL, overdue_reminded_at = NULL WHERE id = $1",
+    [paymentId, amount],
+  );
+  // A draft (no number yet) just follows along quietly.
+  if (!p.invoice_number) return amount;
+  await say(
+    `Invoice ${p.invoice_number} updated automatically: ${p.amount_czk} → ${amount} CZK.${p.emailed_at ? " It will be emailed to the client again." : ""}`,
+  );
+  return amount;
+}
+
+/** recomputeInvoice for every unpaid invoice of a client (e.g. after their price changed). */
+export async function recomputeClientInvoices(requestId: string): Promise<void> {
+  const { rows } = await pool.query<{ id: string }>(
+    "SELECT id FROM payments WHERE request_id = $1 AND paid_on IS NULL",
+    [requestId],
+  );
+  for (const r of rows) await recomputeInvoice(r.id);
+}
+
+/** Takes a session off its unpaid invoice (which then updates). */
+export async function removeFromInvoice(sessionId: string): Promise<void> {
+  const { rows } = await pool.query<{ payment_id: string }>(
+    `UPDATE client_sessions cs SET payment_id = NULL FROM payments p
+     WHERE cs.id = $1 AND p.id = cs.payment_id AND p.paid_on IS NULL
+     RETURNING p.id AS payment_id`,
+    [sessionId],
+  );
+  if (rows[0]) await recomputeInvoice(rows[0].payment_id);
+}
+
+/** A coordinator sets an invoice's amount, or (null) lets it follow the sessions again. */
+export async function setInvoiceAmount(paymentId: string, amount: number | null): Promise<void> {
+  await pool.query(
+    "UPDATE payments SET amount_manual = $2, amount_czk = COALESCE($3, amount_czk) WHERE id = $1 AND paid_on IS NULL",
+    [paymentId, amount !== null, amount],
+  );
+  if (amount === null) await recomputeInvoice(paymentId);
+  else await pool.query("UPDATE payments SET emailed_at = NULL WHERE id = $1 AND emailed_at IS NOT NULL", [paymentId]);
+}
+
 export type MonthlyInvoiceResult = { requestId: string; firstName: string; paymentId: string; sessions: number; amount: number };
 
 /**
  * One invoice per private client for the sessions held in `month` (late cancellations included)
- * that aren't paid or invoiced yet. Sessions without a price are left out and reported.
+ * that aren't paid or invoiced yet. A client who already has an unpaid invoice for that month gets the
+ * new sessions added to it (it's then emailed again). Sessions without a price are left out and reported.
  */
 export async function createMonthlyInvoices(
   month: string,
-  staffId: string,
-): Promise<{ created: MonthlyInvoiceResult[]; withoutPrice: { requestId: string; firstName: string; sessions: number }[] }> {
-  const { rows } = await pool.query<{ request_id: string; first_name: string; ids: string[]; no_price: number }>(
+  staffId: string | null,
+): Promise<{ created: MonthlyInvoiceResult[]; updated: MonthlyInvoiceResult[]; withoutPrice: { requestId: string; firstName: string; sessions: number }[] }> {
+  const { rows } = await pool.query<{ request_id: string; first_name: string; ids: string[]; no_price: number; existing: string | null }>(
     `SELECT r.id AS request_id, r.first_name,
        COALESCE(array_agg(cs.id ORDER BY cs.starts_at) FILTER (WHERE cs.price_czk IS NOT NULL), '{}') AS ids,
-       count(*) FILTER (WHERE cs.price_czk IS NULL)::int AS no_price
+       count(*) FILTER (WHERE cs.price_czk IS NULL)::int AS no_price,
+       (SELECT p.id FROM payments p WHERE p.request_id = r.id AND p.period = $1 AND p.paid_on IS NULL
+        ORDER BY p.created_at LIMIT 1) AS existing
      FROM client_sessions cs JOIN support_requests r ON r.id = cs.request_id
      WHERE r.kind = 'private' AND cs.done_at IS NOT NULL AND cs.paid_at IS NULL AND cs.payment_id IS NULL
        AND to_char(cs.starts_at AT TIME ZONE 'Europe/Prague', 'YYYY-MM') = $1
@@ -450,15 +536,36 @@ export async function createMonthlyInvoices(
     [month],
   );
   const created: MonthlyInvoiceResult[] = [];
+  const updated: MonthlyInvoiceResult[] = [];
   for (const r of rows) {
     if (!r.ids.length) continue;
-    const paymentId = await createInvoiceToPay({ requestId: r.request_id, sessionIds: r.ids, amount: null, staffId, period: month });
+    let paymentId = r.existing;
+    if (paymentId) {
+      await pool.query("UPDATE client_sessions SET payment_id = $2 WHERE id = ANY($1::uuid[]) AND payment_id IS NULL", [r.ids, paymentId]);
+      await recomputeInvoice(paymentId);
+    } else paymentId = await createInvoiceToPay({ requestId: r.request_id, sessionIds: r.ids, amount: null, staffId, period: month });
     if (!paymentId) continue;
     const { rows: p } = await pool.query<{ amount_czk: number }>("SELECT amount_czk FROM payments WHERE id = $1", [paymentId]);
-    created.push({ requestId: r.request_id, firstName: r.first_name, paymentId, sessions: r.ids.length, amount: p[0].amount_czk });
+    if (!p[0]) continue;
+    (r.existing ? updated : created).push({ requestId: r.request_id, firstName: r.first_name, paymentId, sessions: r.ids.length, amount: p[0].amount_czk });
+  }
+  // Drafts built up during the month (sessions added as they were completed) are issued now.
+  const { rows: drafts } = await pool.query<{ id: string; request_id: string; first_name: string; sessions: number }>(
+    `SELECT p.id, p.request_id, r.first_name, (SELECT count(*)::int FROM client_sessions WHERE payment_id = p.id) AS sessions
+     FROM payments p JOIN support_requests r ON r.id = p.request_id
+     WHERE p.period = $1 AND p.paid_on IS NULL AND p.invoice_number IS NULL`,
+    [month],
+  );
+  for (const d of drafts) {
+    if ((await recomputeInvoice(d.id)) === null) continue; // an empty draft is dropped
+    await issueInvoice(d.id);
+    const { rows: p } = await pool.query<{ amount_czk: number }>("SELECT amount_czk FROM payments WHERE id = $1", [d.id]);
+    if (!created.some((c) => c.paymentId === d.id) && !updated.some((c) => c.paymentId === d.id))
+      created.push({ requestId: d.request_id, firstName: d.first_name, paymentId: d.id, sessions: d.sessions, amount: p[0].amount_czk });
   }
   return {
     created,
+    updated,
     withoutPrice: rows.filter((r) => r.no_price > 0).map((r) => ({ requestId: r.request_id, firstName: r.first_name, sessions: r.no_price })),
   };
 }
@@ -496,4 +603,87 @@ export function qrPlatba(p: { iban: string; amountCzk: number; variableSymbol: s
     `X-VS:${p.variableSymbol.replace(/\D/g, "").slice(0, 10)}`,
     `MSG:${clean(p.message)}`,
   ].join("*");
+}
+
+// ---- Running monthly invoice ---------------------------------------------------------------
+
+const monthOfSession = (d: Date) =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Prague", year: "numeric", month: "2-digit" }).format(d);
+
+/**
+ * When a private client's session is completed (or late-cancelled), it goes straight onto their invoice for
+ * that month: the unpaid one if there is one, else a new draft (numbered when it's issued on the 1st).
+ * Sessions without a price wait until the client's price is chosen. Returns the invoice id, if any.
+ */
+export async function addToMonthlyInvoice(sessionId: string): Promise<string | null> {
+  const { rows } = await pool.query<{ request_id: string; starts_at: Date; price_czk: number | null; kind: string }>(
+    `SELECT cs.request_id, cs.starts_at, cs.price_czk, r.kind FROM client_sessions cs
+     JOIN support_requests r ON r.id = cs.request_id
+     WHERE cs.id = $1 AND cs.done_at IS NOT NULL AND cs.paid_at IS NULL AND cs.payment_id IS NULL`,
+    [sessionId],
+  );
+  const s = rows[0];
+  if (!s || s.kind !== "private" || s.price_czk === null) return null;
+  const period = monthOfSession(s.starts_at);
+  const id = await inTransaction(async (c) => {
+    // One running invoice per client and month.
+    await c.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`invoice:${s.request_id}:${period}`]);
+    const { rows: open } = await c.query<{ id: string }>(
+      "SELECT id FROM payments WHERE request_id = $1 AND period = $2 AND paid_on IS NULL ORDER BY created_at LIMIT 1",
+      [s.request_id, period],
+    );
+    let paymentId = open[0]?.id;
+    if (!paymentId) {
+      const { rows: made } = await c.query<{ id: string }>(
+        `INSERT INTO payments (request_id, amount_czk, paid_on, method, period) VALUES ($1, 0, NULL, 'Bank transfer', $2) RETURNING id`,
+        [s.request_id, period],
+      );
+      paymentId = made[0].id;
+      await ensureVariableSymbol(s.request_id, c);
+    }
+    await c.query("UPDATE client_sessions SET payment_id = $2 WHERE id = $1", [sessionId, paymentId]);
+    return paymentId;
+  });
+  await recomputeInvoice(id);
+  return id;
+}
+
+/** After a client's price is chosen: completed sessions not on an invoice yet go onto their month's invoice. */
+export async function addHeldSessionsToInvoices(requestId: string): Promise<void> {
+  const { rows } = await pool.query<{ id: string }>(
+    `SELECT id FROM client_sessions WHERE request_id = $1 AND done_at IS NOT NULL AND paid_at IS NULL
+       AND payment_id IS NULL AND price_czk IS NOT NULL ORDER BY starts_at`,
+    [requestId],
+  );
+  for (const r of rows) await addToMonthlyInvoice(r.id);
+}
+
+/** A coordinator adds any line to an unpaid invoice (amount with VAT; negative for a discount). */
+export async function addInvoiceItem(paymentId: string, description: string, amount: number): Promise<void> {
+  await pool.query(
+    `INSERT INTO invoice_items (payment_id, description, amount_czk)
+     SELECT id, $2, $3 FROM payments WHERE id = $1 AND paid_on IS NULL`,
+    [paymentId, description, amount],
+  );
+  await recomputeInvoice(paymentId);
+}
+
+export async function removeInvoiceItem(paymentId: string, itemId: string): Promise<void> {
+  await pool.query(
+    "DELETE FROM invoice_items i USING payments p WHERE i.id = $2 AND i.payment_id = $1 AND p.id = $1 AND p.paid_on IS NULL",
+    [paymentId, itemId],
+  );
+  await recomputeInvoice(paymentId);
+}
+
+export type ClientInvoice = { id: string; invoice_number: string; amount_czk: number; due_on: string | null; paid_on: string | null; period: string | null };
+
+/** A client's issued invoices, newest first, for their private page. */
+export async function clientInvoices(requestId: string): Promise<ClientInvoice[]> {
+  const { rows } = await pool.query<ClientInvoice>(
+    `SELECT id, invoice_number, amount_czk, to_char(due_on, 'YYYY-MM-DD') AS due_on, to_char(paid_on, 'YYYY-MM-DD') AS paid_on, period
+     FROM payments WHERE request_id = $1 AND invoice_number IS NOT NULL ORDER BY invoiced_at DESC`,
+    [requestId],
+  );
+  return rows;
 }

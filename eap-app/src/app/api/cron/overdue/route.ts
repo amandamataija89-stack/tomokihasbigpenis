@@ -3,7 +3,8 @@ import { assignWaitingAndNotify } from "@/lib/assign";
 import { releaseExpiredOffers, remindPendingOffers, sendDailyDigest } from "@/lib/offers";
 import { warnOverdue } from "@/lib/overdue";
 import { sendSessionReminders } from "@/lib/session-reminders";
-import { remindOverdueInvoices } from "@/lib/invoice-mail";
+import { alertOverdueInvoices, autoMonthlyInvoices } from "@/lib/invoice-mail";
+import { monthEndReminders, sendMonthlyExport } from "@/lib/month-end";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,12 @@ export async function GET(request: Request) {
   const reminders = await warnOverdue();
   const digestSent = await sendDailyDigest();
   const sessionReminders = await sendSessionReminders();
-  const overdueInvoices = await remindOverdueInvoices();
-  return Response.json({ offerReminders, released, assigned, reminders, digestSent, sessionReminders, overdueInvoices });
+  const monthlyInvoices = await autoMonthlyInvoices();
+  const overdueInvoices = await alertOverdueInvoices();
+  const monthEnd = await monthEndReminders();
+  const exportSent = await sendMonthlyExport();
+  return Response.json({
+    offerReminders, released, assigned, reminders, digestSent, sessionReminders,
+    monthlyInvoices, overdueInvoices, monthEnd, exportSent,
+  });
 }

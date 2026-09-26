@@ -7,6 +7,8 @@ import { invoiceFileName, loadInvoice, renderInvoice } from "@/lib/invoice-pdf";
 export async function GET(_req: Request, { params }: { params: Promise<{ paymentId: string }> }) {
   const staff = await currentStaff();
   if (!staff) return new Response("Please sign in.", { status: 401 });
+  // Invoices are for coordinators and admins; counsellors only see amounts on the client's page.
+  if (!isManager(staff)) return new Response("Not found", { status: 404 });
   const { paymentId } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(paymentId)) return new Response("Not found", { status: 404 });
   const { rows } = await pool.query<{ assigned_to: string | null }>(
@@ -14,7 +16,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ payment
     [paymentId],
   );
   if (!rows[0] || (!isManager(staff) && rows[0].assigned_to !== staff.id)) return new Response("Not found", { status: 404 });
-  const data = await loadInvoice(paymentId);
+  // A running monthly invoice (a draft) is shown as a preview; it's numbered when issued.
+  const data = await loadInvoice(paymentId, true);
   const pdf = await renderInvoice(data);
   return new Response(Buffer.from(pdf), {
     headers: {

@@ -26,6 +26,7 @@ export type InvoiceData = {
   period: string | null; // 'YYYY-MM' for a monthly invoice
   sessionCount: number;
   qr: string | null; // QR Platba text, for an invoice to pay
+  draft?: boolean; // a monthly invoice still building up (no number yet)
   taxDate: string; // YYYY-MM-DD, datum uskutečnění zdanitelného plnění (DUZP)
   method: string;
   customer: string[]; // lines: name, address, IČO, DIČ
@@ -49,6 +50,7 @@ export function invoiceLines(
   total: number,
   pkg: { sessions: number } | null,
   sessions: { starts_at: Date; price_czk: number | null; late_cancelled: boolean }[],
+  items: { description: string; amount_czk: number }[] = [],
 ): InvoiceLine[] {
   const what = itemName(service);
   const lines: InvoiceLine[] = [];
@@ -66,14 +68,20 @@ export function invoiceLines(
           .join(", ")}`,
       });
   }
+  for (const i of items) lines.push({ text: i.description, amount: i.amount_czk });
   const sum = lines.reduce((a, l) => a + l.amount, 0);
   if (sum !== total) lines.push({ text: "Úprava ceny / Price adjustment", amount: total - sum });
   return lines;
 }
 
-/** Gathers what the invoice for a payment shows, giving it an invoice number if it has none yet. */
-export async function loadInvoice(paymentId: string): Promise<InvoiceData> {
-  const number = await issueInvoice(paymentId);
+/**
+ * Gathers what the invoice for a payment shows, giving it an invoice number if it has none yet. With
+ * `preview`, a draft (a monthly invoice still building up) is shown as a draft instead, without a number.
+ */
+export async function loadInvoice(paymentId: string, preview = false): Promise<InvoiceData> {
+  const { rows: pre } = await pool.query<{ invoice_number: string | null }>("SELECT invoice_number FROM payments WHERE id = $1", [paymentId]);
+  const draft = preview && !pre[0]?.invoice_number;
+  const number = draft ? "NÁVRH / DRAFT" : await issueInvoice(paymentId);
   const { rows } = await pool.query<{
     amount_czk: number;
     paid_on: string | null;
@@ -81,7 +89,7 @@ export async function loadInvoice(paymentId: string): Promise<InvoiceData> {
     period: string | null;
     request_id: string;
     method: string;
-    invoiced_at: Date;
+    invoiced_at: Date | null;
     service: string;
     first_name: string;
     full_name: string;
@@ -105,6 +113,10 @@ export async function loadInvoice(paymentId: string): Promise<InvoiceData> {
     "SELECT starts_at, price_czk, late_cancelled FROM client_sessions WHERE payment_id = $1 ORDER BY starts_at",
     [paymentId],
   );
+  const { rows: items } = await pool.query<{ description: string; amount_czk: number }>(
+    "SELECT description, amount_czk FROM invoice_items WHERE payment_id = $1 ORDER BY created_at",
+    [paymentId],
+  );
   const customer = [
     p.billing_name || p.full_name || p.first_name,
     ...(p.billing_address || p.address).split("\n").map((l) => l.trim()).filter(Boolean),
@@ -115,21 +127,22 @@ export async function loadInvoice(paymentId: string): Promise<InvoiceData> {
   const variableSymbol = await ensureVariableSymbol(p.request_id);
   return {
     number,
-    issuedOn: p.invoiced_at,
+    draft,
+    issuedOn: p.invoiced_at ?? new Date(),
     paidOn: p.paid_on,
     dueOn: p.due_on,
     variableSymbol,
     period: p.period,
     sessionCount: p.package_sessions ?? sessions.length,
     qr:
-      p.paid_on === null && supplier.iban
+      p.paid_on === null && supplier.iban && !draft
         ? qrPlatba({ iban: supplier.iban, amountCzk: p.amount_czk, variableSymbol, message: `Faktura ${number}` })
         : null,
     // An unpaid invoice is taxed on the earlier of its date and the last session it covers.
-    taxDate: taxDate(p.paid_on ?? pragueDay(p.invoiced_at), p.package_sessions ? [] : sessions.map((x) => x.starts_at)),
+    taxDate: taxDate(p.paid_on ?? pragueDay(p.invoiced_at ?? new Date()), p.package_sessions ? [] : sessions.map((x) => x.starts_at)),
     method: p.method,
     customer,
-    lines: invoiceLines(p.service, p.amount_czk, p.package_sessions ? { sessions: p.package_sessions } : null, sessions),
+    lines: invoiceLines(p.service, p.amount_czk, p.package_sessions ? { sessions: p.package_sessions } : null, sessions, items),
     total: p.amount_czk,
     supplier,
   };
@@ -321,7 +334,9 @@ export async function renderInvoice(d: InvoiceData): Promise<Uint8Array> {
   text(pg, vatPayer ? "Celkem s DPH / Total incl. VAT" : "Celkem / Total", vatPayer ? 230 : 320, y, { font: bold, size: 12 });
   text(pg, total, R - bold.widthOfTextAtSize(total, 14), y, { font: bold, size: 14 });
   y -= 22;
-  const status = unpaid
+  const status = d.draft
+    ? "NÁVRH – VYSTAVENO BUDE 1. DNE MĚSÍCE / DRAFT – ISSUED ON THE 1ST"
+    : unpaid
     ? `K ÚHRADĚ DO ${d.dueOn ? isoDay(d.dueOn) : ""} / PLEASE PAY BY ${d.dueOn ? isoDay(d.dueOn) : ""}, VS ${d.variableSymbol}`
     : "UHRAZENO – NEPLAŤTE / PAID – NOTHING TO PAY";
   text(pg, status, R - bold.widthOfTextAtSize(status, 10), y, { font: bold, size: 10, color: unpaid ? ink : green });
