@@ -9,6 +9,7 @@ export function StaffNav({ role }: { role: Role }) {
   const manager = role === "admin" || role === "coordinator";
   const links = [
     { href: "/admin", label: manager ? "Requests" : "My clients", show: true },
+    { href: "/admin/clients", label: "Clients by month", show: true },
     { href: "/admin/availability", label: "My availability", show: true },
     { href: "/admin/team", label: "Team", show: manager },
     { href: "/admin/companies", label: "Companies", show: manager },
