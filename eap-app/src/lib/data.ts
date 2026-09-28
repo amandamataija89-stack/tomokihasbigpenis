@@ -72,6 +72,7 @@ export type RequestRow = {
   session_price_net_czk: number | null; // the same without VAT, as chosen by their counsellor
   variable_symbol: string | null; // private clients: on all their invoices
   address: string; // private clients: residential address from the sign-up form
+  consent_form_sent_at: Date | null; // when the client was last emailed the link to sign the consent form
   billing_name: string;
   billing_address: string;
   billing_ico: string;

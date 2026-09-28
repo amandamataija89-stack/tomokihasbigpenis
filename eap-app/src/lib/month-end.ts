@@ -22,6 +22,7 @@ export type OpenAdmin = {
   pastUnmarked: { requestId: string; firstName: string; startsAt: Date }[];
   noType: { requestId: string; firstName: string }[];
   noPrice: { requestId: string; firstName: string }[];
+  noConsent: { requestId: string; firstName: string }[]; // sessions booked but the consent form isn't signed
 };
 
 /** What a counsellor still has to do: past sessions not marked, and private clients without a type or price. */
@@ -34,16 +35,21 @@ export async function openAdmin(staffId: string, now = new Date()): Promise<Open
        ORDER BY cs.starts_at`,
       [staffId, now],
     ),
-    pool.query<{ id: string; first_name: string; service: string; session_price_czk: number | null }>(
-      `SELECT id, first_name, service, session_price_czk FROM support_requests
-       WHERE assigned_to = $1 AND kind = 'private' AND status NOT IN ('completed', 'closed') AND accepted_at IS NOT NULL`,
+    pool.query<{ id: string; first_name: string; service: string; session_price_czk: number | null; kind: string; unsigned: boolean }>(
+      `SELECT r.id, r.first_name, r.service, r.session_price_czk, r.kind,
+         EXISTS (SELECT 1 FROM client_sessions WHERE request_id = r.id)
+           AND NOT EXISTS (SELECT 1 FROM consent_forms WHERE request_id = r.id) AS unsigned
+       FROM support_requests r
+       WHERE r.assigned_to = $1 AND r.status NOT IN ('completed', 'closed') AND r.accepted_at IS NOT NULL`,
       [staffId],
     ),
   ]);
+  const privateClients = clients.filter((c) => c.kind === "private");
   return {
     pastUnmarked: past.map((p) => ({ requestId: p.request_id, firstName: p.first_name, startsAt: p.starts_at })),
-    noType: clients.filter((c) => !c.service).map((c) => ({ requestId: c.id, firstName: c.first_name })),
-    noPrice: clients.filter((c) => c.session_price_czk === null).map((c) => ({ requestId: c.id, firstName: c.first_name })),
+    noType: privateClients.filter((c) => !c.service).map((c) => ({ requestId: c.id, firstName: c.first_name })),
+    noPrice: privateClients.filter((c) => c.session_price_czk === null).map((c) => ({ requestId: c.id, firstName: c.first_name })),
+    noConsent: clients.filter((c) => c.unsigned).map((c) => ({ requestId: c.id, firstName: c.first_name })),
   };
 }
 
@@ -91,8 +97,13 @@ export async function monthEndReminders(now = new Date()): Promise<number> {
   let sent = 0;
   for (const s of staff) {
     const open = await openAdmin(s.id, now);
-    const items = { pastUnmarked: open.pastUnmarked.length, noType: open.noType.length, noPrice: open.noPrice.length };
-    if (!items.pastUnmarked && !items.noType && !items.noPrice) continue;
+    const items = {
+      pastUnmarked: open.pastUnmarked.length,
+      noType: open.noType.length,
+      noPrice: open.noPrice.length,
+      noConsent: open.noConsent.length,
+    };
+    if (!items.pastUnmarked && !items.noType && !items.noPrice && !items.noConsent) continue;
     if (!(await once(`month_end_reminder:${p.ym}:${s.id}`))) continue;
     try {
       await sendEmail(monthEndReminder(s.email, s.name, monthLabel(p.ym), items));

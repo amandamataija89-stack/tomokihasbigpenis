@@ -298,3 +298,33 @@ CREATE TABLE IF NOT EXISTS invoice_items (
   created_at  timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS invoice_items_payment_idx ON invoice_items (payment_id);
+
+-- The informed consent form, signed online by the client (or a parent/guardian for a minor) before the
+-- first session. Keeps what was filled in, the drawn signature and exactly which wording was agreed to.
+CREATE TABLE IF NOT EXISTS consent_forms (
+  id                    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  request_id            uuid NOT NULL REFERENCES support_requests(id) ON DELETE CASCADE,
+  version               text NOT NULL,
+  text_sha256           text NOT NULL,
+  full_name             text NOT NULL,
+  home_address          text NOT NULL,
+  local_address         text NOT NULL DEFAULT '',
+  phone                 text NOT NULL,
+  email                 text NOT NULL,
+  emergency_name        text NOT NULL,
+  emergency_contact     text NOT NULL, -- relationship, email / telephone
+  other_info            text NOT NULL DEFAULT '',
+  for_minor             boolean NOT NULL DEFAULT false,
+  guardian_name         text NOT NULL DEFAULT '',
+  signed_name           text NOT NULL, -- typed by whoever signs (client, or guardian for a minor)
+  signature_png         text NOT NULL, -- the drawn signature, as a base64 PNG
+  signed_at             timestamptz NOT NULL DEFAULT now(),
+  ip                    text NOT NULL DEFAULT '',
+  user_agent            text NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS consent_forms_request_idx ON consent_forms (request_id, signed_at DESC);
+-- When the client was last sent the link to sign it.
+ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS consent_form_sent_at timestamptz;
+
+-- When a finished case's client record was reduced to what its invoices need (see src/lib/retention.ts).
+ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS anonymized_at timestamptz;

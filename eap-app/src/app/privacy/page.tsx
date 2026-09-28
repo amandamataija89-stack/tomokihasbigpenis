@@ -26,6 +26,8 @@ export default function PrivacyPolicy() {
         <li><b>Health-related information:</b> much of what you tell us about your wellbeing is a special category of personal data under the GDPR. We process it only with your explicit consent (see section 4).</li>
         <li><b>Our work together:</b> session dates, attendance and cancellations, notes written by your counsellor and our coordinator, and messages exchanged on your private page.</li>
         <li><b>For EAP clients:</b> which company&apos;s programme you came through (from the company code).</li>
+        <li><b>Your signed informed consent form:</b> your name and surname, permanent home and local address, phone, email, an <b>emergency contact</b> (their name, relationship and phone or email – please tell them you&apos;ve named them), anything else relevant you choose to tell us, your signature, and when and from which internet address it was signed. If a parent or guardian signs for a minor, their name too.</li>
+        <li><b>Questionnaires and assessments</b> you complete as part of your sessions, and their results.</li>
         <li><b>For private clients – billing:</b> session prices, invoices, payments received (including the payer name, amount, date and variable symbol from our bank statement), and any invoice details you give us (e.g. a company name, IČO or DIČ).</li>
         <li><b>Consent records:</b> when you gave each consent.</li>
         <li><b>Feedback:</b> if you fill in our feedback form, your answers are stored anonymously – without your name, email or case – and only our management can read them.</li>
@@ -35,6 +37,7 @@ export default function PrivacyPolicy() {
       <h2>3. What we use it for</h2>
       <ul>
         <li>to contact you, arrange and provide counselling and related services, and remind you of sessions;</li>
+        <li>to contact your emergency contact if we have strong reason to believe you or someone else is at serious risk;</li>
         <li>to assign you to a suitable counsellor (see section 8) and to coordinate your care within our team;</li>
         <li>for private clients: to invoice you, record payments and send payment reminders;</li>
         <li>for EAP clients: to report to your employer only the <b>number</b> of requests from their company – never who asked or why;</li>
@@ -53,10 +56,12 @@ export default function PrivacyPolicy() {
 
       <h2>5. Who can see your data</h2>
       <ul>
-        <li><b>Within Prague Integration:</b> only the counsellor who works with you, our coordinator and our management. Other counsellors can&apos;t see your case.</li>
+        <li><b>Within Prague Integration:</b> only the counsellor who works with you, our coordinator and our management. Other counsellors can&apos;t see your case. Counsellors may discuss their work in supervision or peer consultation, but only in anonymised form, without anything that identifies you.</li>
+        <li><b>In an emergency:</b> where a practitioner has strong reason to believe you intend to harm yourself or someone else, they must notify the police and may alert others who need to know, such as a potential victim, appropriate institutions, or your emergency contact or family.</li>
         <li><b>Your employer (EAP):</b> never sees who uses the programme, what you talk about, or any of your data. We only report anonymous numbers of requests.</li>
         <li><b>Service providers</b> who process data for us under contract and our instructions: Vercel Inc. (hosting of this app), Neon Inc. (database, stored in Frankfurt, Germany), Resend Inc. (sending emails), and our bank (receiving payments). Emails we send you never contain what you wrote to us – only that there is a message, session details or an invoice.</li>
         <li><b>Authorities</b> when the law requires it (e.g. tax authorities for invoices).</li>
+        <li><b>Others, only with your written permission</b> – for example an insurer you ask us to deal with, which may be outside the EU.</li>
       </ul>
       <p>
         Some of these providers are based in, or use servers in, countries outside the EU/EEA (such as the USA or
@@ -66,8 +71,8 @@ export default function PrivacyPolicy() {
 
       <h2>6. How long we keep it</h2>
       <ul>
-        <li>Your request, session records, notes and messages: while we work with you and then for 3 years after our last contact, after which we delete them – unless you ask us to delete them sooner (see section 9) or the law requires longer.</li>
-        <li>Invoices and accounting records: 10 years, as Czech tax law requires.</li>
+        <li>Client records – your request, consent form, session records, notes, assessments and messages: while we work with you and then for <b>3 years after our last contact</b>, after which they are deleted automatically – unless you ask us to delete them sooner (see section 9).</li>
+        <li>Invoices and payment records: <b>10 years</b> from the end of the year they were issued, as Czech tax law requires. After the 3 years above, we keep only what the invoices show (your name, invoice address, variable symbol and the session dates they cover).</li>
         <li>Your private messages page stops working 30 days after your sessions end.</li>
         <li>Anonymous feedback is kept without a time limit, as it can&apos;t be linked to you.</li>
       </ul>
@@ -105,8 +110,9 @@ export default function PrivacyPolicy() {
 
       <h2>10. Children</h2>
       <p>
-        Our request form is for adults. Support for children and teenagers is arranged with a parent or legal
-        guardian, who gives the consents on the child&apos;s behalf.
+        Our services are for adults (18 and over). Support for children and teenagers is arranged with a parent or
+        legal guardian, who signs the consent form on the child&apos;s behalf and agrees a disclosure protocol with the
+        counsellor.
       </p>
 
       <h2>11. Cookies</h2>
@@ -114,7 +120,13 @@ export default function PrivacyPolicy() {
         We use no advertising or tracking cookies. See our <Link href="/cookies">Cookie Policy</Link>.
       </p>
 
-      <h2>12. Changes</h2>
+      <h2>12. Our status</h2>
+      <p>
+        Prague Integration is not a healthcare provider under the Czech Act on Health Services; our counselling,
+        therapy and coaching are not provided as health services.
+      </p>
+
+      <h2>13. Changes</h2>
       <p>
         We may update this policy. The date at the top shows the latest version; if we make important changes we
         will tell clients we are working with.

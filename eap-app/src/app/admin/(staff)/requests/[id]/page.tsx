@@ -10,6 +10,8 @@ import { listMessages, markClientMessagesRead } from "@/lib/messages";
 import { Messages } from "./Messages";
 import { Sessions } from "./Sessions";
 import { Payments } from "./Payments";
+import { ConsentCard } from "./ConsentCard";
+import { latestConsent } from "@/lib/consent";
 import { BillingProfile } from "./BillingProfile";
 import { defaultSessionPrice, invoiceSettings, listPackages, listPayments, priceList } from "@/lib/billing";
 
@@ -29,6 +31,7 @@ export default async function RequestPage({
     billing?: string;
     why?: string;
     pdf?: string;
+    consent?: string;
   }>;
 }) {
   const { id } = await params;
@@ -41,6 +44,7 @@ export default async function RequestPage({
   // The client's messages count as read once whoever looks after them opens the case.
   if (r.assigned_to === me.id || (!r.assigned_to && manager)) await markClientMessagesRead(id);
   const isPrivate = r.kind === "private";
+  const signedConsent = await latestConsent(id);
   const [notes, staff, sessions, messages, payments, packages, prices, defaultPrice] = await Promise.all([
     listNotes(id),
     manager ? listStaffWithLoad(undefined, false) : Promise.resolve([]),
@@ -165,6 +169,7 @@ export default async function RequestPage({
               </>
             )}
           </section>
+          <ConsentCard requestId={r.id} signed={signedConsent} sentAt={r.consent_form_sent_at} flash={sp.consent} />
           <Messages requestId={r.id} nickname={r.first_name} messages={messages} flash={sp.msg} />
           <Sessions
             manager={manager}

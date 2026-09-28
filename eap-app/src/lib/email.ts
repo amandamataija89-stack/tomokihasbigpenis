@@ -351,12 +351,13 @@ export function monthEndReminder(
   to: string,
   name: string,
   monthLabel: string,
-  items: { pastUnmarked: number; noType: number; noPrice: number },
+  items: { pastUnmarked: number; noType: number; noPrice: number; noConsent: number },
 ): Mail {
   const lines = [
     items.pastUnmarked && `${items.pastUnmarked} past session${items.pastUnmarked === 1 ? "" : "s"} not marked done, late-cancelled or removed`,
     items.noType && `${items.noType} private client${items.noType === 1 ? "" : "s"} without a type of counselling`,
     items.noPrice && `${items.noPrice} private client${items.noPrice === 1 ? "" : "s"} without a price`,
+    items.noConsent && `${items.noConsent} client${items.noConsent === 1 ? " hasn't" : "s haven't"} signed the consent form (resend the link from their page)`,
   ].filter(Boolean);
   return {
     to,
@@ -377,5 +378,24 @@ export function monthlyExportEmail(to: string, monthLabel: string, count: number
       { filename: `faktury-${month}.pdf`, content: pdfBase64 },
       { filename: `faktury-${month}.csv`, content: csvBase64 },
     ],
+  };
+}
+
+/** Asks the client to read and sign the informed consent form before their first session. */
+export function consentRequestEmail(to: string, firstName: string, link: string): Mail {
+  return {
+    to,
+    subject: "Please sign your consent form before your first session – Prague Integration",
+    text: `Hi ${firstName},\n\nBefore your first session, please read and sign our informed consent form online. It takes about 5 minutes: you'll add your contact details and an emergency contact, and sign with your finger or mouse.\n\n${link}\n\n(Keep this link to yourself.) If the client is under 18, a parent or guardian signs on their behalf.\n\nThank you,\nPrague Integration\n+420 608 573 256\ncontact@pragueintegration.cz\n`,
+  };
+}
+
+/** A copy of the signed consent form, for the client's records. */
+export function consentSignedEmail(to: string, firstName: string, pdfBase64: string): Mail {
+  return {
+    to,
+    subject: "Your signed consent form – Prague Integration",
+    text: `Hi ${firstName},\n\nThank you for signing our informed consent form. A copy is attached for your records.\n\nPrague Integration\n`,
+    attachments: [{ filename: "prague-integration-consent-form.pdf", content: pdfBase64 }],
   };
 }

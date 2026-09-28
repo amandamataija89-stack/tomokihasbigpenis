@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { Brand, SiteFooter } from "./Brand";
 
-export const LEGAL_UPDATED = "27 September 2026";
+export const LEGAL_UPDATED = "28 September 2026";
 
 // Shared layout for the Privacy Policy, Terms of Service and Cookie Policy.
 export function LegalPage({ title, children }: { title: string; children: ReactNode }) {

@@ -5,6 +5,7 @@ import { warnOverdue } from "@/lib/overdue";
 import { sendSessionReminders } from "@/lib/session-reminders";
 import { alertOverdueInvoices, autoMonthlyInvoices } from "@/lib/invoice-mail";
 import { monthEndReminders, sendMonthlyExport } from "@/lib/month-end";
+import { dailyRetention } from "@/lib/retention";
 
 export const dynamic = "force-dynamic";
 
@@ -26,8 +27,9 @@ export async function GET(request: Request) {
   const overdueInvoices = await alertOverdueInvoices();
   const monthEnd = await monthEndReminders();
   const exportSent = await sendMonthlyExport();
+  const retention = await dailyRetention();
   return Response.json({
     offerReminders, released, assigned, reminders, digestSent, sessionReminders,
-    monthlyInvoices, overdueInvoices, monthEnd, exportSent,
+    monthlyInvoices, overdueInvoices, monthEnd, exportSent, retention,
   });
 }

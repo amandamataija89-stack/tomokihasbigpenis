@@ -82,6 +82,26 @@ or per client.
 Private clients have a **Private** tag; the **Private clients** tab lists them. Counsellors don't see
 unassigned private clients in the pool.
 
+## Informed consent form
+
+Every client signs Prague Integration's informed consent form online before their first full session.
+
+- When the **first session is booked**, the client is emailed a private link (`/consent/<link>`). They read the
+  full form, fill in their contact details and an **emergency contact**, tick that they agree, type their full
+  name and **sign with a finger or mouse**. For a client under 18, a parent or guardian signs.
+- They get a copy as a PDF by email and can download it again from the same link.
+- On the case, **Informed consent form** shows whether it's signed, the emergency contact, and the signed PDF;
+  or a button to email the link again. Unsigned forms appear in counsellors' month-end to-do lists.
+- The wording is in `src/lib/consent-text.ts`. Change it only with a new `CONSENT_VERSION`: each signed form
+  records the version and a fingerprint of the exact text.
+
+## Data retention (automatic, daily)
+
+- Client records are deleted **3 years after the last contact** (session, message or change). If the client
+  had invoices, only what the invoices show is kept (name, invoice address, variable symbol, invoiced
+  sessions); notes, messages, the consent form and wellbeing details are deleted.
+- Invoices and payment records are deleted **10 years** after the end of the year they were issued.
+
 ## Roles
 
 | Role | Sees | Can |
