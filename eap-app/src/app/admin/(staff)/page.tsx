@@ -216,7 +216,7 @@ function MyMonth({
   month: Awaited<ReturnType<typeof counsellorMonth>>;
   open: Awaited<ReturnType<typeof openAdmin>>;
 }) {
-  const todo = open.pastUnmarked.length + open.noType.length + open.noPrice.length;
+  const todo = open.pastUnmarked.length + open.noType.length + open.noPrice.length + open.noConsent.length;
   return (
     <section className="card stack">
       <h2>My month: {monthLabel(currentMonth())}</h2>
@@ -246,6 +246,11 @@ function MyMonth({
             {open.noPrice.map((c) => (
               <li key={`p-${c.requestId}`}>
                 <Link href={`/admin/requests/${c.requestId}#price`}>{c.firstName}</Link>: choose the session price
+              </li>
+            ))}
+            {open.noConsent.map((c) => (
+              <li key={`c-${c.requestId}`}>
+                <Link href={`/admin/requests/${c.requestId}#consent`}>{c.firstName}</Link>: consent form not signed yet
               </li>
             ))}
           </ul>

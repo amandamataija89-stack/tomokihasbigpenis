@@ -16,7 +16,7 @@ const nextConfig: NextConfig = {
       },
       {
         // Registration links carry the company code; keep them out of search engines.
-        source: "/(join|admin|feedback|messages)/:path*",
+        source: "/(join|admin|feedback|messages|consent)/:path*",
         headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],
       },
     ];

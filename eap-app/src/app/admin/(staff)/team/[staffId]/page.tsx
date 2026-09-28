@@ -41,7 +41,7 @@ export default async function CounsellorProfile({
     counsellorMonth(staffId, currentMonth()),
     openAdmin(staffId),
   ]);
-  const todo = open.pastUnmarked.length + open.noType.length + open.noPrice.length;
+  const todo = open.pastUnmarked.length + open.noType.length + open.noPrice.length + open.noConsent.length;
 
   return (
     <main className="stack" style={{ gap: 20 }}>
@@ -79,6 +79,11 @@ export default async function CounsellorProfile({
               {open.noPrice.map((c) => (
                 <li key={`p-${c.requestId}`}><Link href={`/admin/requests/${c.requestId}#price`}>{c.firstName}</Link>: no price</li>
               ))}
+            {open.noConsent.map((c) => (
+              <li key={`c-${c.requestId}`}>
+                <Link href={`/admin/requests/${c.requestId}#consent`}>{c.firstName}</Link>: consent form not signed yet
+              </li>
+            ))}
             </ul>
           </div>
         )}

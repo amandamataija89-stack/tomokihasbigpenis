@@ -486,7 +486,24 @@ export async function addSession(requestId: string, formData: FormData) {
     `Session booked for ${pragueLabel(startsAt)}.${fromPackage ? " Paid from the client's package." : ""}${emailed}`,
   );
   await syncStatusWithSessions(requestId, staff.id);
+  // The first booking asks the client to sign the informed consent form (once).
+  if (rows[0].n === 0) {
+    const { requestConsentIfNeeded } = await import("@/lib/consent");
+    await requestConsentIfNeeded(requestId, staff.id).catch((err) => console.error("EAP consent email failed:", err));
+  }
   redirect(`/admin/requests/${requestId}#sessions`);
+}
+
+/** Emails the client the link to sign the informed consent form (again). */
+export async function sendConsentAction(requestId: string) {
+  const { staff } = await requireCase(requestId);
+  const { sendConsentRequest } = await import("@/lib/consent");
+  try {
+    await sendConsentRequest(requestId, staff.id);
+  } catch (err) {
+    console.error("EAP consent email failed:", err);
+  }
+  redirect(`/admin/requests/${requestId}?consent=sent#consent`);
 }
 
 export async function moveSession(sessionId: string, formData: FormData) {
