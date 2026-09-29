@@ -18,9 +18,16 @@ export function Brand({ href = "/" }: { href?: string }) {
   );
 }
 
-export function SiteFooter() {
+export function SiteFooter({ staff = false }: { staff?: boolean }) {
   return (
     <footer className="site">
+      <span>© {new Date().getFullYear()} Prague Integration s.r.o. All rights reserved.</span>
+      {staff && (
+        <span>
+          Confidential: client information here is for Prague Integration work only. Don&apos;t share or copy it outside
+          the app, and handle exports under our Privacy Policy.
+        </span>
+      )}
       <span>Prague Integration s.r.o. · Olšanská 4E, 130 00 Praha 3 · IČO 21048428</span>
       <span>+420 608 573 256 · contact@pragueintegration.cz</span>
       <span>

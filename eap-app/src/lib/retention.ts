@@ -42,6 +42,12 @@ export async function applyRetention(now = new Date()): Promise<RetentionResult>
     if ((await eraseClient(r.id)) === "deleted") deleted++;
     else reduced++;
   }
+  // 3. Groups that have met no one for 3 years go, with their members and attendance.
+  await pool.query(
+    `DELETE FROM support_groups g
+     WHERE COALESCE((SELECT max(starts_at) FROM group_sessions WHERE group_id = g.id), g.created_at) < $1`,
+    [cutoff],
+  );
   return { deleted, reduced, invoicesDeleted: invoicesDeleted ?? 0 };
 }
 

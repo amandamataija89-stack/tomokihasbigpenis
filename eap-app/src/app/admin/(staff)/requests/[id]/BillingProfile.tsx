@@ -1,5 +1,5 @@
 import type { RequestRow } from "@/lib/data";
-import { priceSteps, withVat, type PriceRow } from "@/lib/billing";
+import { priceChoices, withVat, type PriceRow } from "@/lib/billing";
 import { chooseClientPrice, saveClientBilling, setClientService } from "../../../billing-actions";
 import { SERVICES } from "@/lib/request-form";
 
@@ -23,7 +23,7 @@ export function BillingProfile({
   manager: boolean;
   flash?: string;
 }) {
-  const steps = range?.min_net_czk != null ? priceSteps(range.min_net_czk, range.max_net_czk ?? range.min_net_czk) : [];
+  const steps = priceChoices(range);
   const vat = { vatPayer, vatRate };
   const chosen = r.session_price_net_czk;
   return (
@@ -56,7 +56,7 @@ export function BillingProfile({
         {steps.length > 0 ? (
           <form action={chooseClientPrice.bind(null, r.id)} className="stack" style={{ gap: 8 }}>
             <span className="small">
-              {r.service || "Their support"}: {czk(steps[0])} to {czk(steps[steps.length - 1])} without VAT. Choose this client&apos;s price:
+              {r.service || "Their support"}: {range?.price_options?.length ? steps.map(czk).join(", ") : <>{czk(steps[0])} to {czk(steps[steps.length - 1])}</>} without VAT. Choose this client&apos;s price:
             </span>
             <div className="actions" style={{ gap: 8 }}>
               <select name="net" defaultValue={chosen !== null && steps.includes(chosen) ? String(chosen) : ""} aria-label="Session price">

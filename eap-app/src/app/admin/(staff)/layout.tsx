@@ -1,4 +1,4 @@
-import { Brand } from "@/components/Brand";
+import { Brand, SiteFooter } from "@/components/Brand";
 import { requireStaff, ROLE_LABELS } from "@/lib/auth";
 import { logout } from "../actions";
 import { StaffNav } from "./StaffNav";
@@ -25,6 +25,7 @@ export default async function StaffLayout({ children }: { children: React.ReactN
         </div>
       </header>
       {children}
+      <SiteFooter staff />
     </div>
   );
 }

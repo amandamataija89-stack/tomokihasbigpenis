@@ -8,7 +8,11 @@ export default async function AddClientPage() {
   const manager = isManager(me);
   const [{ rows: companies }, { rows: counsellors }] = await Promise.all([
     pool.query<{ id: string; name: string }>("SELECT id, name FROM companies WHERE active ORDER BY name"),
-    pool.query<{ id: string; name: string }>("SELECT id, name FROM staff WHERE password_hash <> '!' ORDER BY name"),
+    pool.query<{ id: string; name: string }>(
+      `SELECT id, name || CASE WHEN takes_clients AND (away_until IS NULL OR away_until < (now() AT TIME ZONE 'Europe/Prague')::date)
+         THEN '' ELSE ' (not taking new clients)' END AS name
+       FROM staff WHERE password_hash <> '!' ORDER BY staff.name`,
+    ),
   ]);
   return (
     <main className="stack" style={{ gap: 20 }}>

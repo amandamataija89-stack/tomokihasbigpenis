@@ -22,7 +22,8 @@ import {
   recordPackage,
   recordPayment,
   priceList,
-  priceSteps,
+  priceChoices,
+  parsePriceOptions,
   saveInvoiceSettings,
   setPriceRange,
   withVat,
@@ -106,8 +107,7 @@ export async function chooseClientPrice(requestId: string, formData: FormData) {
   const net = Number(formData.get("net"));
   const { rows } = await pool.query<{ service: string }>("SELECT service FROM support_requests WHERE id = $1", [requestId]);
   const range = (await priceList()).find((p) => p.service === rows[0]?.service);
-  const allowed =
-    range?.min_net_czk != null && range.max_net_czk != null ? priceSteps(range.min_net_czk, range.max_net_czk) : [];
+  const allowed = priceChoices(range);
   // Coordinators and admins may also type a price outside the range (e.g. a no-range service or a discount).
   const custom = isManager(staff) ? parsePrice(formData.get("customNet")) : null;
   const chosen = custom ?? (allowed.includes(net) ? net : undefined);
@@ -445,14 +445,21 @@ const isDuplicateInvoice = (err: unknown) =>
 export async function savePriceList(formData: FormData) {
   await requireManager();
   const ranges = SERVICES.map((service) => {
+    const options = parsePriceOptions(formData.get(`options:${service}`));
+    // Exact prices, when given, set the range too.
+    if (options?.length) return { service, min: options[0], max: options[options.length - 1], options };
     const min = parsePrice(formData.get(`min:${service}`));
     const max = parsePrice(formData.get(`max:${service}`)) ?? min;
-    return { service, min, max: max ?? null };
+    return { service, min, max: max ?? null, options };
   });
   // A single price is fine (leave "to" empty); a range must run from low to high.
-  if (ranges.some((r) => r.min === undefined || r.max === undefined || (r.min !== null && r.max !== null && r.max < r.min)))
+  if (
+    ranges.some(
+      (r) => r.options === undefined || r.min === undefined || r.max === undefined || (r.min !== null && r.max !== null && r.max < r.min),
+    )
+  )
     redirect("/admin/pricing?error=price");
-  for (const r of ranges) await setPriceRange(r.service, r.min ?? null, r.max ?? null);
+  for (const r of ranges) await setPriceRange(r.service, r.min ?? null, r.max ?? null, r.options ?? []);
   revalidatePath("/admin/pricing");
   redirect("/admin/pricing?saved=prices");
 }

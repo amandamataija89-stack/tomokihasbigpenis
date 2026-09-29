@@ -8,7 +8,7 @@ import { AddStaffForm } from "./AddStaffForm";
 
 const monthName = () => new Intl.DateTimeFormat("en-GB", { month: "long", timeZone: "Europe/Prague" }).format(new Date());
 
-type Member = { id: string; role: Role; takes_clients: boolean; away_until: string | null; invited: boolean };
+type Member = { id: string; role: Role; takes_clients: boolean; away_until: string | null; invited: boolean; availability_note: string };
 
 export default async function TeamPage({
   searchParams,
@@ -20,7 +20,7 @@ export default async function TeamPage({
   const [loads, { rows: members }] = await Promise.all([
     therapistLoads(pool, false),
     pool.query<Member>(
-      `SELECT id, role, takes_clients, to_char(away_until, 'YYYY-MM-DD') AS away_until, password_hash = '!' AS invited
+      `SELECT id, role, takes_clients, to_char(away_until, 'YYYY-MM-DD') AS away_until, password_hash = '!' AS invited, availability_note
        FROM staff`,
     ),
   ]);
@@ -98,6 +98,8 @@ export default async function TeamPage({
                     : `${t.assignedThisMonth} / ${t.capacity}${full ? " · full" : ""}`}
                 </span>
               </div>
+              <p className="small"><b>Takes:</b> {t.accepts?.length ? t.accepts.join(", ") : "no new client types"}</p>
+              {m.availability_note && <p className="small" style={{ whiteSpace: "pre-wrap" }}><b>Available:</b> {m.availability_note}</p>}
               <p className="small"><Link href={`/admin/team/${t.id}`}>See their clients and month →</Link></p>
               {m.invited && (
                 <form action={resendInvite.bind(null, t.id)} className="actions invite-pending">
@@ -119,6 +121,7 @@ export default async function TeamPage({
                   maxCapacity={100}
                   takesClients={m.takes_clients}
                   awayUntil={m.away_until ?? ""}
+                  accepts={t.accepts}
                 />
                 <div className="actions"><button type="submit" className="ghost small-btn">Save</button></div>
               </form>

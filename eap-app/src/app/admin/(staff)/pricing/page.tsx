@@ -72,7 +72,8 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
         <p className="small">
           Price per session <b>without VAT</b>, from … to …. Each client&apos;s counsellor picks their price from this
           range (in steps of 100 CZK) on the client&apos;s page; {settings.vatPayer ? `${settings.vatRate} % VAT is added on top.` : "no VAT is added."}{" "}
-          For a single price, fill in only &quot;from&quot;.
+          For a single price, fill in only &quot;from&quot;. To offer only certain prices, list them under &quot;Exact prices&quot;
+          (e.g. 2000, 2200, 2500, 3000): the counsellor then chooses from those.
         </p>
         {SERVICES.map((s) => (
           <div className="field" key={s}>
@@ -82,6 +83,8 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
                 <input name={`min:${s}`} type="text" inputMode="numeric" className="price-input" defaultValue={range(s)?.min_net_czk ?? ""} /></label>
               <label><span className="small">To, CZK</span>
                 <input name={`max:${s}`} type="text" inputMode="numeric" className="price-input" defaultValue={range(s)?.max_net_czk ?? ""} /></label>
+              <label><span className="small">Exact prices (optional)</span>
+                <input name={`options:${s}`} type="text" placeholder="e.g. 2000, 2200, 2500" defaultValue={range(s)?.price_options?.join(", ") ?? ""} /></label>
             </div>
           </div>
         ))}

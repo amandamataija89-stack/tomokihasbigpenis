@@ -1,3 +1,4 @@
+import { CLIENT_TYPES } from "@/lib/assign";
 import { LANGUAGES } from "@/lib/request-form";
 
 const THERAPY_LANGUAGES = LANGUAGES.filter((l) => l !== "Other");
@@ -10,6 +11,7 @@ export function AvailabilityFields({
   maxCapacity,
   takesClients,
   awayUntil,
+  accepts = [...CLIENT_TYPES],
 }: {
   idPrefix: string;
   languages: string[];
@@ -17,6 +19,7 @@ export function AvailabilityFields({
   maxCapacity: number;
   takesClients: boolean;
   awayUntil: string;
+  accepts?: string[];
 }) {
   return (
     <>
@@ -33,7 +36,18 @@ export function AvailabilityFields({
         <input id={`away-${idPrefix}`} name="awayUntil" type="date" defaultValue={awayUntil} className="date-input" />
       </div>
       <fieldset>
-        <legend className="small">Works in<span className="opt">none ticked = any language</span></legend>
+        <legend className="small">Clients I take</legend>
+        <div className="choices">
+          {CLIENT_TYPES.map((c) => (
+            <label className="choice" key={c}>
+              <input type="checkbox" name="accepts" value={c} defaultChecked={accepts.includes(c)} />
+              <span>{c}</span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend className="small">Languages I work in<span className="opt">none ticked = any language</span></legend>
         <div className="choices">
           {THERAPY_LANGUAGES.map((l) => (
             <label className="choice" key={l}>

@@ -367,3 +367,49 @@ CREATE INDEX IF NOT EXISTS intake_forms_request_idx ON intake_forms (request_id,
 -- emergency. Other admins see everything else.
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS is_owner boolean NOT NULL DEFAULT false;
 UPDATE staff SET is_owner = true WHERE lower(email) = 'amandamataija89@gmail.com' AND NOT is_owner;
+
+-- When a counsellor is usually free for sessions (their own words, e.g. "Mon–Wed 9:00–17:00"), shown to the team.
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS availability_note text NOT NULL DEFAULT '';
+
+-- Exact prices to choose from (without VAT), instead of steps of 100 CZK across the range; empty = steps.
+ALTER TABLE price_list ADD COLUMN IF NOT EXISTS price_options integer[] NOT NULL DEFAULT '{}';
+UPDATE price_list SET price_options = '{2000,2200,2500,3000}', min_net_czk = 2000, max_net_czk = 3000
+  WHERE service = 'Couple counselling' AND NOT EXISTS (SELECT 1 FROM app_state WHERE key = 'couple_prices_set');
+INSERT INTO app_state (key, value) VALUES ('couple_prices_set', '1') ON CONFLICT (key) DO NOTHING;
+
+-- Group support: groups led by a counsellor, their members (with whether they've signed the consent form),
+-- the group's sessions and who attended each.
+CREATE TABLE IF NOT EXISTS support_groups (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name          text NOT NULL,
+  kind          text NOT NULL, -- see GROUP_KINDS in src/lib/groups.ts
+  counsellor_id uuid REFERENCES staff(id) ON DELETE SET NULL,
+  details       text NOT NULL DEFAULT '', -- e.g. day, time, online or in person
+  active        boolean NOT NULL DEFAULT true,
+  created_at    timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS group_members (
+  id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  group_id          uuid NOT NULL REFERENCES support_groups(id) ON DELETE CASCADE,
+  first_name        text NOT NULL,
+  surname           text NOT NULL,
+  email             text NOT NULL,
+  consent_signed_on date, -- when they signed the consent form; NULL = not yet
+  added_at          timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS group_members_group_idx ON group_members (group_id);
+CREATE TABLE IF NOT EXISTS group_sessions (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  group_id   uuid NOT NULL REFERENCES support_groups(id) ON DELETE CASCADE,
+  starts_at  timestamptz NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS group_sessions_group_idx ON group_sessions (group_id, starts_at);
+CREATE TABLE IF NOT EXISTS group_attendance (
+  session_id uuid NOT NULL REFERENCES group_sessions(id) ON DELETE CASCADE,
+  member_id  uuid NOT NULL REFERENCES group_members(id) ON DELETE CASCADE,
+  PRIMARY KEY (session_id, member_id)
+);
+
+-- Which clients a counsellor takes (see CLIENT_TYPES in src/lib/assign.ts). All by default.
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS accepts text[] NOT NULL DEFAULT '{Individuals,Couples,Teenagers,Children,Students}';

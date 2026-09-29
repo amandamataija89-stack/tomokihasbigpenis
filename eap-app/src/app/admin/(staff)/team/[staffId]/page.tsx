@@ -16,7 +16,7 @@ export default async function CounsellorProfile({
   params: Promise<{ staffId: string }>;
   searchParams: Promise<{ show?: string; month?: string }>;
 }) {
-  await requireManager();
+  const me = await requireManager();
   const { staffId } = await params;
   const sp = await searchParams;
   if (!/^[0-9a-f-]{36}$/i.test(staffId)) notFound();
@@ -24,12 +24,14 @@ export default async function CounsellorProfile({
     name: string;
     email: string;
     role: Role;
+    availability_note: string;
+    accepts: string[];
     takes_clients: boolean;
     monthly_capacity: number;
     languages: string[];
     away_until: string | null;
   }>(
-    `SELECT name, email, role, takes_clients, monthly_capacity, languages, to_char(away_until, 'YYYY-MM-DD') AS away_until
+    `SELECT name, email, role, takes_clients, availability_note, accepts, monthly_capacity, languages, to_char(away_until, 'YYYY-MM-DD') AS away_until
      FROM staff WHERE id = $1`,
     [staffId],
   );
@@ -80,6 +82,8 @@ export default async function CounsellorProfile({
           {s.away_until ? ` · away until ${s.away_until}` : ""}
           {s.languages.length ? ` · ${s.languages.join(", ")}` : ""}
         </p>
+        <p className="small"><b>Takes:</b> {s.accepts.length ? s.accepts.join(", ") : "no new client types"}</p>
+        {s.availability_note && <p className="small" style={{ whiteSpace: "pre-wrap" }}><b>Available:</b> {s.availability_note}</p>}
       </div>
 
       <section className="card stack">
@@ -123,6 +127,11 @@ export default async function CounsellorProfile({
             <Link href={`/admin/team/${staffId}?month=${shiftMonth(sessionMonth, -1)}#sessions`}>← {monthLabel(shiftMonth(sessionMonth, -1))}</Link>
             {sessionMonth < currentMonth() && (
               <Link href={`/admin/team/${staffId}?month=${shiftMonth(sessionMonth, 1)}#sessions`}>{monthLabel(shiftMonth(sessionMonth, 1))} →</Link>
+            )}
+            {me.role === "admin" && (
+              <a href={`/admin/sessions/export?month=${sessionMonth}&counsellor=${staffId}`} title="Confidential – do not distribute">
+                Export to Excel (confidential)
+              </a>
             )}
           </nav>
         </div>
