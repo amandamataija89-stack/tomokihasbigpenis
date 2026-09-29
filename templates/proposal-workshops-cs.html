@@ -1,0 +1,130 @@
+<!--
+Source for assets/nabidka-workshopu-cs.pdf: the general Czech workshop
+proposal Amanda sends to companies that ask about single workshops or
+talks (not the full EAP). Pricing confirmed by Amanda 2026-09-29:
+15 000–40 000 CZK + 21 % VAT depending on length, content, etc.
+Re-render to PDF with Chromium/Playwright (A4, print backgrounds on).
+-->
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<title>Workshopy a přednášky pro firmy – nabídka</title>
+<style>
+  @page { size: A4; margin: 13mm 14mm; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "DejaVu Sans", Arial, Helvetica, sans-serif; color: #1a1a1a; font-size: 9.5pt; line-height: 1.4; }
+  .brand { font-weight: 800; font-size: 13pt; color: #0a0a0a; }
+  .brand .plus { color: #4e9c77; }
+  .brand .dots { color: #d98aa0; letter-spacing: -2px; margin-left: 4px; }
+  .eyebrow { color: #33416b; font-size: 9pt; margin-top: 2px; }
+  h1 { font-size: 21pt; color: #33416b; margin: 12px 0 2px; line-height: 1.15; }
+  .sub { font-style: italic; color: #33416b; margin: 0 0 10px; }
+  hr.rule { border: none; border-top: 2px solid #4e9c77; margin: 0 0 10px; }
+  h2 { font-size: 12.5pt; color: #c56685; margin: 12px 0 5px; }
+  h3 { font-size: 11pt; color: #33416b; margin: 0 0 3px; }
+  p { margin: 0 0 6px; }
+  .ws { border: 1px solid #e4e2de; border-left: 4px solid #33416b; border-radius: 4px; padding: 8px 12px; margin: 0 0 8px; page-break-inside: avoid; }
+  .ws .intro { color: #444; margin-bottom: 4px; }
+  .ws ul { margin: 0; padding-left: 16px; }
+  .ws li { margin-bottom: 1px; }
+  .tag { display: inline-block; font-size: 8pt; color: #4e9c77; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+  table.fmt { width: 100%; border-collapse: collapse; margin: 4px 0; }
+  table.fmt td { padding: 4px 10px; vertical-align: top; border-bottom: 1px solid #eceae7; }
+  table.fmt td:first-child { width: 30%; background: #f3f2ef; font-weight: 700; color: #33416b; }
+  .price { background: #f8eef1; border-radius: 6px; padding: 10px 14px; margin: 8px 0; page-break-inside: avoid; }
+  .price .big { font-size: 15pt; font-weight: 800; color: #7a2f47; }
+  .contact { background: #33416b; color: #fff; border-radius: 6px; padding: 12px 14px; margin-top: 12px; page-break-inside: avoid; }
+  .contact h2 { color: #fff; margin: 0 0 4px; }
+  .foot { color: #8a8a8a; font-size: 8pt; font-style: italic; margin-top: 10px; border-top: 1px solid #ddd; padding-top: 6px; }
+</style>
+</head>
+<body>
+
+<div class="brand">Prague <span class="plus">+</span> Integration<span class="dots">●●</span></div>
+<div class="eyebrow">Nabídka pro firmy · 2026</div>
+
+<h1>Workshopy a přednášky o duševním zdraví</h1>
+<p class="sub">Samostatné workshopy pro týmy, bez nutnosti celého programu EAP</p>
+<hr class="rule">
+
+<p>Prague Integration je pražský tým více než 30 psychologů, poradců a trenérů. Pro firmy připravujeme praktické workshopy a přednášky, které pomáhají zaměstnancům zvládat tlak, předcházet vyčerpání a lépe podporovat sebe i kolegy. Každý workshop přizpůsobujeme konkrétnímu týmu, jeho situaci a potřebám.</p>
+
+<h2>Témata workshopů</h2>
+
+<div class="ws">
+  <span class="tag">Listopad 2026</span>
+  <h3>Muži a duševní zdraví</h3>
+  <p class="intro">Workshop s panelovou diskusí k Měsíci mužského duševního zdraví. Tři témata na výběr: tlak role živitele, práce a vyčerpání, identita a osamělost. Podrobný program zašleme samostatně.</p>
+</div>
+
+<div class="ws">
+  <h3>Prevence vyhoření</h3>
+  <p class="intro">Jak včas rozpoznat varovné signály a dlouhodobě pečovat o svou energii.</p>
+  <ul>
+    <li>rozdíl mezi běžnou únavou, stresem a vyhořením</li>
+    <li>varovné signály u sebe i v týmu</li>
+    <li>praktické kroky k obnově energie a nastavení hranic</li>
+  </ul>
+</div>
+
+<div class="ws">
+  <h3>Zvládání stresu a odolnost</h3>
+  <p class="intro">Praktické nástroje pro náročná a hektická období.</p>
+  <ul>
+    <li>jak stres funguje a jak se projevuje v práci</li>
+    <li>techniky pro zklidnění a zvládání tlaku v každodenním provozu</li>
+    <li>budování dlouhodobé odolnosti jednotlivce i týmu</li>
+  </ul>
+</div>
+
+<div class="ws">
+  <h3>První psychická pomoc na pracovišti</h3>
+  <p class="intro">Jak poznat, že kolega není v pořádku, a jak ho vhodně podpořit.</p>
+  <ul>
+    <li>nejčastější signály psychické nepohody</li>
+    <li>jak otevřít rozhovor a naslouchat bez hodnocení</li>
+    <li>kdy a kam doporučit odbornou pomoc</li>
+  </ul>
+</div>
+
+<div class="ws">
+  <h3>Neurodiverzita na pracovišti</h3>
+  <p class="intro">ADHD, autismus a další formy neurodiverzity: jak vytvořit prostředí, kde se daří všem.</p>
+  <ul>
+    <li>co neurodiverzita znamená v každodenní práci</li>
+    <li>silné stránky i výzvy neurodivergentních kolegů</li>
+    <li>jednoduché úpravy komunikace a pracovního prostředí</li>
+  </ul>
+</div>
+
+<div class="ws">
+  <h3>Duševní zdraví žen</h3>
+  <p class="intro">Workshop zaměřený na témata, která ženy v práci i mimo ni často nesou: dvojí zátěž práce a péče o rodinu, stres, hranice a sebepéče. Obsah přizpůsobíme potřebám Vašeho týmu.</p>
+</div>
+
+<h2>Formát</h2>
+<table class="fmt">
+  <tr><td>Forma</td><td>Online, nebo osobně u Vás ve firmě</td></tr>
+  <tr><td>Délka</td><td>Podle zvoleného formátu, od kratší přednášky po delší interaktivní workshop</td></tr>
+  <tr><td>Jazyk</td><td>Čeština nebo angličtina</td></tr>
+  <tr><td>Styl</td><td>Interaktivní: krátký odborný vstup, diskuse, praktická cvičení a prostor pro otázky</td></tr>
+  <tr><td>Termín</td><td>Podle Vašich možností</td></tr>
+</table>
+
+<div class="price">
+  <div>Cena workshopu</div>
+  <div class="big">15 000 – 40 000 Kč + 21 % DPH</div>
+  <div>Konečná cena závisí na délce, obsahu, formě (online / osobně) a počtu účastníků. Rádi Vám připravíme nabídku na míru.</div>
+</div>
+
+<div class="contact">
+  <h2>Jak postupovat</h2>
+  <p style="margin:0 0 6px;">Napište nám, které téma Vás zajímá, a navrhneme formát, délku a termín, které budou Vašemu týmu nejlépe vyhovovat.</p>
+  <p style="margin:0;"><strong>Amanda Mataija</strong>, CEO · contact@pragueintegration.cz · +420 608 573 256 · www.pragueintegration.cz</p>
+</div>
+
+<div class="foot">© Prague Integration s.r.o., IČO 21048428, Olšanská 4E, 130 00 Praha 3. Duševní vlastnictví společnosti, bez svolení nekopírujte.</div>
+
+</body>
+</html>

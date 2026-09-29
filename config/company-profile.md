@@ -225,3 +225,12 @@ pitch it yet.
   support-materials voucher and a counselling-session voucher.
 - **Sending:** Amanda reviews every email one more time before anything
   is sent. Never send without her explicit go-ahead.
+
+## Standalone workshop pricing (CONFIRMED by Amanda Mataija, 2026-09-29)
+
+- Single workshops/talks (without the full EAP): **15 000–40 000 CZK + 21 % VAT**,
+  depending on duration, content, format and number of participants.
+- Topics offered: Men's mental health (November), Burnout prevention, Stress
+  management & resilience, Mental health first aid at work, Neurodiversity at
+  work, Women's mental health.
+- Czech proposal: `templates/proposal-workshops-cs.html` → `assets/nabidka-workshopu-cs.pdf`.
