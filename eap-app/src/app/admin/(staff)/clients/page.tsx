@@ -1,3 +1,4 @@
+import { CounsellorFilter, counsellorOptions, isStaffId } from "../CounsellorFilter";
 import Link from "next/link";
 import { isManager, requireStaff } from "@/lib/auth";
 import { STATUS_LABELS, type Status } from "@/lib/data";
@@ -31,13 +32,15 @@ type Row = {
 
 // Clients by month: everyone who signed up or had sessions in a month, with that month's and all-time sessions.
 // Counsellors see only their own clients.
-export default async function ClientsByMonth({ searchParams }: { searchParams: Promise<{ month?: string; kind?: string }> }) {
+export default async function ClientsByMonth({ searchParams }: { searchParams: Promise<{ month?: string; kind?: string; counsellor?: string }> }) {
   const me = await requireStaff();
   const manager = isManager(me);
   const sp = await searchParams;
   const thisMonth = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Prague", year: "numeric", month: "2-digit" }).format(new Date());
   const month = /^\d{4}-\d{2}$/.test(sp.month ?? "") ? sp.month! : thisMonth;
   const kind = sp.kind === "eap" || sp.kind === "private" ? sp.kind : "all";
+  const counsellor = manager && isStaffId(sp.counsellor) ? sp.counsellor : "";
+  const staffList = manager ? await counsellorOptions() : [];
   const inMonth = "to_char(cs.starts_at AT TIME ZONE 'Europe/Prague', 'YYYY-MM') = $1";
   const { rows } = await pool.query<Row>(
     `SELECT r.id, r.first_name, r.full_name, r.kind, c.name AS company_name, r.service, r.status, s.name AS counsellor,
@@ -57,13 +60,13 @@ export default async function ClientsByMonth({ searchParams }: { searchParams: P
      HAVING to_char(r.created_at AT TIME ZONE 'Europe/Prague', 'YYYY-MM') = $1
          OR count(cs.id) FILTER (WHERE ${inMonth}) > 0
      ORDER BY s.name NULLS LAST, r.first_name`,
-    [month, manager ? null : me.id, kind],
+    [month, manager ? counsellor || null : me.id, kind],
   );
   const held = rows.reduce((a, r) => a + r.month_held, 0);
   const booked = rows.reduce((a, r) => a + r.month_booked, 0);
   const newClients = rows.filter((r) => r.signed_up_this_month).length;
   const withSessions = rows.filter((r) => r.month_held > 0).length;
-  const link = (m: string, k = kind) => `/admin/clients?month=${m}${k !== "all" ? `&kind=${k}` : ""}`;
+  const link = (m: string, k = kind) => `/admin/clients?month=${m}${k !== "all" ? `&kind=${k}` : ""}${counsellor ? `&counsellor=${counsellor}` : ""}`;
 
   return (
     <main className="stack" style={{ gap: 20 }}>
@@ -74,6 +77,9 @@ export default async function ClientsByMonth({ searchParams }: { searchParams: P
           all-time sessions. Late cancellations count as sessions held.
         </p>
       </div>
+      {manager && (
+        <CounsellorFilter action="/admin/clients" keep={{ month, ...(kind !== "all" ? { kind } : {}) }} value={counsellor} staff={staffList} />
+      )}
       <nav className="tabs" aria-label="Month">
         <Link href={link(shift(month, -1))}>← {monthName(shift(month, -1))}</Link>
         <Link href={link(month)} aria-current="page">{monthName(month)}</Link>

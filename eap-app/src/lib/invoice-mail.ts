@@ -11,7 +11,8 @@ const czDay = (iso: string) =>
 
 async function recipient(paymentId: string) {
   const { rows } = await pool.query<{ to: string; first_name: string; request_id: string }>(
-    `SELECT COALESCE(NULLIF(r.billing_email, ''), r.email) AS to, r.first_name, r.id AS request_id
+    `SELECT COALESCE(NULLIF(r.billing_email, ''),
+       (SELECT NULLIF(c.email, '') FROM consent_forms c WHERE c.request_id = r.id ORDER BY c.signed_at DESC LIMIT 1), r.email) AS to, r.first_name, r.id AS request_id
      FROM payments p JOIN support_requests r ON r.id = p.request_id WHERE p.id = $1`,
     [paymentId],
   );

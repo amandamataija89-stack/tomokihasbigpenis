@@ -13,8 +13,10 @@ export function BillingProfile({
   vatRate,
   manager,
   flash,
+  consent,
 }: {
   r: RequestRow;
+  consent?: { fullName: string; homeAddress: string; email: string } | null; // from the signed consent form
   range: PriceRow | null;
   vatPayer: boolean;
   vatRate: number;
@@ -106,12 +108,12 @@ export function BillingProfile({
         <h3 style={{ fontSize: 16 }}>Invoice to</h3>
         <div className="field">
           <label htmlFor="billingName">Name or company</label>
-          <input id="billingName" name="billingName" type="text" defaultValue={r.billing_name} placeholder={r.full_name || r.first_name} />
+          <input id="billingName" name="billingName" type="text" defaultValue={r.billing_name} placeholder={consent?.fullName || r.full_name || r.first_name} />
         </div>
         <div className="field">
           <label htmlFor="billingAddress">Address</label>
-          <textarea id="billingAddress" name="billingAddress" rows={3} defaultValue={r.billing_address} placeholder={r.address} />
-          <span className="small">Leave empty to use their residential address from the sign-up form.</span>
+          <textarea id="billingAddress" name="billingAddress" rows={3} defaultValue={r.billing_address} placeholder={consent?.homeAddress || r.address} />
+          <span className="small">Leave empty to use the name, address and email from their signed consent form (from the sign-up form until it&apos;s signed).</span>
         </div>
         <div className="pay-fields">
           <label>
@@ -125,8 +127,8 @@ export function BillingProfile({
         </div>
         <div className="field">
           <label htmlFor="billingEmail">Send invoices to</label>
-          <input id="billingEmail" name="billingEmail" type="email" defaultValue={r.billing_email} placeholder={r.email} />
-          <span className="small">Leave empty to use the client&apos;s email.</span>
+          <input id="billingEmail" name="billingEmail" type="email" defaultValue={r.billing_email} placeholder={consent?.email || r.email} />
+          <span className="small">Leave empty to use the email from their signed consent form.</span>
         </div>
         <div className="actions"><button type="submit">Save</button></div>
       </form>

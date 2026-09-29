@@ -127,3 +127,19 @@ describe("private clients", () => {
     expect(m.text).toContain("Private client");
   });
 });
+
+describe("discovery session", () => {
+  it("is always online, even for a client who chose in person", () => {
+    const booked = sessionConfirmation({ ...base, kind: "booked", format: "In person in Prague", discovery: true });
+    expect(booked.text).toContain("Where: online");
+    expect(booked.text).not.toContain("Mezibranská");
+    const r = sessionReminder({ ...base, format: "In person in Prague", discovery: true, lateCancelHours: 48, cancelBy: "Sunday" });
+    expect(r.subject).toContain("free discovery session");
+    expect(r.text).toContain("Where: online");
+    expect(r.text).not.toContain("counts as");
+  });
+
+  it("full sessions in person meet at Mezibranská 4", () => {
+    expect(sessionConfirmation({ ...base, kind: "booked", format: "In person in Prague" }).text).toContain("Mezibranská 4, 110 00 Prague 1");
+  });
+});

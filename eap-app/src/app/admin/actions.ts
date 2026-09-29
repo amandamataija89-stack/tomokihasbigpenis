@@ -530,7 +530,7 @@ export async function addSession(requestId: string, formData: FormData) {
 }
 
 const DISCOVERY_OFFER = (counsellor: string) =>
-  `Hello, I'm ${counsellor}, your counsellor at Prague Integration. I'd like to offer you a free discovery session: a first, no-obligation conversation where we get to know each other and talk about what you'd like support with. Please reply here with a few days and times that suit you, and whether you prefer online or in person.`;
+  `Hello, I'm ${counsellor}, your counsellor at Prague Integration. I'd like to offer you a free discovery session: a first, no-obligation conversation online where we get to know each other and talk about what you'd like support with. Please reply here with a few days and times that suit you.`;
 
 /** Step 2: offers the client a free discovery session, by message on their private page. */
 export async function offerDiscoveryAction(requestId: string) {

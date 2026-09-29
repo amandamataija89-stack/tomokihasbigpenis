@@ -301,3 +301,7 @@ footer.site a { color: inherit; }
 .client-steps li.current > b { text-decoration: underline; text-decoration-color: var(--green); text-underline-offset: 4px; }
 .step-done { display: inline-block; margin-left: 8px; font-size: 14px; color: var(--green-strong); }
 .step-form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; }
+
+.form-links { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; font-size: 14px; margin: 0 0 16px; }
+.form-links a { font-weight: 600; }
+.counsellor-filter select { width: auto; min-width: 220px; }

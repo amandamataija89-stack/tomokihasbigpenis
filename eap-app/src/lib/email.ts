@@ -199,14 +199,16 @@ const sessionOf = (n: number, total: number | null) => (total ? `Session ${n} of
 export const lateCancellationPolicy = (hours: number, total: number | null) =>
   `Cancellation policy: if you need to cancel or move a session, please tell us at least ${hours} hours before it starts. A session cancelled with less notice ${lateCancelCost(total)}.`;
 
+/** Where the session happens. The free discovery session is always online; other sessions follow the client's choice. */
+export function whereText(format: string, discovery?: boolean): string {
+  if (discovery || format === "Online") return "Where: online. Your therapist will send you the details for joining.";
+  if (format === "In person in Prague") return "Where: Prague Integration, Mezibranská 4, 110 00 Prague 1";
+  return "";
+}
+
 // Contains only practical details, nothing about why the person is coming.
 export function sessionConfirmation(s: SessionEmail): Mail {
-  const where =
-    s.format === "In person in Prague"
-      ? "Where: Prague Integration, Mezibranská 4, 110 00 Prague 1"
-      : s.format === "Online"
-        ? "Where: online. Your therapist will send you the details for joining."
-        : "Your therapist will let you know whether you'll meet online or in person.";
+  const where = whereText(s.format, s.discovery) || "Your therapist will let you know whether you'll meet online or in person.";
   const withWhom = s.therapistName ? ` with ${s.therapistName}` : "";
   const subject = {
     booked: s.discovery ? `Your free discovery session: ${s.when}` : `Your session is booked: ${s.when}`,
@@ -271,16 +273,17 @@ export function feedbackInvitation(to: string, firstName: string, token: string)
 }
 
 export function sessionReminder(s: Omit<SessionEmail, "kind"> & { cancelBy: string; lateCancelHours: number }): Mail {
-  const where =
-    s.format === "In person in Prague"
-      ? "Where: Prague Integration, Mezibranská 4, 110 00 Prague 1"
-      : s.format === "Online"
-        ? "Where: online. Your therapist will send you the details for joining."
-        : "";
+  const where = whereText(s.format, s.discovery);
+  const contact = `${s.messageLink ? `message us on your private page (${s.messageLink})` : "reply to this email"} or call +420 608 573 256`;
+  const session = s.discovery ? "free discovery session" : "session";
   return {
     to: s.to,
-    subject: `Reminder: your session on ${s.when} – Prague Integration`,
-    text: `Hi ${s.firstName},\n\nA reminder of your upcoming session${s.therapistName ? ` with ${s.therapistName}` : ""}:\n\n${s.when} (Prague time)\n${sessionOf(s.number, s.total)}${where ? `\n${where}` : ""}\n\nIf you need to cancel or move it, please tell us by ${s.cancelBy}: ${s.messageLink ? `message us on your private page (${s.messageLink})` : "reply to this email"} or call +420 608 573 256. After that, a cancellation ${lateCancelCost(s.total)}.\n\nSee you soon,\nPrague Integration\n`,
+    subject: `Reminder: your ${session} on ${s.when} – Prague Integration`,
+    text: `Hi ${s.firstName},\n\nA reminder of your upcoming ${session}${s.therapistName ? ` with ${s.therapistName}` : ""}:\n\n${s.when} (Prague time)\n${s.discovery ? "Free of charge" : sessionOf(s.number, s.total)}${where ? `\n${where}` : ""}\n\n${
+      s.discovery
+        ? `If you need to cancel or move it, please ${contact}.`
+        : `If you need to cancel or move it, please tell us by ${s.cancelBy}: ${contact}. After that, a cancellation ${lateCancelCost(s.total)}.`
+    }\n\nSee you soon,\nPrague Integration\n`,
   };
 }
 

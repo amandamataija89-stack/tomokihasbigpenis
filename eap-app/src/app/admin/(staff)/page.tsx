@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CounsellorFilter, counsellorOptions, isStaffId } from "./CounsellorFilter";
 import { assignWaitingAndNotify } from "@/lib/assign";
 import { isManager, requireStaff } from "@/lib/auth";
 import {
@@ -18,7 +19,7 @@ import { age, formatDate, isOverdue } from "../format";
 export default async function RequestsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; deleted?: string; declined?: string; gone?: string }>;
+  searchParams: Promise<{ status?: string; deleted?: string; declined?: string; gone?: string; counsellor?: string }>;
 }) {
   const sp = await searchParams;
   const me = await requireStaff();
@@ -44,7 +45,11 @@ export default async function RequestsPage({
         return [];
       })
     : [];
-  const onlyFor = manager ? undefined : me.id;
+  // Coordinators and admins can narrow the list to one counsellor's clients.
+  const counsellor = manager && isStaffId(sp.counsellor) ? sp.counsellor : "";
+  const onlyFor = manager ? counsellor || undefined : me.id;
+  const staffList = manager ? await counsellorOptions() : [];
+  const withCounsellor = (href: string) => (counsellor ? `${href}${href.includes("?") ? "&" : "?"}counsellor=${counsellor}` : href);
   const [requests, counts, month, open] = await Promise.all([
     listRequests(filter, onlyFor),
     filterCounts(onlyFor),
@@ -84,9 +89,12 @@ export default async function RequestsPage({
 
       {month && open && <MyMonth month={month} open={open} />}
 
+      {manager && (
+        <CounsellorFilter action="/admin" keep={filter === "open" ? {} : { status: filter }} value={counsellor} staff={staffList} />
+      )}
       <nav className="tabs" aria-label="Filter">
         {filters.map((f) => (
-          <Link key={f} href={f === "open" ? "/admin" : `/admin?status=${f}`} aria-current={f === filter ? "page" : undefined}>
+          <Link key={f} href={withCounsellor(f === "open" ? "/admin" : `/admin?status=${f}`)} aria-current={f === filter ? "page" : undefined}>
             {labels[f]}
             <span className="count">{counts[f]}</span>
           </Link>

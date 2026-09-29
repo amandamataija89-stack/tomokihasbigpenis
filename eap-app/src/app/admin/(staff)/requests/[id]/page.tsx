@@ -101,6 +101,14 @@ export default async function RequestPage({
         <button type="submit" className="small-btn">Save</button>
         {sp.crisis && <span className="small">{sp.crisis === "on" ? "Marked as a crisis case." : "No longer a crisis case."}</span>}
       </form>
+      {isPrivate && (
+        <nav className="form-links" aria-label="Client's forms">
+          <b>Forms:</b>
+          <a href="#intake">Intake form {intake ? "✓ filled in" : "– not yet"}</a>
+          <a href="#consent">Consent form {signedConsent ? "✓ signed" : "– not signed yet"}</a>
+          {signedConsent && <a href={`/admin/consent/${r.id}`} target="_blank" rel="noopener">Consent PDF</a>}
+        </nav>
+      )}
       {sp.saved && <p className="flash" role="status">Saved.</p>}
       {sp.added && <p className="flash" role="status">Client added.</p>}
       {sp.accepted && <p className="flash" role="status">Accepted. Please contact them by {formatDate(due)}.</p>}
@@ -212,7 +220,7 @@ export default async function RequestPage({
               }}
             />
           )}
-          {intake && <IntakeCard intake={intake} />}
+          {isPrivate && <IntakeCard requestId={r.id} intake={intake} sentAt={r.intake_sent_at} />}
           {isPrivate && <ConsentCard requestId={r.id} signed={signedConsent} sentAt={r.consent_form_sent_at} flash={sp.consent} />}
           <Messages requestId={r.id} nickname={r.first_name} messages={messages} flash={sp.msg} />
           <Sessions
@@ -270,7 +278,7 @@ export default async function RequestPage({
           </form>
 
           {isPrivate && settings && (
-            <BillingProfile r={r} range={priceRange} vatPayer={settings.vatPayer} vatRate={settings.vatRate} manager={manager} flash={sp.billing} />
+            <BillingProfile r={r} range={priceRange} vatPayer={settings.vatPayer} vatRate={settings.vatRate} manager={manager} flash={sp.billing} consent={signedConsent} />
           )}
 
           <section className="card stack counsellor-notes" id="counsellor-notes">
