@@ -185,6 +185,10 @@ export type SessionEmail = {
   total: number | null; // null: no session limit (private clients)
   format: string;
   therapistName: string | null;
+  // Private clients: how to pay for this session (QR code attached), within 24 hours after it.
+  payment?: { amount: number; variableSymbol: string; account: string; iban: string; qrPngBase64: string };
+  discovery?: boolean; // the free discovery session
+  intakeLink?: string; // sent with the discovery session invitation
 };
 
 // What a late cancellation costs: one of the EAP sessions, or the full fee for a private client.
@@ -205,21 +209,28 @@ export function sessionConfirmation(s: SessionEmail): Mail {
         : "Your therapist will let you know whether you'll meet online or in person.";
   const withWhom = s.therapistName ? ` with ${s.therapistName}` : "";
   const subject = {
-    booked: `Your session is booked: ${s.when}`,
+    booked: s.discovery ? `Your free discovery session: ${s.when}` : `Your session is booked: ${s.when}`,
     moved: `Your session has moved: ${s.when}`,
     cancelled: `Your session on ${s.when} is cancelled`,
   }[s.kind];
   const lead = {
-    booked: `your session${withWhom} is booked for:`,
+    booked: s.discovery ? `your free discovery session${withWhom} is booked for:` : `your session${withWhom} is booked for:`,
     moved: `your session${withWhom} has moved to:`,
     cancelled: `your session${withWhom} on the date below has been cancelled:`,
   }[s.kind];
   const policy = s.lateCancelHours ? `\n\n${lateCancellationPolicy(s.lateCancelHours, s.total)}` : "";
+  const intake = s.intakeLink
+    ? `\n\nBefore we meet, please fill in our intake & registration form (about 10 minutes):\n${s.intakeLink}\n(Keep this link to yourself.)`
+    : "";
+  const pay = s.payment
+    ? `\n\nPayment: ${s.payment.amount.toLocaleString("cs-CZ")} CZK, within 24 hours after the session, to account ${s.payment.account}${s.payment.iban ? ` (IBAN ${s.payment.iban})` : ""} with variable symbol ${s.payment.variableSymbol}. The attached QR code fills this in for you in your banking app.`
+    : "";
   const body =
     s.kind === "cancelled"
       ? `\n\nWe'll be in touch to find a new time.`
-      : `\n${sessionOf(s.number, s.total)}\n${where}${policy}`;
+      : `\n${s.discovery ? "Free of charge" : sessionOf(s.number, s.total)}\n${where}${policy}${intake}${pay}`;
   return {
+    attachments: s.payment && s.kind !== "cancelled" ? [{ filename: "qr-platba.png", content: s.payment.qrPngBase64 }] : undefined,
     to: s.to,
     subject: `${subject} – Prague Integration`,
     text: `Hi ${s.firstName},\n\n${lead[0].toUpperCase()}${lead.slice(1)}\n\n${s.when} (Prague time)${body}\n\nIf you need to change the time, ${s.messageLink ? `message us on your private page (${s.messageLink})` : "reply to this email"} or call +420 608 573 256.\n\nPrague Integration\ncontact@pragueintegration.cz\n`,
@@ -397,5 +408,37 @@ export function consentSignedEmail(to: string, firstName: string, pdfBase64: str
     subject: "Your signed consent form – Prague Integration",
     text: `Hi ${firstName},\n\nThank you for signing our informed consent form. A copy is attached for your records.\n\nPrague Integration\n`,
     attachments: [{ filename: "prague-integration-consent-form.pdf", content: pdfBase64 }],
+  };
+}
+
+/** The intake & registration form, before the discovery session. */
+export function intakeRequestEmail(to: string, firstName: string, link: string): Mail {
+  return {
+    to,
+    subject: "Your intake & registration form – Prague Integration",
+    text: `Hi ${firstName},\n\nBefore your discovery session, please fill in our intake & registration form. It takes about 10 minutes and helps your counsellor prepare:\n\n${link}\n\n(Keep this link to yourself.)\n\nPrague Integration\n+420 608 573 256\ncontact@pragueintegration.cz\n`,
+  };
+}
+
+/** To the counsellor and coordinator: the client answered yes to thoughts of harm in the intake form. */
+export function intakeHarmAlert(to: string, clientNickname: string, requestId: string): Mail {
+  return {
+    to,
+    subject: `URGENT – ${clientNickname}: thoughts of harm in the intake form`,
+    text: `${clientNickname} answered YES to "Have you had any thoughts of harming yourself or others?" in their intake form. The case is now marked as a crisis. Please contact them as soon as possible:\n${appUrl()}/admin/requests/${requestId}\n`,
+  };
+}
+
+/** After the discovery session, the client chose counselling: consent form and how payment works. */
+export function counsellingStartEmail(
+  to: string,
+  firstName: string,
+  consentLink: string,
+  p: { priceText: string; variableSymbol: string; account: string; iban: string; messageLink: string },
+): Mail {
+  return {
+    to,
+    subject: "Starting counselling: consent form and payment – Prague Integration",
+    text: `Hi ${firstName},\n\nWe're glad you'd like to continue. Two things before your first full session:\n\n1. Please read and sign our informed consent form (about 5 minutes):\n${consentLink}\n\n2. Payment: ${p.priceText} per session. Please pay each session within 24 hours after it ends, by bank transfer to account ${p.account}${p.iban ? ` (IBAN ${p.iban})` : ""} with your variable symbol ${p.variableSymbol} – it identifies your payments. With each booked session you'll receive a QR code that fills this in for you, and you'll also find them on your private page:\n${p.messageLink}\n\nCancellations: please give at least 48 hours' notice; otherwise the full session fee is charged.\n\nPrague Integration\n+420 608 573 256\ncontact@pragueintegration.cz\n`,
   };
 }

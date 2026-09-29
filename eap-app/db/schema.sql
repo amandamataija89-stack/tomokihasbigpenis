@@ -328,3 +328,37 @@ ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS consent_form_sent_at times
 
 -- When a finished case's client record was reduced to what its invoices need (see src/lib/retention.ts).
 ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS anonymized_at timestamptz;
+
+-- The counsellor's own notes on a client: only the counsellor looking after the client can read them
+-- (not coordinators or admins, unless they are that client's counsellor).
+CREATE TABLE IF NOT EXISTS counsellor_notes (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  request_id uuid NOT NULL REFERENCES support_requests(id) ON DELETE CASCADE,
+  staff_id   uuid REFERENCES staff(id) ON DELETE SET NULL,
+  body       text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS counsellor_notes_request_idx ON counsellor_notes (request_id, created_at DESC);
+
+-- The steps with a new private client: offer a free discovery session, book it and send the intake form,
+-- then (if they choose counselling) send the consent form and payment information.
+ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS discovery_offered_at timestamptz;
+ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS intake_sent_at timestamptz;
+ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS counselling_agreed_at timestamptz;
+-- A free discovery session (not charged, not invoiced, not counted as one of the EAP sessions).
+ALTER TABLE client_sessions ADD COLUMN IF NOT EXISTS is_discovery boolean NOT NULL DEFAULT false;
+-- Added by staff rather than through the website.
+ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS added_by uuid REFERENCES staff(id) ON DELETE SET NULL;
+
+-- The intake & registration form the client fills in before their discovery session.
+CREATE TABLE IF NOT EXISTS intake_forms (
+  id                     uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  request_id             uuid NOT NULL REFERENCES support_requests(id) ON DELETE CASCADE,
+  answers                jsonb NOT NULL, -- every answer, as filled in (see src/lib/intake.ts)
+  signed_name            text NOT NULL,
+  signature_png          text NOT NULL,
+  signed_at              timestamptz NOT NULL DEFAULT now(),
+  ip                     text NOT NULL DEFAULT '',
+  user_agent             text NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS intake_forms_request_idx ON intake_forms (request_id, signed_at DESC);

@@ -48,6 +48,7 @@ export async function applyRetention(now = new Date()): Promise<RetentionResult>
     // Invoices must stay: keep only what they show (name, address, invoice details, variable symbol and
     // the sessions they cover); everything about the client's wellbeing and contact goes.
     await pool.query("DELETE FROM request_notes WHERE request_id = $1", [r.id]);
+    await pool.query("DELETE FROM counsellor_notes WHERE request_id = $1", [r.id]);
     await pool.query("DELETE FROM client_messages WHERE request_id = $1", [r.id]);
     await pool.query("DELETE FROM message_links WHERE request_id = $1", [r.id]);
     await pool.query("DELETE FROM consent_forms WHERE request_id = $1", [r.id]);

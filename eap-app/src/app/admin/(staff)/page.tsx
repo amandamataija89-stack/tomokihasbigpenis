@@ -24,13 +24,14 @@ export default async function RequestsPage({
   const me = await requireStaff();
   const manager = isManager(me);
   const filters: Filter[] = manager
-    ? ["open", "pool", "awaiting", "private", ...STATUSES, "all"]
-    : ["open", "awaiting", "private", ...STATUSES.filter((s) => s !== "scheduled"), "all", "pool"];
+    ? ["open", "crisis", "pool", "awaiting", "private", ...STATUSES, "all"]
+    : ["open", "crisis", "awaiting", "private", ...STATUSES.filter((s) => s !== "scheduled"), "all", "pool"];
   const labels: Record<Filter, string> = {
     open: "Open",
     pool: manager ? "To assign" : "Pool: clients anyone can take",
     awaiting: manager ? "Waiting to accept" : "Waiting for my answer",
     private: manager ? "Private clients" : "My private clients",
+    crisis: "Crisis",
     ...STATUS_LABELS,
     all: "All",
   };
@@ -62,7 +63,10 @@ export default async function RequestsPage({
   return (
     <main className="stack" style={{ gap: 20 }}>
       <div className="stack">
-        <h1 style={{ fontSize: 32 }}>{manager ? "Support requests" : "My clients"}</h1>
+        <div className="actions" style={{ justifyContent: "space-between" }}>
+          <h1 style={{ fontSize: 32 }}>{manager ? "Support requests" : "My clients"}</h1>
+          <Link className="button small-btn" href="/admin/clients/new">+ Add a client</Link>
+        </div>
         <p className="lede">
           {summary.length ? `${summary.join(" · ")}.` : manager ? "Nothing waiting to be assigned." : "No new clients waiting for your answer."}
           {!manager && " You only see your own clients, and the pool."}

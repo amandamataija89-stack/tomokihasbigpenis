@@ -5,7 +5,7 @@ import { PDFDocument, rgb, type PDFFont } from "pdf-lib";
 import { appUrl } from "./app-url";
 import { CONSENT_SECTIONS, CONSENT_TITLE, CONSENT_VERSION, consentPlainText } from "./consent-text";
 import { pool } from "./db";
-import { consentRequestEmail, consentSignedEmail, sendEmail } from "./email";
+import { consentRequestEmail, consentSignedEmail, counsellingStartEmail, sendEmail } from "./email";
 import { LIBERATION_SANS_BOLD, LIBERATION_SANS_REGULAR } from "./fonts/liberation-sans";
 
 export type ConsentInput = {
@@ -136,13 +136,14 @@ export async function sendConsentRequest(requestId: string, staffId: string | nu
 
 /** When the first session is booked: asks the client to sign, unless they already have or were asked. */
 export async function requestConsentIfNeeded(requestId: string, staffId: string | null): Promise<boolean> {
-  const { rows } = await pool.query<{ asked: boolean; signed: boolean }>(
-    `SELECT consent_form_sent_at IS NOT NULL AS asked,
+  // Only Prague Integration's own (private) clients sign the form; EAP clients don't.
+  const { rows } = await pool.query<{ asked: boolean; signed: boolean; kind: string }>(
+    `SELECT consent_form_sent_at IS NOT NULL AS asked, kind,
        EXISTS (SELECT 1 FROM consent_forms WHERE request_id = $1) AS signed
      FROM support_requests WHERE id = $1`,
     [requestId],
   );
-  if (!rows[0] || rows[0].asked || rows[0].signed) return false;
+  if (!rows[0] || rows[0].kind !== "private" || rows[0].asked || rows[0].signed) return false;
   await sendConsentRequest(requestId, staffId);
   return true;
 }
@@ -253,4 +254,45 @@ export async function sendSignedCopy(c: SignedConsent, requestId: string): Promi
   const { rows } = await pool.query<{ first_name: string }>("SELECT first_name FROM support_requests WHERE id = $1", [requestId]);
   const pdf = Buffer.from(await renderConsentPdf(c)).toString("base64");
   await sendEmail(consentSignedEmail(c.email, rows[0]?.first_name ?? c.fullName, pdf));
+}
+
+/**
+ * The first full (paid) session of a private client is booked: they're sent the consent form and how
+ * payment works (price, variable symbol, pay within 24 hours after each session). Once only.
+ */
+export async function startCounselling(requestId: string, staffId: string | null): Promise<boolean> {
+  const { rows } = await pool.query<{ kind: string; agreed: boolean; email: string; first_name: string; price: number | null; net: number | null }>(
+    `SELECT kind, counselling_agreed_at IS NOT NULL AS agreed, email, first_name, session_price_czk AS price, session_price_net_czk AS net
+     FROM support_requests WHERE id = $1`,
+    [requestId],
+  );
+  const r = rows[0];
+  if (!r || r.kind !== "private" || r.agreed) return false;
+  const { ensureVariableSymbol, invoiceSettings } = await import("./billing");
+  const { clientMessageLink } = await import("./messages");
+  const settings = await invoiceSettings();
+  const vs = await ensureVariableSymbol(requestId);
+  const priceText =
+    r.price !== null
+      ? `${r.price.toLocaleString("cs-CZ")} CZK${settings.vatPayer && r.net !== null ? ` (${r.net.toLocaleString("cs-CZ")} CZK + ${settings.vatRate} % VAT)` : ""}`
+      : "the price agreed with your counsellor";
+  await sendEmail(
+    counsellingStartEmail(r.email, r.first_name, await consentLink(requestId), {
+      priceText,
+      variableSymbol: vs,
+      account: settings.bankAccount,
+      iban: settings.iban,
+      messageLink: await clientMessageLink(requestId),
+    }),
+  );
+  await pool.query(
+    "UPDATE support_requests SET counselling_agreed_at = now(), consent_form_sent_at = now(), updated_at = now() WHERE id = $1",
+    [requestId],
+  );
+  await pool.query("INSERT INTO request_notes (request_id, staff_id, body) VALUES ($1, $2, $3)", [
+    requestId,
+    staffId,
+    "First full session booked: consent form and payment information emailed to the client.",
+  ]);
+  return true;
 }

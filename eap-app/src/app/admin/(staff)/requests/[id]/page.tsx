@@ -1,9 +1,10 @@
 import Link from "next/link";
+import { pool } from "@/lib/db";
 import { notFound } from "next/navigation";
 import { speaks } from "@/lib/assign";
 import { isManager, requireStaff } from "@/lib/auth";
 import { getRequest, listNotes, listSessions, listStaffWithLoad, STATUSES, STATUS_LABELS } from "@/lib/data";
-import { acceptCase, addNote, declineCase, deleteRequest, emailFeedbackLink, updateRequest } from "../../../actions";
+import { acceptCase, addCounsellorNote, addNote, setCrisisAction, declineCase, deleteRequest, emailFeedbackLink, updateRequest } from "../../../actions";
 import { contactDue } from "@/lib/deadlines";
 import { formatDate } from "../../../format";
 import { listMessages, markClientMessagesRead } from "@/lib/messages";
@@ -11,6 +12,9 @@ import { Messages } from "./Messages";
 import { Sessions } from "./Sessions";
 import { Payments } from "./Payments";
 import { ConsentCard } from "./ConsentCard";
+import { IntakeCard } from "./IntakeCard";
+import { Steps } from "./Steps";
+import { latestIntake } from "@/lib/intake";
 import { latestConsent } from "@/lib/consent";
 import { BillingProfile } from "./BillingProfile";
 import { defaultSessionPrice, invoiceSettings, listPackages, listPayments, priceList } from "@/lib/billing";
@@ -32,6 +36,8 @@ export default async function RequestPage({
     why?: string;
     pdf?: string;
     consent?: string;
+    crisis?: string;
+    added?: string;
   }>;
 }) {
   const { id } = await params;
@@ -44,7 +50,16 @@ export default async function RequestPage({
   // The client's messages count as read once whoever looks after them opens the case.
   if (r.assigned_to === me.id || (!r.assigned_to && manager)) await markClientMessagesRead(id);
   const isPrivate = r.kind === "private";
-  const signedConsent = await latestConsent(id);
+  const [signedConsent, intake] = await Promise.all([latestConsent(id), latestIntake(id)]);
+  // Counsellor-only notes: readable only by the client's counsellor; others see just how many there are.
+  const isTheirCounsellor = r.assigned_to === me.id;
+  const { rows: privateNotes } = await pool.query<{ id: string; body: string; created_at: Date; staff_name: string | null }>(
+    isTheirCounsellor
+      ? `SELECT n.id, n.body, n.created_at, s.name AS staff_name FROM counsellor_notes n LEFT JOIN staff s ON s.id = n.staff_id
+         WHERE n.request_id = $1 ORDER BY n.created_at DESC`
+      : "SELECT id, '' AS body, created_at, NULL AS staff_name FROM counsellor_notes WHERE request_id = $1",
+    [id],
+  );
   const [notes, staff, sessions, messages, payments, packages, prices, defaultPrice] = await Promise.all([
     listNotes(id),
     manager ? listStaffWithLoad(undefined, false) : Promise.resolve([]),
@@ -78,7 +93,16 @@ export default async function RequestPage({
           <span className={`pill pill-${r.status}`}>{STATUS_LABELS[r.status]}</span>
         </span>
       </div>
+      <form action={setCrisisAction.bind(null, r.id)} className={`crisis-toggle${r.crisis ? " on" : ""}`}>
+        <label className="consent">
+          <input type="checkbox" name="crisis" value="yes" defaultChecked={r.crisis} />
+          <span><b>Crisis case</b>: needs contact as soon as possible</span>
+        </label>
+        <button type="submit" className="small-btn">Save</button>
+        {sp.crisis && <span className="small">{sp.crisis === "on" ? "Marked as a crisis case." : "No longer a crisis case."}</span>}
+      </form>
       {sp.saved && <p className="flash" role="status">Saved.</p>}
+      {sp.added && <p className="flash" role="status">Client added.</p>}
       {sp.accepted && <p className="flash" role="status">Accepted. Please contact them by {formatDate(due)}.</p>}
       {sp.taken && <p className="flash" role="status">They&apos;re your client now. Please contact them by {formatDate(due)}.</p>}
 
@@ -169,7 +193,27 @@ export default async function RequestPage({
               </>
             )}
           </section>
-          <ConsentCard requestId={r.id} signed={signedConsent} sentAt={r.consent_form_sent_at} flash={sp.consent} />
+          {isPrivate && (
+            <Steps
+              requestId={r.id}
+              canAct={r.assigned_to === me.id || manager}
+              s={{
+                accepted: r.accepted_at,
+                discoveryOffered: r.discovery_offered_at,
+                discoverySession: (() => {
+                  const d = sessions.find((x) => x.is_discovery);
+                  return d ? { starts_at: d.starts_at, done: !!d.done_at } : null;
+                })(),
+                intakeSent: r.intake_sent_at,
+                intakeDone: intake?.signed_at ?? null,
+                firstFullSession: sessions.find((x) => !x.is_discovery)?.starts_at ?? null,
+                consentSent: r.consent_form_sent_at,
+                consentSigned: signedConsent?.signed_at ?? null,
+              }}
+            />
+          )}
+          {intake && <IntakeCard intake={intake} />}
+          {isPrivate && <ConsentCard requestId={r.id} signed={signedConsent} sentAt={r.consent_form_sent_at} flash={sp.consent} />}
           <Messages requestId={r.id} nickname={r.first_name} messages={messages} flash={sp.msg} />
           <Sessions
             manager={manager}
@@ -222,10 +266,6 @@ export default async function RequestPage({
                 </span>
               </div>
             )}
-            <label className="consent">
-              <input type="checkbox" name="crisis" value="yes" defaultChecked={r.crisis} />
-              <span>Crisis case (needs contact as soon as possible)</span>
-            </label>
             <div className="actions"><button type="submit">Save</button></div>
           </form>
 
@@ -233,10 +273,34 @@ export default async function RequestPage({
             <BillingProfile r={r} range={priceRange} vatPayer={settings.vatPayer} vatRate={settings.vatRate} manager={manager} flash={sp.billing} />
           )}
 
+          <section className="card stack counsellor-notes" id="counsellor-notes">
+            <h2>Counsellor&apos;s notes</h2>
+            {isTheirCounsellor ? (
+              <>
+                <form action={addCounsellorNote.bind(null, r.id)} className="form" style={{ gap: 10 }}>
+                  <label htmlFor="cbody" className="small">🔒 Only you, as {r.first_name}&apos;s counsellor, can read these. The coordinator and admins can&apos;t.</label>
+                  <textarea id="cbody" name="body" rows={4} placeholder="Your session notes" />
+                  <div className="actions"><button type="submit" className="ghost">Add note</button></div>
+                </form>
+                {privateNotes.map((n) => (
+                  <div className="note" key={n.id}>
+                    <span className="meta">{n.staff_name ?? "You"} · {formatDate(n.created_at)}</span>
+                    <span className="body" style={{ whiteSpace: "pre-wrap" }}>{n.body}</span>
+                  </div>
+                ))}
+              </>
+            ) : (
+              <p className="small">
+                🔒 {privateNotes.length ? `${privateNotes.length} note${privateNotes.length === 1 ? "" : "s"}` : "Notes"} written by the
+                client&apos;s counsellor. Only the counsellor can read them.
+              </p>
+            )}
+          </section>
+
           <section className="card stack">
-            <h2>Notes</h2>
+            <h2>Team notes</h2>
             <form action={addNote.bind(null, r.id)} className="form" style={{ gap: 10 }}>
-              <label htmlFor="body" className="small">Visible to staff only</label>
+              <label htmlFor="body" className="small">Visible to the counsellor, coordinator and admins</label>
               <textarea id="body" name="body" placeholder="e.g. Called, left voicemail. Will try again tomorrow morning." />
               <div className="actions"><button type="submit" className="ghost">Add note</button></div>
             </form>

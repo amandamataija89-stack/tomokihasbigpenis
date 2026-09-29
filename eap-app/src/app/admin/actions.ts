@@ -94,24 +94,12 @@ export async function updateRequest(requestId: string, formData: FormData) {
   if (!STATUSES.includes(status)) throw new Error("Unknown status");
   await acceptIfPending(requestId, c);
 
-  const crisis = formData.get("crisis") === "yes";
   const { rows } = await pool.query<{ status: Status; assigned_to: string | null; crisis: boolean; kind: ClientKind }>(
     "SELECT status, assigned_to, crisis, kind FROM support_requests WHERE id = $1",
     [requestId],
   );
   if (!rows[0]) redirect("/admin");
-  await pool.query("UPDATE support_requests SET status = $2, crisis = $3, updated_at = now() WHERE id = $1", [
-    requestId,
-    status,
-    crisis,
-  ]);
-  if (rows[0].crisis !== crisis) {
-    await pool.query("INSERT INTO request_notes (request_id, staff_id, body) VALUES ($1, $2, $3)", [
-      requestId,
-      staff.id,
-      crisis ? "Marked as a crisis case." : "No longer marked as a crisis case.",
-    ]);
-  }
+  await pool.query("UPDATE support_requests SET status = $2, updated_at = now() WHERE id = $1", [requestId, status]);
   if (rows[0].assigned_to !== assignedTo) {
     // A reassignment counts towards the new counsellor's monthly total from today.
     if (assignedTo) await offerTo(requestId, assignedTo, staff.id, formData.get("agreed") === "yes");
@@ -142,6 +130,33 @@ export async function updateRequest(requestId: string, formData: FormData) {
   }
   revalidatePath(`/admin/requests/${requestId}`);
   redirect(`/admin/requests/${requestId}?saved=1`);
+}
+
+/** The crisis tick box at the top of the case. */
+export async function setCrisisAction(requestId: string, formData: FormData) {
+  const { staff } = await requireCase(requestId);
+  const crisis = formData.get("crisis") === "yes";
+  const { rowCount } = await pool.query(
+    "UPDATE support_requests SET crisis = $2, updated_at = now() WHERE id = $1 AND crisis <> $2",
+    [requestId, crisis],
+  );
+  if (rowCount)
+    await pool.query("INSERT INTO request_notes (request_id, staff_id, body) VALUES ($1, $2, $3)", [
+      requestId,
+      staff.id,
+      crisis ? "Marked as a crisis case." : "No longer marked as a crisis case.",
+    ]);
+  redirect(`/admin/requests/${requestId}?crisis=${crisis ? "on" : "off"}`);
+}
+
+/** A note only the client's counsellor can read. */
+export async function addCounsellorNote(requestId: string, formData: FormData) {
+  const c = await requireCase(requestId);
+  if (c.assignedTo !== c.staff.id) redirect(`/admin/requests/${requestId}`);
+  const body = String(formData.get("body") ?? "").trim().slice(0, 8000);
+  if (body)
+    await pool.query("INSERT INTO counsellor_notes (request_id, staff_id, body) VALUES ($1, $2, $3)", [requestId, c.staff.id, body]);
+  redirect(`/admin/requests/${requestId}#counsellor-notes`);
 }
 
 export async function addNote(requestId: string, formData: FormData) {
@@ -401,11 +416,12 @@ const whenFmt = new Intl.DateTimeFormat("en-GB", {
 
 // Emails the client about a session when staff ticked "Email the client". Returns the note to add.
 async function emailClient(
-  formData: FormData,
+  formData: FormData | null,
   sessionId: string,
   kind: SessionEmail["kind"],
+  extra: { intakeLink?: string } = {},
 ): Promise<string> {
-  if (formData.get("notifyClient") !== "yes") return "";
+  if (formData && formData.get("notifyClient") !== "yes") return "";
   const { rows } = await pool.query<{
     request_id: string;
     email: string;
@@ -415,9 +431,11 @@ async function emailClient(
     starts_at: Date;
     number: number;
     kind: ClientKind;
+    is_discovery: boolean;
   }>(
-    `SELECT r.id AS request_id, r.email, r.first_name, r.format, r.kind, s.name AS therapist, cs.starts_at,
-       (SELECT count(*)::int FROM client_sessions o WHERE o.request_id = r.id AND o.starts_at <= cs.starts_at) AS number
+    `SELECT r.id AS request_id, r.email, r.first_name, r.format, r.kind, s.name AS therapist, cs.starts_at, cs.is_discovery,
+       (SELECT count(*)::int FROM client_sessions o
+        WHERE o.request_id = r.id AND o.starts_at <= cs.starts_at AND NOT o.is_discovery) AS number
      FROM client_sessions cs
      JOIN support_requests r ON r.id = cs.request_id
      LEFT JOIN staff s ON s.id = r.assigned_to
@@ -426,6 +444,10 @@ async function emailClient(
   );
   const r = rows[0];
   if (!r) return "";
+  // Private clients get how to pay for this session, with its QR code.
+  const { sessionPayment } = await import("@/lib/session-qr");
+  const pay = kind !== "cancelled" && !r.is_discovery ? await sessionPayment(sessionId) : null;
+  const { qrPng } = pay ? await import("@/lib/invoice-pdf") : { qrPng: null };
   try {
     await sendEmail(
       sessionConfirmation({
@@ -439,7 +461,19 @@ async function emailClient(
         therapistName: r.therapist,
         messageLink: await clientMessageLink(r.request_id),
         // The first booking explains the cancellation policy.
-        lateCancelHours: kind === "booked" && r.number === 1 ? LATE_CANCEL_HOURS : undefined,
+        lateCancelHours: kind === "booked" && r.number === 1 && !r.is_discovery ? LATE_CANCEL_HOURS : undefined,
+        discovery: r.is_discovery,
+        intakeLink: extra.intakeLink,
+        payment:
+          pay && qrPng
+            ? {
+                amount: pay.amount,
+                variableSymbol: pay.variableSymbol,
+                account: pay.account,
+                iban: pay.iban,
+                qrPngBase64: (await qrPng(pay.qr)).toString("base64"),
+              }
+            : undefined,
       }),
     );
     return " Confirmation emailed to the client.";
@@ -487,11 +521,56 @@ export async function addSession(requestId: string, formData: FormData) {
   );
   await syncStatusWithSessions(requestId, staff.id);
   // The first booking asks the client to sign the informed consent form (once).
-  if (rows[0].n === 0) {
-    const { requestConsentIfNeeded } = await import("@/lib/consent");
-    await requestConsentIfNeeded(requestId, staff.id).catch((err) => console.error("EAP consent email failed:", err));
+  // The first full (paid) session of a private client: the consent form and how payment works.
+  if (rows[0].kind === "private") {
+    const { startCounselling } = await import("@/lib/consent");
+    await startCounselling(requestId, staff.id).catch((err) => console.error("EAP consent email failed:", err));
   }
   redirect(`/admin/requests/${requestId}#sessions`);
+}
+
+const DISCOVERY_OFFER = (counsellor: string) =>
+  `Hello, I'm ${counsellor}, your counsellor at Prague Integration. I'd like to offer you a free discovery session: a first, no-obligation conversation where we get to know each other and talk about what you'd like support with. Please reply here with a few days and times that suit you, and whether you prefer online or in person.`;
+
+/** Step 2: offers the client a free discovery session, by message on their private page. */
+export async function offerDiscoveryAction(requestId: string) {
+  const c = await requireCase(requestId);
+  await acceptIfPending(requestId, c);
+  await sendStaffMessage(requestId, c.staff.id, DISCOVERY_OFFER(c.staff.name));
+  await pool.query(
+    "UPDATE support_requests SET discovery_offered_at = now(), status = CASE WHEN status = 'new' THEN 'contacted' ELSE status END, updated_at = now() WHERE id = $1",
+    [requestId],
+  );
+  await note(requestId, c.staff.id, "Free discovery session offered to the client (message sent).");
+  redirect(`/admin/requests/${requestId}#steps`);
+}
+
+/** Step 3: books the free discovery session and sends the invitation with the intake form. */
+export async function bookDiscoveryAction(requestId: string, formData: FormData) {
+  const c = await requireCase(requestId);
+  await acceptIfPending(requestId, c);
+  const startsAt = sessionDate(formData);
+  if (!startsAt) redirect(`/admin/requests/${requestId}?session=date#steps`);
+  // Free: marked paid at once, so it's never charged or invoiced.
+  const { rows } = await pool.query<{ id: string }>(
+    `INSERT INTO client_sessions (request_id, starts_at, price_czk, paid_at, is_discovery)
+     VALUES ($1, $2::timestamp AT TIME ZONE 'Europe/Prague', 0, now(), true) RETURNING id`,
+    [requestId, startsAt],
+  );
+  const { intakeLink } = await import("@/lib/intake");
+  const emailed = await emailClient(null, rows[0].id, "booked", { intakeLink: await intakeLink(requestId) });
+  await pool.query("UPDATE support_requests SET intake_sent_at = now(), updated_at = now() WHERE id = $1", [requestId]);
+  await note(requestId, c.staff.id, `Free discovery session booked for ${pragueLabel(startsAt!)}, with the intake form.${emailed}`);
+  await syncStatusWithSessions(requestId, c.staff.id);
+  redirect(`/admin/requests/${requestId}#steps`);
+}
+
+/** Emails the intake form (again). */
+export async function sendIntakeAction(requestId: string) {
+  const { staff } = await requireCase(requestId);
+  const { sendIntakeRequest } = await import("@/lib/intake");
+  await sendIntakeRequest(requestId, staff.id).catch((err) => console.error("EAP intake email failed:", err));
+  redirect(`/admin/requests/${requestId}#steps`);
 }
 
 /** Emails the client the link to sign the informed consent form (again). */

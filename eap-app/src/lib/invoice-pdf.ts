@@ -29,7 +29,11 @@ export type InvoiceData = {
   draft?: boolean; // a monthly invoice still building up (no number yet)
   taxDate: string; // YYYY-MM-DD, datum uskutečnění zdanitelného plnění (DUZP)
   method: string;
-  customer: string[]; // lines: name, address, IČO, DIČ
+  customer: string[]; // lines: name, address, email, IČO, DIČ
+  // The client's details as on the signed consent form (falling back to the registration), for exports.
+  customerName: string;
+  customerEmail: string;
+  customerAddress: string;
   lines: InvoiceLine[];
   total: number;
   supplier: InvoiceSettings;
@@ -96,6 +100,7 @@ export async function loadInvoice(paymentId: string, preview = false): Promise<I
     email: string;
     billing_name: string;
     billing_address: string;
+    billing_email: string;
     billing_ico: string;
     billing_dic: string;
     address: string;
@@ -103,7 +108,7 @@ export async function loadInvoice(paymentId: string, preview = false): Promise<I
   }>(
     `SELECT p.amount_czk, to_char(p.paid_on, 'YYYY-MM-DD') AS paid_on, to_char(p.due_on, 'YYYY-MM-DD') AS due_on,
        p.period, p.request_id, p.method, p.invoiced_at,
-       r.service, r.first_name, r.full_name, r.email, r.billing_name, r.billing_address, r.billing_ico, r.billing_dic, r.address,
+       r.service, r.first_name, r.full_name, r.email, r.billing_name, r.billing_address, r.billing_email, r.billing_ico, r.billing_dic, r.address,
        (SELECT sessions FROM packages WHERE payment_id = p.id LIMIT 1) AS package_sessions
      FROM payments p JOIN support_requests r ON r.id = p.request_id WHERE p.id = $1`,
     [paymentId],
@@ -117,9 +122,26 @@ export async function loadInvoice(paymentId: string, preview = false): Promise<I
     "SELECT description, amount_czk FROM invoice_items WHERE payment_id = $1 ORDER BY created_at",
     [paymentId],
   );
+  // Name, email and address come from the signed consent form; billing details set on the client's
+  // profile (e.g. a company paying) take precedence, with the client still named on the invoice.
+  const { rows: consent } = await pool.query<{ full_name: string; home_address: string; email: string }>(
+    "SELECT full_name, home_address, email FROM consent_forms WHERE request_id = $1 ORDER BY signed_at DESC LIMIT 1",
+    [p.request_id],
+  );
+  const c = consent[0];
+  const clientName = c?.full_name || p.full_name || p.first_name;
+  const customerName = p.billing_name || clientName;
+  const customerAddress = (p.billing_address || c?.home_address || p.address || "")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .join(", ");
+  const customerEmail = p.billing_email || c?.email || p.email;
   const customer = [
-    p.billing_name || p.full_name || p.first_name,
-    ...(p.billing_address || p.address).split("\n").map((l) => l.trim()).filter(Boolean),
+    customerName,
+    p.billing_name && p.billing_name !== clientName && `Klient / Client: ${clientName}`,
+    ...(p.billing_address || c?.home_address || p.address || "").split("\n").map((l) => l.trim()).filter(Boolean),
+    customerEmail && `E-mail: ${customerEmail}`,
     p.billing_ico && `IČO: ${p.billing_ico}`,
     p.billing_dic && `DIČ: ${p.billing_dic}`,
   ].filter(Boolean) as string[];
@@ -142,6 +164,9 @@ export async function loadInvoice(paymentId: string, preview = false): Promise<I
     taxDate: taxDate(p.paid_on ?? pragueDay(p.invoiced_at ?? new Date()), p.package_sessions ? [] : sessions.map((x) => x.starts_at)),
     method: p.method,
     customer,
+    customerName,
+    customerEmail,
+    customerAddress,
     lines: invoiceLines(p.service, p.amount_czk, p.package_sessions ? { sessions: p.package_sessions } : null, sessions, items),
     total: p.amount_czk,
     supplier,
