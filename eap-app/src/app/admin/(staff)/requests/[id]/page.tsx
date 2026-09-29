@@ -208,6 +208,7 @@ export default async function RequestPage({
             <Steps
               requestId={r.id}
               canAct={r.assigned_to === me.id || manager}
+              counsellorName={r.assigned_name ?? me.name}
               s={{
                 accepted: r.accepted_at,
                 discoveryOffered: r.discovery_offered_at,

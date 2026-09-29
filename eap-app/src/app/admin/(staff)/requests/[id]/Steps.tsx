@@ -1,5 +1,6 @@
 import { bookDiscoveryAction, offerDiscoveryAction, sendIntakeAction } from "../../../actions";
 import { formatDate } from "../../../format";
+import { discoveryOffer } from "@/lib/discovery-offer";
 
 type StepState = {
   accepted: Date | null;
@@ -16,7 +17,7 @@ const Done = ({ when, text }: { when: Date | null; text: string }) =>
   when ? <span className="step-done">✓ {text} {formatDate(when)}</span> : null;
 
 // The steps with a new private client, in order, with what's done and the button for what's next.
-export function Steps({ requestId, s, canAct }: { requestId: string; s: StepState; canAct: boolean }) {
+export function Steps({ requestId, s, canAct, counsellorName }: { requestId: string; s: StepState; canAct: boolean; counsellorName: string }) {
   return (
     <section className="card stack" id="steps">
       <h2>Steps with this client</h2>
@@ -30,6 +31,10 @@ export function Steps({ requestId, s, canAct }: { requestId: string; s: StepStat
           {!s.discoveryOffered && s.accepted && canAct && (
             <form action={offerDiscoveryAction.bind(null, requestId)} className="step-form">
               <span className="small">Sends the client a message on their private page offering a free discovery session.</span>
+              <details className="small">
+                <summary>See the message</summary>
+                <p style={{ whiteSpace: "pre-wrap" }}>{discoveryOffer(counsellorName)}</p>
+              </details>
               <button type="submit" className="small-btn">Send the offer</button>
             </form>
           )}

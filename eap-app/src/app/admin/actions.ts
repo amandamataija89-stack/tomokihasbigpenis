@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { discoveryOffer } from "@/lib/discovery-offer";
 import { endSession, isManager, requireManager, requireOwner, requireStaff, ROLES, startSession, type Role, type Staff } from "@/lib/auth";
 import { inviteFeedback } from "@/lib/feedback";
 import { assignWaitingAndNotify, DEFAULT_MONTHLY_CAPACITY, offerToNext } from "@/lib/assign";
@@ -541,14 +542,17 @@ export async function addSession(requestId: string, formData: FormData) {
   redirect(`/admin/requests/${requestId}#sessions`);
 }
 
-const DISCOVERY_OFFER = (counsellor: string) =>
-  `Hello, I'm ${counsellor}, your counsellor at Prague Integration. I'd like to offer you a free discovery session: a first, no-obligation conversation online where we get to know each other and talk about what you'd like support with. Please reply here with a few days and times that suit you.`;
-
 /** Step 2: offers the client a free discovery session, by message on their private page. */
 export async function offerDiscoveryAction(requestId: string) {
   const c = await requireCase(requestId);
   await acceptIfPending(requestId, c);
-  await sendStaffMessage(requestId, c.staff.id, DISCOVERY_OFFER(c.staff.name));
+  // Signed with the client's counsellor's name, even when the coordinator sends it for them.
+  const { rows } = await pool.query<{ id: string; name: string }>(
+    "SELECT s.id, s.name FROM support_requests r JOIN staff s ON s.id = r.assigned_to WHERE r.id = $1",
+    [requestId],
+  );
+  const from = rows[0] ?? c.staff;
+  await sendStaffMessage(requestId, from.id, discoveryOffer(from.name));
   await pool.query(
     "UPDATE support_requests SET discovery_offered_at = now(), status = CASE WHEN status = 'new' THEN 'contacted' ELSE status END, updated_at = now() WHERE id = $1",
     [requestId],
