@@ -86,6 +86,7 @@ export default async function ClientsByMonth({ searchParams }: { searchParams: P
         {month < thisMonth && <Link href={link(shift(month, 1))}>{monthName(shift(month, 1))} →</Link>}
         {month !== thisMonth && <Link href={link(thisMonth)}>This month</Link>}
       </nav>
+      {me.role === "admin" && <ExportLink month={month} counsellor={counsellor} />}
       <nav className="tabs" aria-label="Kind of client">
         <Link href={link(month, "all")} aria-current={kind === "all" ? "page" : undefined}>All clients</Link>
         <Link href={link(month, "eap")} aria-current={kind === "eap" ? "page" : undefined}>EAP</Link>
@@ -153,5 +154,18 @@ export default async function ClientsByMonth({ searchParams }: { searchParams: P
         )}
       </div>
     </main>
+  );
+}
+
+// Admins only. The sheet holds clients' personal data, so it carries a do-not-distribute warning.
+function ExportLink({ month, counsellor }: { month: string; counsellor: string }) {
+  return (
+    <p className="notice small">
+      <a href={`/admin/sessions/export?month=${month}${counsellor ? `&counsellor=${counsellor}` : ""}`}>
+        <b>Export {counsellor ? "their" : "all"} sessions to Excel</b>
+      </a>{" "}
+      · Confidential – do not distribute. The file contains clients&apos; personal data: keep it for Prague Integration
+      work only, don&apos;t forward or share it, and delete it when you no longer need it.
+    </p>
   );
 }

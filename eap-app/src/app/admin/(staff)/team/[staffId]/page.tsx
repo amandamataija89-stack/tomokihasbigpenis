@@ -16,7 +16,7 @@ export default async function CounsellorProfile({
   params: Promise<{ staffId: string }>;
   searchParams: Promise<{ show?: string; month?: string }>;
 }) {
-  await requireManager();
+  const me = await requireManager();
   const { staffId } = await params;
   const sp = await searchParams;
   if (!/^[0-9a-f-]{36}$/i.test(staffId)) notFound();
@@ -125,6 +125,11 @@ export default async function CounsellorProfile({
             <Link href={`/admin/team/${staffId}?month=${shiftMonth(sessionMonth, -1)}#sessions`}>← {monthLabel(shiftMonth(sessionMonth, -1))}</Link>
             {sessionMonth < currentMonth() && (
               <Link href={`/admin/team/${staffId}?month=${shiftMonth(sessionMonth, 1)}#sessions`}>{monthLabel(shiftMonth(sessionMonth, 1))} →</Link>
+            )}
+            {me.role === "admin" && (
+              <a href={`/admin/sessions/export?month=${sessionMonth}&counsellor=${staffId}`} title="Confidential – do not distribute">
+                Export to Excel (confidential)
+              </a>
             )}
           </nav>
         </div>
