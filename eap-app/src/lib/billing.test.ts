@@ -113,3 +113,13 @@ describe("exact prices", () => {
     expect(priceChoices({ service: "x", min_net_czk: 1400, max_net_czk: 1600, price_options: [] })).toEqual([1400, 1500, 1600]);
   });
 });
+
+describe("student discount", () => {
+  it("takes 10 % off the price without VAT, then VAT is added", async () => {
+    const { discounted, withVat } = await import("./billing");
+    expect(discounted(7000, true)).toBe(6300);
+    expect(withVat(discounted(7000, true), { vatPayer: true, vatRate: 21 })).toBe(7623);
+    expect(discounted(1500, false)).toBe(1500);
+    expect(discounted(2500, true)).toBe(2250);
+  });
+});

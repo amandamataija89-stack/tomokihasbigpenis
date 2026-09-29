@@ -413,3 +413,10 @@ CREATE TABLE IF NOT EXISTS group_attendance (
 
 -- Which clients a counsellor takes (see CLIENT_TYPES in src/lib/assign.ts). All by default.
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS accepts text[] NOT NULL DEFAULT '{Individuals,Couples,Teenagers,Children,Students}';
+
+-- ADHD testing: 7 000 CZK without VAT (set once; change it under Pricing & invoices).
+UPDATE price_list SET min_net_czk = 7000, max_net_czk = 7000, price_options = '{}'
+  WHERE service = 'ADHD testing' AND NOT EXISTS (SELECT 1 FROM app_state WHERE key = 'adhd_price_set');
+INSERT INTO app_state (key, value) VALUES ('adhd_price_set', '1') ON CONFLICT (key) DO NOTHING;
+-- Student discount (STUDENT_DISCOUNT_PERCENT, 10 %) on the client's price, ticked by their counsellor.
+ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS student_discount boolean NOT NULL DEFAULT false;

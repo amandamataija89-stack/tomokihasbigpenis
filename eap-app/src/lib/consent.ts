@@ -261,20 +261,24 @@ export async function sendSignedCopy(c: SignedConsent, requestId: string): Promi
  * payment works (price, variable symbol, pay within 24 hours after each session). Once only.
  */
 export async function startCounselling(requestId: string, staffId: string | null): Promise<boolean> {
-  const { rows } = await pool.query<{ kind: string; agreed: boolean; email: string; first_name: string; price: number | null; net: number | null }>(
-    `SELECT kind, counselling_agreed_at IS NOT NULL AS agreed, email, first_name, session_price_czk AS price, session_price_net_czk AS net
+  const { rows } = await pool.query<{ kind: string; agreed: boolean; email: string; first_name: string; price: number | null; net: number | null; student: boolean }>(
+    `SELECT kind, counselling_agreed_at IS NOT NULL AS agreed, email, first_name, session_price_czk AS price, session_price_net_czk AS net, student_discount AS student
      FROM support_requests WHERE id = $1`,
     [requestId],
   );
   const r = rows[0];
   if (!r || r.kind !== "private" || r.agreed) return false;
-  const { ensureVariableSymbol, invoiceSettings } = await import("./billing");
+  const { discounted, ensureVariableSymbol, invoiceSettings, STUDENT_DISCOUNT_PERCENT } = await import("./billing");
   const { clientMessageLink } = await import("./messages");
   const settings = await invoiceSettings();
   const vs = await ensureVariableSymbol(requestId);
   const priceText =
     r.price !== null
-      ? `${r.price.toLocaleString("cs-CZ")} CZK${settings.vatPayer && r.net !== null ? ` (${r.net.toLocaleString("cs-CZ")} CZK + ${settings.vatRate} % VAT)` : ""}`
+      ? `${r.price.toLocaleString("cs-CZ")} CZK${
+          settings.vatPayer && r.net !== null
+            ? ` (${discounted(r.net, r.student).toLocaleString("cs-CZ")} CZK + ${settings.vatRate} % VAT${r.student ? `, with your ${STUDENT_DISCOUNT_PERCENT} % student discount` : ""})`
+            : ""
+        }`
       : "the price agreed with your counsellor";
   await sendEmail(
     counsellingStartEmail(r.email, r.first_name, await consentLink(requestId), {

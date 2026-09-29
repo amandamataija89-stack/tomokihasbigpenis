@@ -23,6 +23,8 @@ import {
   recordPayment,
   priceList,
   priceChoices,
+  discounted,
+  STUDENT_DISCOUNT_PERCENT,
   parsePriceOptions,
   saveInvoiceSettings,
   setPriceRange,
@@ -112,8 +114,30 @@ export async function chooseClientPrice(requestId: string, formData: FormData) {
   const custom = isManager(staff) ? parsePrice(formData.get("customNet")) : null;
   const chosen = custom ?? (allowed.includes(net) ? net : undefined);
   if (chosen === undefined || chosen === null) redirect(`/admin/requests/${requestId}?billing=range#price`);
+  await applyClientPrice(requestId, staff.id, chosen!, "Price chosen");
+  redirect(`/admin/requests/${requestId}?billing=pricechosen#price`);
+}
+
+/** Ticks or unticks the student discount (STUDENT_DISCOUNT_PERCENT); the client's price and unpaid sessions follow. */
+export async function setStudentDiscountAction(requestId: string, formData: FormData) {
+  const staff = await requirePrivateCase(requestId);
+  const on = formData.get("student") === "yes";
+  const { rows } = await pool.query<{ net: number | null }>(
+    "UPDATE support_requests SET student_discount = $2, updated_at = now() WHERE id = $1 RETURNING session_price_net_czk AS net",
+    [requestId, on],
+  );
+  if (rows[0]?.net != null) await applyClientPrice(requestId, staff.id, rows[0].net, on ? "Student discount applied" : "Student discount removed");
+  else await note(requestId, staff.id, on ? "Student discount ticked." : "Student discount removed.");
+  redirect(`/admin/requests/${requestId}?billing=${on ? "student" : "nostudent"}#price`);
+}
+
+/** Sets the client's price (without VAT, before discount) and applies it to their unpaid sessions and invoices. */
+async function applyClientPrice(requestId: string, staffId: string, chosen: number, what: string) {
   const settings = await invoiceSettings();
-  const gross = withVat(chosen!, settings);
+  const { rows } = await pool.query<{ student: boolean }>("SELECT student_discount AS student FROM support_requests WHERE id = $1", [requestId]);
+  const student = rows[0]?.student ?? false;
+  const net = discounted(chosen, student);
+  const gross = withVat(net, settings);
   await pool.query(
     "UPDATE support_requests SET session_price_net_czk = $2, session_price_czk = $3, updated_at = now() WHERE id = $1",
     [requestId, chosen, gross],
@@ -125,12 +149,12 @@ export async function chooseClientPrice(requestId: string, formData: FormData) {
   await recomputeClientInvoices(requestId); // unpaid invoices follow the new price
   await addHeldSessionsToInvoices(requestId); // completed sessions that were waiting for a price
   const vat = settings.vatPayer ? ` + ${settings.vatRate} % VAT = ${czk(gross)}` : "";
+  const off = student ? ` − ${STUDENT_DISCOUNT_PERCENT} % student discount = ${czk(net)}` : "";
   await note(
     requestId,
-    staff.id,
-    `Price chosen: ${czk(chosen!)}${vat} per session.${rowCount ? ` Applied to ${rowCount} unpaid booked session${rowCount === 1 ? "" : "s"}.` : ""}`,
+    staffId,
+    `${what}: ${czk(chosen)}${off}${vat} per session.${rowCount ? ` Applied to ${rowCount} unpaid booked session${rowCount === 1 ? "" : "s"}.` : ""}`,
   );
-  redirect(`/admin/requests/${requestId}?billing=pricechosen#price`);
 }
 
 /** Who the client's invoices are made out to. */
