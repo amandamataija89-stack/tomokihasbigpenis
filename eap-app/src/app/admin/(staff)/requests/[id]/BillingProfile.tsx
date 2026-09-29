@@ -1,6 +1,6 @@
 import type { RequestRow } from "@/lib/data";
-import { priceChoices, withVat, type PriceRow } from "@/lib/billing";
-import { chooseClientPrice, saveClientBilling, setClientService } from "../../../billing-actions";
+import { discounted, priceChoices, STUDENT_DISCOUNT_PERCENT, withVat, type PriceRow } from "@/lib/billing";
+import { setStudentDiscountAction, chooseClientPrice, saveClientBilling, setClientService } from "../../../billing-actions";
 import { SERVICES } from "@/lib/request-form";
 
 const czk = (n: number) => `${n.toLocaleString("cs-CZ")} CZK`;
@@ -46,7 +46,12 @@ export function BillingProfile({
         {chosen !== null ? (
           <p>
             <b>{czk(chosen)}</b>
-            {vatPayer ? <> + {vatRate} % VAT = <b>{czk(r.session_price_czk ?? withVat(chosen, vat))}</b> per session</> : " per session"}
+            {r.student_discount && <> − {STUDENT_DISCOUNT_PERCENT} % student discount = <b>{czk(discounted(chosen, true))}</b></>}
+            {vatPayer ? (
+              <> + {vatRate} % VAT = <b>{czk(r.session_price_czk ?? withVat(discounted(chosen, r.student_discount), vat))}</b> per session</>
+            ) : (
+              " per session"
+            )}
           </p>
         ) : (
           <p className="notice">
@@ -89,6 +94,15 @@ export function BillingProfile({
             <button type="submit" className="ghost small-btn">Set other price</button>
           </form>
         )}
+        <form action={setStudentDiscountAction.bind(null, r.id)} className="actions student-discount" style={{ gap: 8 }}>
+          <label className="consent">
+            <input type="checkbox" name="student" value="yes" defaultChecked={r.student_discount} />
+            <span><b>Student discount</b>: {STUDENT_DISCOUNT_PERCENT} % off the price</span>
+          </label>
+          <button type="submit" className="ghost small-btn">Apply</button>
+        </form>
+        {flash === "student" && <p className="flash" role="status">Student discount applied.</p>}
+        {flash === "nostudent" && <p className="flash" role="status">Student discount removed.</p>}
         <span className="small">Applies to new sessions and to booked sessions not yet paid.</span>
       </section>
 

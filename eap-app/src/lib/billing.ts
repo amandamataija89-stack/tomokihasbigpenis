@@ -13,6 +13,12 @@ export const PAYMENT_METHODS = ["Bank transfer", "Cash", "Card"] as const;
 // in steps of PRICE_STEP. Sessions and payments store the price with VAT (what the client pays).
 export const PRICE_STEP = 100;
 
+export const STUDENT_DISCOUNT_PERCENT = 10;
+
+/** The price without VAT after the student discount, if the client has it. Whole crowns. */
+export const discounted = (net: number, student: boolean) =>
+  student ? Math.round((net * (100 - STUDENT_DISCOUNT_PERCENT)) / 100) : net;
+
 export type PriceRow = { service: string; min_net_czk: number | null; max_net_czk: number | null; price_options?: number[] };
 
 /** The prices a counsellor can choose for a kind of support: its exact prices if set, else steps across the range. */

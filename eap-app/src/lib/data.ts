@@ -69,7 +69,8 @@ export type RequestRow = {
   location: string;
   service: string; // private clients: the kind of support they asked for
   session_price_czk: number | null; // private clients: their price with VAT (what they pay per session)
-  session_price_net_czk: number | null; // the same without VAT, as chosen by their counsellor
+  session_price_net_czk: number | null; // the same without VAT, as chosen by their counsellor (before any student discount)
+  student_discount: boolean; // STUDENT_DISCOUNT_PERCENT off
   variable_symbol: string | null; // private clients: on all their invoices
   address: string; // private clients: residential address from the sign-up form
   consent_form_sent_at: Date | null; // when the client was last emailed the link to sign the consent form
