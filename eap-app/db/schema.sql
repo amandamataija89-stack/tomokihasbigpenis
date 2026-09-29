@@ -420,3 +420,9 @@ UPDATE price_list SET min_net_czk = 7000, max_net_czk = 7000, price_options = '{
 INSERT INTO app_state (key, value) VALUES ('adhd_price_set', '1') ON CONFLICT (key) DO NOTHING;
 -- Student discount (STUDENT_DISCOUNT_PERCENT, 10 %) on the client's price, ticked by their counsellor.
 ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS student_discount boolean NOT NULL DEFAULT false;
+
+-- Private clients: when the coordinator was told the discovery offer wasn't sent within 24 hours.
+ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS offer_late_alerted_at timestamptz;
+
+-- The second reminder, 24 hours before the session (the first goes 48 hours before).
+ALTER TABLE client_sessions ADD COLUMN IF NOT EXISTS reminder24_sent_at timestamptz;

@@ -89,7 +89,7 @@ export async function offerTo(requestId: string, counsellorId: string, byStaffId
   const deadline = alreadyAgreed ? null : respondBy(new Date(), r.crisis);
   await pool.query(
     `UPDATE support_requests SET assigned_to = $2, assigned_at = now(), in_pool = false, overdue_warned_at = NULL,
-       offer_reminded_at = NULL,
+       offer_reminded_at = NULL, offer_late_alerted_at = NULL,
        accepted_at = CASE WHEN $3::timestamptz IS NULL THEN now() END, respond_by = $3, updated_at = now()
      WHERE id = $1`,
     [requestId, counsellorId, deadline],

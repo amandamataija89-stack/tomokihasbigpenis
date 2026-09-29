@@ -620,7 +620,7 @@ export async function moveSession(sessionId: string, formData: FormData) {
   const { staff } = await requireCase(requestId);
   const startsAt = sessionDate(formData);
   if (!startsAt) redirect(`/admin/requests/${requestId}?session=date#sessions`);
-  await pool.query("UPDATE client_sessions SET starts_at = $2::timestamp AT TIME ZONE 'Europe/Prague', reminder_sent_at = NULL WHERE id = $1", [
+  await pool.query("UPDATE client_sessions SET starts_at = $2::timestamp AT TIME ZONE 'Europe/Prague', reminder_sent_at = NULL, reminder24_sent_at = NULL WHERE id = $1", [
     sessionId,
     startsAt,
   ]);

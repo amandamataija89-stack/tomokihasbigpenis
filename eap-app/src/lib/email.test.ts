@@ -154,3 +154,11 @@ describe("discovery offer message", () => {
     expect(m).toMatch(/Warm regards,\nEva Novak\nPrague Integration$/);
   });
 });
+
+describe("24-hour reminder", () => {
+  it("says tomorrow and that cancelling now is charged", () => {
+    const r = sessionReminder({ ...base, format: "Online", lateCancelHours: 48, cancelBy: "x", final: true, total: null });
+    expect(r.subject).toMatch(/^Tomorrow: your session/);
+    expect(r.text).toContain("less than 48 hours away, a cancellation is charged as a session");
+  });
+});
