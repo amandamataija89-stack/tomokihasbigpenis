@@ -31,9 +31,10 @@ export async function sendSessionReminders(now = new Date()): Promise<number> {
     therapist: string | null;
     number: number;
     kind: ClientKind;
+    is_discovery: boolean;
   }>(
-    `SELECT cs.id, cs.request_id, cs.starts_at, r.email, r.first_name, r.format, r.kind, s.name AS therapist,
-       (SELECT count(*)::int FROM client_sessions o WHERE o.request_id = r.id AND o.starts_at <= cs.starts_at) AS number
+    `SELECT cs.id, cs.request_id, cs.starts_at, cs.is_discovery, r.email, r.first_name, r.format, r.kind, s.name AS therapist,
+       (SELECT count(*)::int FROM client_sessions o WHERE o.request_id = r.id AND NOT o.is_discovery AND o.starts_at <= cs.starts_at) AS number
      FROM client_sessions cs
      JOIN support_requests r ON r.id = cs.request_id
      LEFT JOIN staff s ON s.id = r.assigned_to
@@ -55,6 +56,7 @@ export async function sendSessionReminders(now = new Date()): Promise<number> {
           total: sessionLimit(r.kind),
           format: r.format,
           therapistName: r.therapist,
+          discovery: r.is_discovery,
           lateCancelHours: LATE_CANCEL_HOURS,
           messageLink: await clientMessageLink(r.request_id),
           cancelBy: formatDeadline(new Date(r.starts_at.getTime() - LATE_CANCEL_HOURS * 3600_000)),

@@ -25,7 +25,7 @@ export function Steps({ requestId, s, canAct }: { requestId: string; s: StepStat
           <b>Accept the client</b> (within 24 hours) <Done when={s.accepted} text="Accepted" />
         </li>
         <li className={s.discoveryOffered ? "done" : s.accepted ? "current" : ""}>
-          <b>Offer a free discovery session</b>
+          <b>Offer a free discovery session</b> (online)
           <Done when={s.discoveryOffered} text="Offered" />
           {!s.discoveryOffered && s.accepted && canAct && (
             <form action={offerDiscoveryAction.bind(null, requestId)} className="step-form">
@@ -35,7 +35,7 @@ export function Steps({ requestId, s, canAct }: { requestId: string; s: StepStat
           )}
         </li>
         <li className={s.discoverySession ? "done" : s.discoveryOffered ? "current" : ""}>
-          <b>When they agree: book the discovery session and send the intake form</b>
+          <b>When they agree: book the discovery session (always online) and send the intake form</b>
           {s.discoverySession && <span className="step-done">✓ Discovery session {formatDate(s.discoverySession.starts_at)}</span>}
           <Done when={s.intakeDone} text="Intake form filled in" />
           {!s.discoverySession && canAct && (
