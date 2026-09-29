@@ -11,6 +11,7 @@ export function StaffNav({ role }: { role: Role }) {
     { href: "/admin", label: manager ? "Requests" : "My clients", show: true },
     { href: "/admin/overview", label: manager ? "All clients" : "All my clients", show: true },
     { href: "/admin/clients", label: "Clients by month", show: true },
+    { href: "/admin/groups", label: manager ? "Groups" : "My groups", show: true },
     { href: "/admin/availability", label: "My availability", show: true },
     { href: "/admin/team", label: "Team", show: manager },
     { href: "/admin/companies", label: "Companies", show: manager },

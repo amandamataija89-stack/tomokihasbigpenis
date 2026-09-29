@@ -307,3 +307,6 @@ footer.site a { color: inherit; }
 .counsellor-filter select { width: auto; min-width: 220px; }
 .taking-status.on { border-left: 4px solid var(--green); }
 .taking-status.off { border-left: 4px solid #b3261e; background: #fbeeee; }
+table.attendance th, table.attendance td.att-cell { text-align: center; white-space: nowrap; }
+table.attendance td.att-cell input[type="checkbox"] { width: 20px; height: 20px; }
+table.attendance td.att-cell .small-btn { margin-left: 6px; }
