@@ -22,7 +22,14 @@ const NotifyBox = ({ label }: { label: string }) => (
 const czk = (n: number) => `${n.toLocaleString("cs-CZ")} CZK`;
 
 // Price and paid tick for one session of a private client.
+// A link to the session's payment QR code, e.g. to show the client in person.
+const QrLink = ({ s }: { s: ClientSession }) =>
+  !s.paid_at && s.price_czk ? (
+    <a className="small" href={`/admin/sessions/${s.id}/qr`} target="_blank" rel="noopener">Payment QR</a>
+  ) : null;
+
 function Payment({ s, requestId }: { s: ClientSession; requestId: string }) {
+  if (s.is_discovery) return <span className="pill pill-paid">Free discovery session</span>;
   return (
     <span className="payment">
       <input
@@ -48,7 +55,10 @@ function Payment({ s, requestId }: { s: ClientSession; requestId: string }) {
           </button>
         </>
       ) : (
-        <button formAction={setSessionPaid.bind(null, s.id, true)} className="small-btn">Mark paid</button>
+        <>
+          <button formAction={setSessionPaid.bind(null, s.id, true)} className="small-btn">Mark paid</button>
+          <QrLink s={s} />
+        </>
       )}
     </span>
   );
@@ -56,10 +66,11 @@ function Payment({ s, requestId }: { s: ClientSession; requestId: string }) {
 
 // What a counsellor sees about a private client's session: its price and whether it's paid.
 function PaidState({ s }: { s: ClientSession }) {
+  if (s.is_discovery) return <span className="pill pill-paid">Free discovery session</span>;
   return (
     <span className="payment">
       <span className="small">{s.price_czk !== null ? czk(s.price_czk) : "No price yet"}</span>
-      {s.paid_at ? <span className="pill pill-paid">✓ Paid</span> : null}
+      {s.paid_at ? <span className="pill pill-paid">✓ Paid</span> : <QrLink s={s} />}
     </span>
   );
 }
@@ -144,7 +155,9 @@ export function Sessions({
             return (
               <li key={s.id} className={s.done_at ? "session done" : "session"}>
                 <form className="session-row">
-                  <span className="session-n">Session {i + 1}</span>
+                  <span className="session-n">
+                    {s.is_discovery ? "Discovery" : `Session ${i + 1 - sessions.slice(0, i).filter((x) => x.is_discovery).length}`}
+                  </span>
                   {s.done_at ? (
                     <>
                       <span className="session-when">{formatDate(s.starts_at)}</span>

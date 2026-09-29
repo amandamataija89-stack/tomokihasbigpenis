@@ -154,7 +154,7 @@ export type NewPayment = {
   paidOn: string; // YYYY-MM-DD
   method: string;
   invoiceNumber: string | null;
-  staffId: string;
+  staffId: string | null; // null when matched from a bank statement
 };
 
 /** Records one payment for one or more of the client's unpaid sessions. Returns the amount, or null if nothing to pay. */

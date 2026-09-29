@@ -27,22 +27,19 @@ export const invoicesPdf = (list: { data: InvoiceData }[]) => renderInvoices(lis
 
 export async function invoicesCsv(list: { id: string; data: InvoiceData }[]): Promise<string> {
   const settings = await invoiceSettings();
-  const { rows: who } = await pool.query<{ id: string; first_name: string; full_name: string; billing_name: string }>(
-    "SELECT p.id, r.first_name, r.full_name, r.billing_name FROM payments p JOIN support_requests r ON r.id = p.request_id WHERE p.id = ANY($1::uuid[])",
-    [list.map((i) => i.id)],
-  );
-  const nameOf = new Map(who.map((w) => [w.id, w.billing_name || w.full_name || w.first_name]));
   const cell = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
   const money = (h: number) => (h / 100).toFixed(2).replace(".", ",");
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Prague" }).format(new Date());
   const lines = [
-    ["Číslo faktury", "Odběratel", "Variabilní symbol", "Datum vystavení", "DUZP", "Splatnost", "Uhrazeno", "Počet sezení", "Základ", "DPH", "Celkem", "Stav"],
-    ...list.map(({ id, data: d }) => {
+    ["Číslo faktury", "Odběratel", "E-mail", "Adresa", "Variabilní symbol", "Datum vystavení", "DUZP", "Splatnost", "Uhrazeno", "Počet sezení", "Základ", "DPH", "Celkem", "Stav"],
+    ...list.map(({ data: d }) => {
       const v = settings.vatPayer ? vatSplit(d.total, settings.vatRate) : { base: d.total * 100, vat: 0, gross: d.total * 100 };
       const overdue = !d.paidOn && d.dueOn && d.dueOn < today;
       return [
         d.number,
-        nameOf.get(id) ?? "",
+        d.customerName,
+        d.customerEmail,
+        d.customerAddress,
         d.variableSymbol,
         new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Prague" }).format(d.issuedOn),
         d.taxDate,

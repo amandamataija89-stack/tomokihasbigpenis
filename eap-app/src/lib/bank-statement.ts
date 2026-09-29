@@ -2,7 +2,7 @@
 // matches incoming payments to unpaid invoices by the client's variable symbol and the amount.
 import { createHash } from "node:crypto";
 import { pool } from "./db";
-import { markInvoicePaid } from "./billing";
+import { markInvoicePaid, recordPayment, removeFromInvoice } from "./billing";
 
 export type Transaction = {
   date: string; // YYYY-MM-DD
@@ -187,6 +187,33 @@ export async function importStatement(transactions: Transaction[]): Promise<Impo
     const all = open.reduce((a, o) => a + o.amount_czk, 0);
     const toPay = exact ? [exact] : open.length > 1 && all === t.amount ? open : [];
     if (!toPay.length) {
+      // A single session paid on its own (from its QR code): the client's oldest unpaid session of that price
+      // that isn't on an issued invoice.
+      const { rows: sessions } = await pool.query<{ id: string; starts_at: Date }>(
+        `SELECT cs.id, cs.starts_at FROM client_sessions cs LEFT JOIN payments p ON p.id = cs.payment_id
+         WHERE cs.request_id = $1 AND cs.paid_at IS NULL AND cs.price_czk = $2
+           AND (cs.payment_id IS NULL OR p.invoice_number IS NULL)
+         ORDER BY cs.done_at IS NULL, cs.starts_at LIMIT 1`,
+        [client[0].id, t.amount],
+      );
+      if (sessions[0]) {
+        await removeFromInvoice(sessions[0].id); // off the running monthly invoice, if it was on one
+        await recordPayment({
+          requestId: client[0].id,
+          sessionIds: [sessions[0].id],
+          amount: t.amount,
+          paidOn: t.date,
+          method: "Bank transfer",
+          invoiceNumber: null,
+          staffId: null,
+        });
+        await pool.query("INSERT INTO request_notes (request_id, body) VALUES ($1, $2)", [
+          client[0].id,
+          `Session payment of ${t.amount} CZK on ${t.date} matched from the bank statement.`,
+        ]);
+        result.paid.push({ firstName: client[0].first_name, invoice: "session payment", amount: t.amount, date: t.date });
+        continue;
+      }
       unmatched(open.length ? `${client[0].first_name}: amount doesn't match an unpaid invoice` : `${client[0].first_name}: no unpaid invoice`);
       continue;
     }

@@ -1,5 +1,6 @@
 import { Brand, CrisisNotice, SiteFooter } from "@/components/Brand";
 import { clientInvoices } from "@/lib/billing";
+import { payableSessions } from "@/lib/session-qr";
 import { conversationFor, listMessages } from "@/lib/messages";
 import { replyAsClient } from "./actions";
 
@@ -38,7 +39,13 @@ export default async function ClientMessages({
         <SiteFooter />
       </main>
     );
-  const [messages, invoices] = await Promise.all([listMessages(convo.requestId), clientInvoices(convo.requestId)]);
+  const [messages, invoices, payable] = await Promise.all([
+    listMessages(convo.requestId),
+    clientInvoices(convo.requestId),
+    payableSessions(convo.requestId),
+  ]);
+  const sessionDay = (d: Date) =>
+    new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "Europe/Prague" }).format(d);
   return (
     <main className="wrap">
       <Brand />
@@ -66,6 +73,29 @@ export default async function ClientMessages({
           ))
         )}
       </section>
+
+      {payable.length > 0 && (
+        <section className="card stack" aria-label="Pay for your sessions">
+          <h2 style={{ fontSize: 20 }}>Pay for your sessions / Platba za sezení</h2>
+          <p className="small">
+            Please pay each session within 24 hours after it ends. Scan the QR code in your banking app, or pay by bank
+            transfer to account <b>{payable[0].account}</b> (IBAN {payable[0].iban}) with variable symbol{" "}
+            <b>{payable[0].variableSymbol}</b>: it identifies your payments.
+          </p>
+          <div className="session-qrs">
+            {payable.map((p) => (
+              <figure key={p.sessionId} className="session-qr">
+                <img src={`/messages/${token}/sessions/${p.sessionId}/qr`} alt={`QR payment code for the session on ${sessionDay(p.startsAt)}`} width={160} height={160} />
+                <figcaption>
+                  <b>{sessionDay(p.startsAt)}</b>
+                  <br />
+                  {p.amount.toLocaleString("cs-CZ")} CZK · VS {p.variableSymbol}
+                </figcaption>
+              </figure>
+            ))}
+          </div>
+        </section>
+      )}
 
       {invoices.length > 0 && (
         <section className="card stack" aria-label="Invoices">

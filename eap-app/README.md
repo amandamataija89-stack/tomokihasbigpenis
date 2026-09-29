@@ -82,9 +82,30 @@ or per client.
 Private clients have a **Private** tag; the **Private clients** tab lists them. Counsellors don't see
 unassigned private clients in the pool.
 
+## Steps with a new private client
+
+On a private client's case, **Steps with this client** walks the counsellor through:
+
+1. **Accept** within 24 hours.
+2. **Offer a free discovery session**: sends a message on the client's private page.
+3. **Book the discovery session + send the intake form**: a free session (price 0, never invoiced) and the
+   online **intake & registration form** (`/intake/<link>`), signed with a finger or mouse. Answering *yes* to
+   thoughts of harm marks the case as a **crisis** and emails the counsellor and coordinators at once.
+4. **Book the first full session**: the client is emailed the **consent form** and payment details (price,
+   variable symbol, account, QR code, pay within 24 hours after each session).
+
+Clients who don't use the website can be added by hand: **+ Add a client** on the Requests or All clients page.
+
+Other case tools: a **Crisis case** tick box (and a Crisis tab), **Counsellor's notes** that only the client's
+counsellor can read, and a **Payment QR** for each unpaid private session (also on the client's private page),
+carrying the client's variable symbol. A bank payment of one session's price with that symbol marks that
+session paid.
+
 ## Informed consent form
 
-Every client signs Prague Integration's informed consent form online before their first full session.
+Private (Prague Integration) clients sign the informed consent form online before their first full session.
+EAP clients don't. Invoices and invoice exports (PDF and CSV) take the client's name, email and home address from
+the latest signed consent form, unless billing details were set on the client's profile.
 
 - When the **first session is booked**, the client is emailed a private link (`/consent/<link>`). They read the
   full form, fill in their contact details and an **emergency contact**, tick that they agree, type their full

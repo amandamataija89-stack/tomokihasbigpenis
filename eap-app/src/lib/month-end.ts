@@ -49,7 +49,7 @@ export async function openAdmin(staffId: string, now = new Date()): Promise<Open
     pastUnmarked: past.map((p) => ({ requestId: p.request_id, firstName: p.first_name, startsAt: p.starts_at })),
     noType: privateClients.filter((c) => !c.service).map((c) => ({ requestId: c.id, firstName: c.first_name })),
     noPrice: privateClients.filter((c) => c.session_price_czk === null).map((c) => ({ requestId: c.id, firstName: c.first_name })),
-    noConsent: clients.filter((c) => c.unsigned).map((c) => ({ requestId: c.id, firstName: c.first_name })),
+    noConsent: privateClients.filter((c) => c.unsigned).map((c) => ({ requestId: c.id, firstName: c.first_name })),
   };
 }
 

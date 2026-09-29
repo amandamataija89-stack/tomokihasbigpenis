@@ -14,7 +14,7 @@ export default async function CounsellorProfile({
   searchParams,
 }: {
   params: Promise<{ staffId: string }>;
-  searchParams: Promise<{ show?: string }>;
+  searchParams: Promise<{ show?: string; month?: string }>;
 }) {
   await requireManager();
   const { staffId } = await params;
@@ -36,11 +36,38 @@ export default async function CounsellorProfile({
   const s = rows[0];
   if (!s) notFound();
   const filter: Filter = sp.show === "all" ? "all" : "open";
-  const [clients, month, open] = await Promise.all([
+  const sessionMonth = /^\d{4}-\d{2}$/.test(sp.month ?? "") ? sp.month! : currentMonth();
+  const [clients, month, open, { rows: sessions }] = await Promise.all([
     listRequests(filter, staffId),
-    counsellorMonth(staffId, currentMonth()),
+    counsellorMonth(staffId, sessionMonth),
     openAdmin(staffId),
+    pool.query<{
+      id: string;
+      request_id: string;
+      first_name: string;
+      full_name: string;
+      kind: "eap" | "private";
+      company_name: string | null;
+      starts_at: Date;
+      done_at: Date | null;
+      late_cancelled: boolean;
+      price_czk: number | null;
+      paid_at: Date | null;
+    }>(
+      `SELECT cs.id, r.id AS request_id, r.first_name, r.full_name, r.kind, c.name AS company_name, cs.starts_at, cs.done_at,
+         cs.late_cancelled, cs.price_czk, cs.paid_at
+       FROM client_sessions cs JOIN support_requests r ON r.id = cs.request_id LEFT JOIN companies c ON c.id = r.company_id
+       WHERE r.assigned_to = $1 AND to_char(cs.starts_at AT TIME ZONE 'Europe/Prague', 'YYYY-MM') = $2
+       ORDER BY cs.starts_at`,
+      [staffId, sessionMonth],
+    ),
   ]);
+  const shiftMonth = (m: string, by: number) => {
+    const d = new Date(`${m}-01T00:00:00Z`);
+    d.setUTCMonth(d.getUTCMonth() + by);
+    return d.toISOString().slice(0, 7);
+  };
+  const now = Date.now();
   const todo = open.pastUnmarked.length + open.noType.length + open.noPrice.length + open.noConsent.length;
 
   return (
@@ -56,7 +83,7 @@ export default async function CounsellorProfile({
       </div>
 
       <section className="card stack">
-        <h2>{monthLabel(currentMonth())}</h2>
+        <h2>{monthLabel(sessionMonth)}</h2>
         <dl className="totals">
           <div><dt>EAP sessions held</dt><dd><b>{month.eapSessions}</b></dd></div>
           <div><dt>Private sessions held</dt><dd><b>{month.privateSessions}</b> · {czk(month.privateAmount)}</dd></div>
@@ -85,6 +112,65 @@ export default async function CounsellorProfile({
               </li>
             ))}
             </ul>
+          </div>
+        )}
+      </section>
+
+      <section className="card stack" id="sessions">
+        <div className="actions" style={{ justifyContent: "space-between" }}>
+          <h2>Sessions in {monthLabel(sessionMonth)}</h2>
+          <nav className="tabs" aria-label="Month">
+            <Link href={`/admin/team/${staffId}?month=${shiftMonth(sessionMonth, -1)}#sessions`}>← {monthLabel(shiftMonth(sessionMonth, -1))}</Link>
+            {sessionMonth < currentMonth() && (
+              <Link href={`/admin/team/${staffId}?month=${shiftMonth(sessionMonth, 1)}#sessions`}>{monthLabel(shiftMonth(sessionMonth, 1))} →</Link>
+            )}
+          </nav>
+        </div>
+        {sessions.length === 0 ? (
+          <p className="small">No sessions this month.</p>
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Date</th><th>Client</th><th>Client of</th><th>Session</th><th>Price</th></tr>
+              </thead>
+              <tbody>
+                {sessions.map((x) => (
+                  <tr key={x.id}>
+                    <td className="age">{formatDate(x.starts_at)}</td>
+                    <td>
+                      <Link className="rowlink" href={`/admin/requests/${x.request_id}#sessions`}>{x.first_name}</Link>
+                      {x.full_name && <div className="small">{x.full_name}</div>}
+                    </td>
+                    <td>{x.company_name ?? <span className="pill pill-private">Private</span>}</td>
+                    <td>
+                      {x.done_at ? (
+                        x.late_cancelled ? <span className="pill pill-contacted">Late cancellation</span> : <span className="pill pill-completed">✓ Held</span>
+                      ) : x.starts_at.getTime() < now ? (
+                        <span className="overdue">Not marked yet</span>
+                      ) : (
+                        <span className="pill pill-scheduled">Booked</span>
+                      )}
+                    </td>
+                    <td className="age">
+                      {x.kind === "private" ? (
+                        <>
+                          {x.price_czk !== null ? czk(x.price_czk) : <span className="overdue">no price</span>}
+                          {x.paid_at ? <div className="small">paid</div> : x.done_at ? <div className="overdue">unpaid</div> : null}
+                        </>
+                      ) : (
+                        <span className="small">EAP</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                <tr>
+                  <td colSpan={3}><b>Total</b></td>
+                  <td><b>{sessions.filter((x) => x.done_at).length}</b> held of {sessions.length}</td>
+                  <td><b>{czk(sessions.filter((x) => x.done_at && x.kind === "private").reduce((a, x) => a + (x.price_czk ?? 0), 0))}</b></td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         )}
       </section>

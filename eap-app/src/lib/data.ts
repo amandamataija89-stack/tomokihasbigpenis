@@ -73,6 +73,9 @@ export type RequestRow = {
   variable_symbol: string | null; // private clients: on all their invoices
   address: string; // private clients: residential address from the sign-up form
   consent_form_sent_at: Date | null; // when the client was last emailed the link to sign the consent form
+  discovery_offered_at: Date | null; // steps with a private client (see Steps on the case page)
+  intake_sent_at: Date | null;
+  counselling_agreed_at: Date | null;
   billing_name: string;
   billing_address: string;
   billing_ico: string;
@@ -111,14 +114,15 @@ const REQUEST_SELECT = `
   LEFT JOIN companies c ON c.id = r.company_id
   LEFT JOIN staff s ON s.id = r.assigned_to`;
 
-export type Filter = Status | "open" | "all" | "pool" | "awaiting" | "private";
+export type Filter = Status | "open" | "all" | "pool" | "awaiting" | "private" | "crisis";
 
 // SQL condition for each list filter. "pool" is cases waiting for someone to take or assign them.
-const FILTER_SQL: Record<"open" | "pool" | "awaiting" | "private", string> = {
+const FILTER_SQL: Record<"open" | "pool" | "awaiting" | "private" | "crisis", string> = {
   open: "r.status NOT IN ('completed', 'closed')",
   pool: "r.assigned_to IS NULL AND r.status = 'new'",
   awaiting: "r.assigned_to IS NOT NULL AND r.accepted_at IS NULL AND r.status = 'new'",
   private: "r.kind = 'private' AND r.status NOT IN ('completed', 'closed')",
+  crisis: "r.crisis AND r.status NOT IN ('completed', 'closed')",
 };
 
 /**
@@ -128,7 +132,8 @@ const FILTER_SQL: Record<"open" | "pool" | "awaiting" | "private", string> = {
 export async function listRequests(filter: Filter, onlyFor?: string): Promise<RequestRow[]> {
   const params: unknown[] = [];
   const where: string[] = [];
-  if (filter === "open" || filter === "pool" || filter === "awaiting" || filter === "private") where.push(FILTER_SQL[filter]);
+  if (filter === "open" || filter === "pool" || filter === "awaiting" || filter === "private" || filter === "crisis")
+    where.push(FILTER_SQL[filter]);
   else if (filter !== "all") where.push(`r.status = $${params.push(filter)}`);
   if (onlyFor && filter !== "pool") where.push(`r.assigned_to = $${params.push(onlyFor)}`);
   if (onlyFor && filter === "pool") where.push("r.kind = 'eap'");
@@ -149,6 +154,7 @@ export async function filterCounts(onlyFor?: string): Promise<Record<Filter, num
        count(*) FILTER (WHERE status NOT IN ('completed', 'closed') ${mine})::int AS open,
        count(*) FILTER (WHERE assigned_to IS NULL AND status = 'new' ${onlyFor ? "AND kind = 'eap'" : ""})::int AS pool,
        count(*) FILTER (WHERE kind = 'private' AND status NOT IN ('completed', 'closed') ${mine})::int AS private,
+       count(*) FILTER (WHERE crisis AND status NOT IN ('completed', 'closed') ${mine})::int AS crisis,
        count(*) FILTER (WHERE assigned_to IS NOT NULL AND accepted_at IS NULL AND status = 'new' ${mine})::int AS awaiting,
        ${STATUSES.map((s) => `count(*) FILTER (WHERE status = '${s}' ${mine})::int AS ${s}`).join(", ")}
      FROM support_requests`,
@@ -202,11 +208,12 @@ export type ClientSession = {
   paid_at: Date | null;
   payment_id: string | null;
   package_id: string | null; // paid from a prepaid package
+  is_discovery: boolean; // the free discovery session
 };
 
 export async function listSessions(requestId: string): Promise<ClientSession[]> {
   const { rows } = await pool.query<ClientSession>(
-    `SELECT id, starts_at, done_at, late_cancelled, price_czk, paid_at, payment_id, package_id FROM client_sessions
+    `SELECT id, starts_at, done_at, late_cancelled, price_czk, paid_at, payment_id, package_id, is_discovery FROM client_sessions
      WHERE request_id = $1 ORDER BY starts_at`,
     [requestId],
   );
