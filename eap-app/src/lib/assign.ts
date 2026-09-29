@@ -16,6 +16,7 @@ export type TherapistLoad = {
   languages: string[];
   assignedThisMonth: number;
   lastAssignedAt: Date | null;
+  available?: boolean; // taking new clients, not away, and signed up
 };
 
 // A therapist with no languages listed is treated as taking any language.
@@ -77,8 +78,11 @@ export async function therapistLoads(db: Queryable = pool, onlyTakingClients = t
     languages: string[];
     assigned: number;
     last_assigned_at: Date | null;
+    available: boolean;
   }>(
     `SELECT s.id, s.name, s.email, s.monthly_capacity, s.languages,
+       (s.takes_clients AND s.password_hash <> '!'
+         AND (s.away_until IS NULL OR s.away_until < (now() AT TIME ZONE 'Europe/Prague')::date)) AS available,
        count(r.id) FILTER (WHERE r.assigned_at >= ${MONTH_START_SQL} AND r.kind = 'eap')::int AS assigned,
        max(r.assigned_at) FILTER (WHERE r.kind = 'eap') AS last_assigned_at
      FROM staff s LEFT JOIN support_requests r ON r.assigned_to = s.id
@@ -99,6 +103,7 @@ export async function therapistLoads(db: Queryable = pool, onlyTakingClients = t
     languages: r.languages,
     assignedThisMonth: r.assigned,
     lastAssignedAt: r.last_assigned_at,
+    available: r.available,
   }));
 }
 

@@ -305,3 +305,5 @@ footer.site a { color: inherit; }
 .form-links { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; font-size: 14px; margin: 0 0 16px; }
 .form-links a { font-weight: 600; }
 .counsellor-filter select { width: auto; min-width: 220px; }
+.taking-status.on { border-left: 4px solid var(--green); }
+.taking-status.off { border-left: 4px solid #b3261e; background: #fbeeee; }

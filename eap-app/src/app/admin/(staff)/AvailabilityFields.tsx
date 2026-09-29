@@ -33,7 +33,7 @@ export function AvailabilityFields({
         <input id={`away-${idPrefix}`} name="awayUntil" type="date" defaultValue={awayUntil} className="date-input" />
       </div>
       <fieldset>
-        <legend className="small">Works in<span className="opt">none ticked = any language</span></legend>
+        <legend className="small">Languages I work in<span className="opt">none ticked = any language</span></legend>
         <div className="choices">
           {THERAPY_LANGUAGES.map((l) => (
             <label className="choice" key={l}>

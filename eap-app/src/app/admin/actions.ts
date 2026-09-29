@@ -308,12 +308,24 @@ export async function updateMyAvailability(formData: FormData) {
   // Counsellors can go down, or up to the usual 5; a higher limit is for a coordinator to set.
   const f = availabilityFields(formData, Math.max(DEFAULT_MONTHLY_CAPACITY, rows[0]?.monthly_capacity ?? 0));
   await pool.query(
-    `UPDATE staff SET takes_clients = $2, monthly_capacity = COALESCE($3, monthly_capacity), languages = $4, away_until = $5
+    `UPDATE staff SET takes_clients = $2, monthly_capacity = COALESCE($3, monthly_capacity), languages = $4, away_until = $5,
+       availability_note = $6
      WHERE id = $1`,
-    [me.id, f.takesClients, f.capacity, f.languages, f.awayUntil],
+    [me.id, f.takesClients, f.capacity, f.languages, f.awayUntil, String(formData.get("availabilityNote") ?? "").trim().slice(0, 500)],
   );
   await assignWaitingAndNotify();
   redirect("/admin/availability?saved=1");
+}
+
+/** The big button on My availability: pause new clients, or start taking them again (clears "away until"). */
+export async function setTakingClientsAction(taking: boolean) {
+  const me = await requireStaff();
+  await pool.query(
+    `UPDATE staff SET takes_clients = $2, away_until = CASE WHEN $2 THEN NULL ELSE away_until END WHERE id = $1`,
+    [me.id, taking],
+  );
+  if (taking) await assignWaitingAndNotify();
+  redirect(`/admin/availability?saved=${taking ? "on" : "paused"}`);
 }
 
 // ---- Offers ----------------------------------------------------------------------

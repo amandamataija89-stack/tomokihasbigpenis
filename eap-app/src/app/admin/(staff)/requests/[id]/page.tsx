@@ -81,7 +81,13 @@ export default async function RequestPage({
   const label = (s: (typeof staff)[number]) => {
     if (s.id === r.assigned_to) return `${s.name} (current)`;
     const load = `${s.assignedThisMonth}/${s.capacity} EAP this month`;
-    const warn = s.assignedThisMonth >= s.capacity && r.kind === "eap" ? ", full" : !speaks(s, r.language) ? `, no ${r.language}` : "";
+    const warn = !s.available
+      ? ", not taking new clients"
+      : s.assignedThisMonth >= s.capacity && r.kind === "eap"
+        ? ", full"
+        : !speaks(s, r.language)
+          ? `, no ${r.language}`
+          : "";
     return `${s.name} (${load}${warn})`;
   };
 
