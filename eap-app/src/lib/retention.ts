@@ -39,27 +39,8 @@ export async function applyRetention(now = new Date()): Promise<RetentionResult>
   let deleted = 0;
   let reduced = 0;
   for (const r of old) {
-    if (!r.invoiced) {
-      // Nothing we must keep: the whole case goes (notes, sessions, messages, consent form with it).
-      await pool.query("DELETE FROM support_requests WHERE id = $1", [r.id]);
-      deleted++;
-      continue;
-    }
-    // Invoices must stay: keep only what they show (name, address, invoice details, variable symbol and
-    // the sessions they cover); everything about the client's wellbeing and contact goes.
-    await pool.query("DELETE FROM request_notes WHERE request_id = $1", [r.id]);
-    await pool.query("DELETE FROM counsellor_notes WHERE request_id = $1", [r.id]);
-    await pool.query("DELETE FROM client_messages WHERE request_id = $1", [r.id]);
-    await pool.query("DELETE FROM message_links WHERE request_id = $1", [r.id]);
-    await pool.query("DELETE FROM consent_forms WHERE request_id = $1", [r.id]);
-    await pool.query("DELETE FROM client_sessions WHERE request_id = $1 AND payment_id IS NULL", [r.id]);
-    await pool.query(
-      `UPDATE support_requests SET message = '', topics = '{}', phone = '', email = '', crisis = false, age_range = '',
-         gender = '', location = '', status = 'closed', anonymized_at = now()
-       WHERE id = $1`,
-      [r.id],
-    );
-    reduced++;
+    if ((await eraseClient(r.id)) === "deleted") deleted++;
+    else reduced++;
   }
   return { deleted, reduced, invoicesDeleted: invoicesDeleted ?? 0 };
 }
@@ -79,4 +60,40 @@ export async function dailyRetention(now = new Date()): Promise<RetentionResult 
   );
   if (!rowCount) return null;
   return applyRetention(now);
+}
+
+/**
+ * Erases a client. Without invoices the whole case goes (notes, sessions, messages, forms with it).
+ * Invoices must be kept for 10 years, so a client with invoices keeps only what they show (name, address,
+ * invoice details, variable symbol and the sessions they cover); everything else goes.
+ */
+export async function eraseClient(id: string): Promise<"deleted" | "reduced"> {
+  const { rows } = await pool.query("SELECT 1 FROM payments WHERE request_id = $1 LIMIT 1", [id]);
+  if (!rows.length) {
+    await pool.query("DELETE FROM support_requests WHERE id = $1", [id]);
+    return "deleted";
+  }
+  // Invoices take the name and address from the consent form: keep them on the client before it goes.
+  await pool.query(
+    `UPDATE support_requests r SET full_name = COALESCE(NULLIF(c.full_name, ''), r.full_name), address = COALESCE(NULLIF(c.home_address, ''), r.address)
+     FROM (SELECT full_name, home_address FROM consent_forms WHERE request_id = $1 ORDER BY signed_at DESC LIMIT 1) c
+     WHERE r.id = $1`,
+    [id],
+  );
+  // Invoices must stay: keep only what they show (name, address, invoice details, variable symbol and
+  // the sessions they cover); everything about the client's wellbeing and contact goes.
+  await pool.query("DELETE FROM request_notes WHERE request_id = $1", [id]);
+  await pool.query("DELETE FROM counsellor_notes WHERE request_id = $1", [id]);
+  await pool.query("DELETE FROM client_messages WHERE request_id = $1", [id]);
+  await pool.query("DELETE FROM message_links WHERE request_id = $1", [id]);
+  await pool.query("DELETE FROM intake_forms WHERE request_id = $1", [id]);
+  await pool.query("DELETE FROM consent_forms WHERE request_id = $1", [id]);
+  await pool.query("DELETE FROM client_sessions WHERE request_id = $1 AND payment_id IS NULL", [id]);
+  await pool.query(
+    `UPDATE support_requests SET message = '', topics = '{}', phone = '', email = '', crisis = false, age_range = '',
+       gender = '', location = '', status = 'closed', anonymized_at = now()
+     WHERE id = $1`,
+    [id],
+  );
+  return "reduced";
 }

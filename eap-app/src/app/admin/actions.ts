@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { endSession, isManager, requireManager, requireStaff, ROLES, startSession, type Role, type Staff } from "@/lib/auth";
+import { endSession, isManager, requireManager, requireOwner, requireStaff, ROLES, startSession, type Role, type Staff } from "@/lib/auth";
 import { inviteFeedback } from "@/lib/feedback";
 import { assignWaitingAndNotify, DEFAULT_MONTHLY_CAPACITY, offerToNext } from "@/lib/assign";
 import { generateCompanyCode } from "@/lib/codes";
@@ -159,6 +159,17 @@ export async function addCounsellorNote(requestId: string, formData: FormData) {
   redirect(`/admin/requests/${requestId}#counsellor-notes`);
 }
 
+/** The owner opens a counsellor's private notes in an emergency. It's recorded in the team notes. */
+export async function openCounsellorNotesAction(requestId: string) {
+  const staff = await requireOwner();
+  await pool.query("INSERT INTO request_notes (request_id, staff_id, body) VALUES ($1, $2, $3)", [
+    requestId,
+    staff.id,
+    `${staff.name} opened the counsellor's private notes (emergency access).`,
+  ]);
+  redirect(`/admin/requests/${requestId}?notes=emergency#counsellor-notes`);
+}
+
 export async function addNote(requestId: string, formData: FormData) {
   const { staff } = await requireCase(requestId);
   const body = String(formData.get("body") ?? "").trim().slice(0, 4000);
@@ -176,8 +187,9 @@ export async function addNote(requestId: string, formData: FormData) {
 export async function deleteRequest(requestId: string, formData: FormData) {
   await requireManager();
   if (formData.get("confirm") !== "yes") redirect(`/admin/requests/${requestId}?confirmDelete=1`);
-  await pool.query("DELETE FROM support_requests WHERE id = $1", [requestId]);
-  redirect("/admin?deleted=1");
+  const { eraseClient } = await import("@/lib/retention");
+  const result = await eraseClient(requestId);
+  redirect(result === "deleted" ? "/admin?deleted=1" : "/admin?deleted=kept");
 }
 
 export async function createCompany(_prev: { error?: string }, formData: FormData): Promise<{ error?: string }> {
