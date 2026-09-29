@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { endSession, isManager, requireManager, requireStaff, ROLES, startSession, type Role, type Staff } from "@/lib/auth";
+import { discoveryOffer } from "@/lib/discovery-offer";
+import { endSession, isManager, requireManager, requireOwner, requireStaff, ROLES, startSession, type Role, type Staff } from "@/lib/auth";
 import { inviteFeedback } from "@/lib/feedback";
 import { assignWaitingAndNotify, DEFAULT_MONTHLY_CAPACITY, offerToNext } from "@/lib/assign";
 import { generateCompanyCode } from "@/lib/codes";
@@ -159,6 +160,17 @@ export async function addCounsellorNote(requestId: string, formData: FormData) {
   redirect(`/admin/requests/${requestId}#counsellor-notes`);
 }
 
+/** The owner opens a counsellor's private notes in an emergency. It's recorded in the team notes. */
+export async function openCounsellorNotesAction(requestId: string) {
+  const staff = await requireOwner();
+  await pool.query("INSERT INTO request_notes (request_id, staff_id, body) VALUES ($1, $2, $3)", [
+    requestId,
+    staff.id,
+    `${staff.name} opened the counsellor's private notes (emergency access).`,
+  ]);
+  redirect(`/admin/requests/${requestId}?notes=emergency#counsellor-notes`);
+}
+
 export async function addNote(requestId: string, formData: FormData) {
   const { staff } = await requireCase(requestId);
   const body = String(formData.get("body") ?? "").trim().slice(0, 4000);
@@ -176,8 +188,9 @@ export async function addNote(requestId: string, formData: FormData) {
 export async function deleteRequest(requestId: string, formData: FormData) {
   await requireManager();
   if (formData.get("confirm") !== "yes") redirect(`/admin/requests/${requestId}?confirmDelete=1`);
-  await pool.query("DELETE FROM support_requests WHERE id = $1", [requestId]);
-  redirect("/admin?deleted=1");
+  const { eraseClient } = await import("@/lib/retention");
+  const result = await eraseClient(requestId);
+  redirect(result === "deleted" ? "/admin?deleted=1" : "/admin?deleted=kept");
 }
 
 export async function createCompany(_prev: { error?: string }, formData: FormData): Promise<{ error?: string }> {
@@ -529,14 +542,17 @@ export async function addSession(requestId: string, formData: FormData) {
   redirect(`/admin/requests/${requestId}#sessions`);
 }
 
-const DISCOVERY_OFFER = (counsellor: string) =>
-  `Hello, I'm ${counsellor}, your counsellor at Prague Integration. I'd like to offer you a free discovery session: a first, no-obligation conversation online where we get to know each other and talk about what you'd like support with. Please reply here with a few days and times that suit you.`;
-
 /** Step 2: offers the client a free discovery session, by message on their private page. */
 export async function offerDiscoveryAction(requestId: string) {
   const c = await requireCase(requestId);
   await acceptIfPending(requestId, c);
-  await sendStaffMessage(requestId, c.staff.id, DISCOVERY_OFFER(c.staff.name));
+  // Signed with the client's counsellor's name, even when the coordinator sends it for them.
+  const { rows } = await pool.query<{ id: string; name: string }>(
+    "SELECT s.id, s.name FROM support_requests r JOIN staff s ON s.id = r.assigned_to WHERE r.id = $1",
+    [requestId],
+  );
+  const from = rows[0] ?? c.staff;
+  await sendStaffMessage(requestId, from.id, discoveryOffer(from.name));
   await pool.query(
     "UPDATE support_requests SET discovery_offered_at = now(), status = CASE WHEN status = 'new' THEN 'contacted' ELSE status END, updated_at = now() WHERE id = $1",
     [requestId],

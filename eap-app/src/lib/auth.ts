@@ -10,7 +10,11 @@ export const ROLES = ["admin", "coordinator", "counsellor"] as const;
 export type Role = (typeof ROLES)[number];
 export const ROLE_LABELS: Record<Role, string> = { admin: "Admin", coordinator: "Coordinator", counsellor: "Counsellor" };
 
-export type Staff = { id: string; email: string; name: string; role: Role };
+export type Staff = { id: string; email: string; name: string; role: Role; owner?: boolean };
+
+// The owner of Prague Integration: the only one who sees the bank statements, and who can open a
+// counsellor's private notes in an emergency (logged on the case).
+export const isOwner = (s: Pick<Staff, "owner">) => s.owner === true;
 
 // Admins and coordinators see and assign every case; counsellors only their own.
 export const isManager = (s: Pick<Staff, "role">) => s.role === "admin" || s.role === "coordinator";
@@ -46,7 +50,7 @@ export async function currentStaff(): Promise<Staff | null> {
   const token = (await cookies()).get(COOKIE)?.value;
   if (!token) return null;
   const { rows } = await pool.query<Staff>(
-    `SELECT s.id, s.email, s.name, s.role FROM staff_sessions ss JOIN staff s ON s.id = ss.staff_id
+    `SELECT s.id, s.email, s.name, s.role, s.is_owner AS owner FROM staff_sessions ss JOIN staff s ON s.id = ss.staff_id
      WHERE ss.token_hash = $1 AND ss.expires_at > now()`,
     [sha256(token)],
   );
@@ -70,5 +74,11 @@ export async function requireAdmin(): Promise<Staff> {
 export async function requireManager(): Promise<Staff> {
   const staff = await requireStaff();
   if (!isManager(staff)) redirect("/admin");
+  return staff;
+}
+
+export async function requireOwner(): Promise<Staff> {
+  const staff = await requireStaff();
+  if (!isOwner(staff)) redirect("/admin");
   return staff;
 }

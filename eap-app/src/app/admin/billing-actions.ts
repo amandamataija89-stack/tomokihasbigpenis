@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { isManager, requireManager, requireStaff, type Staff } from "@/lib/auth";
+import { isManager, requireManager, requireOwner, requireStaff, type Staff } from "@/lib/auth";
 import {
   billingFrom,
   createInvoiceToPay,
@@ -373,7 +373,7 @@ export async function takeOffInvoiceAction(requestId: string, sessionId: string)
 
 /** Reads an uploaded bank statement CSV and marks matching invoices paid. The result shows on Monthly billing. */
 export async function importStatementAction(formData: FormData) {
-  await requireManager();
+  await requireOwner(); // bank statements are for the owner only
   const file = formData.get("statement");
   if (!(file instanceof File) || file.size === 0) redirect("/admin/billing?bank=nofile");
   if ((file as File).size > 5_000_000) redirect("/admin/billing?bank=toobig");

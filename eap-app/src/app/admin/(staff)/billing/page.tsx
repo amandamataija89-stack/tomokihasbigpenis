@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireManager } from "@/lib/auth";
+import { isOwner, requireManager } from "@/lib/auth";
 import { invoiceSettings, openInvoices, vatSplit } from "@/lib/billing";
 import { createMonthlyInvoicesAction, emailMonthlyInvoicesAction, importStatementAction } from "../../billing-actions";
 import type { ImportResult } from "@/lib/bank-statement";
@@ -38,13 +38,16 @@ export default async function MonthlyBilling({ searchParams }: { searchParams: P
     bank?: string;
     why?: string;
   }> }) {
-  await requireManager();
+  const me = await requireManager();
+  const owner = isOwner(me); // only the owner sees the bank statement
   const sp = await searchParams;
   const thisMonth = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Prague", year: "numeric", month: "2-digit" }).format(new Date());
   const month = /^\d{4}-\d{2}$/.test(sp.month ?? "") ? sp.month! : thisMonth;
-  const lastImport = await pool
-    .query<{ value: string }>("SELECT value FROM app_state WHERE key = 'last_bank_import'")
-    .then((r) => (r.rows[0] ? (JSON.parse(r.rows[0].value) as ImportResult & { at: string }) : null));
+  const lastImport = owner
+    ? await pool
+        .query<{ value: string }>("SELECT value FROM app_state WHERE key = 'last_bank_import'")
+        .then((r) => (r.rows[0] ? (JSON.parse(r.rows[0].value) as ImportResult & { at: string }) : null))
+    : null;
   const [settings, open, { rows: toEmail }, { rows }] = await Promise.all([
     invoiceSettings(),
     openInvoices(),
@@ -214,6 +217,7 @@ export default async function MonthlyBilling({ searchParams }: { searchParams: P
         )}
       </div>
 
+      {owner && (
       <section className="card stack" id="bank">
         <h2>Bank statement</h2>
         <p className="small">
@@ -260,6 +264,7 @@ export default async function MonthlyBilling({ searchParams }: { searchParams: P
           </div>
         )}
       </section>
+      )}
 
       <section className="card stack">
         <h2>Invoices awaiting payment</h2>
@@ -284,7 +289,7 @@ export default async function MonthlyBilling({ searchParams }: { searchParams: P
             ))}
           </ul>
         )}
-        <p className="small">Upload the bank statement below to mark paid invoices automatically. For anything still overdue, send the client a payment reminder from their page.</p>
+        <p className="small">{owner ? "Upload the bank statement below to mark paid invoices automatically. " : ""}For anything still overdue, send the client a payment reminder from their page.</p>
       </section>
 
       {byCounsellor.size > 0 && (

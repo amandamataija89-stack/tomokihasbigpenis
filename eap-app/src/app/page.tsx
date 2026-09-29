@@ -19,7 +19,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ e
         <h1>Talk to someone, confidentially</h1>
         <p className="lede">
           Your employer gives you access to confidential support from Prague Integration&apos;s psychologists,
-          counsellors and coaches, in English, Czech, Russian, Spanish and more.
+          counsellors and coaches, in English, Czech, Russian, Spanish, Serbo-Croatian, Italian, French and more.
         </p>
       </section>
 

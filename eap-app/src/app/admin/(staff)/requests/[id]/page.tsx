@@ -2,9 +2,9 @@ import Link from "next/link";
 import { pool } from "@/lib/db";
 import { notFound } from "next/navigation";
 import { speaks } from "@/lib/assign";
-import { isManager, requireStaff } from "@/lib/auth";
+import { isManager, isOwner, requireStaff } from "@/lib/auth";
 import { getRequest, listNotes, listSessions, listStaffWithLoad, STATUSES, STATUS_LABELS } from "@/lib/data";
-import { acceptCase, addCounsellorNote, addNote, setCrisisAction, declineCase, deleteRequest, emailFeedbackLink, updateRequest } from "../../../actions";
+import { acceptCase, addCounsellorNote, openCounsellorNotesAction, addNote, setCrisisAction, declineCase, deleteRequest, emailFeedbackLink, updateRequest } from "../../../actions";
 import { contactDue } from "@/lib/deadlines";
 import { formatDate } from "../../../format";
 import { listMessages, markClientMessagesRead } from "@/lib/messages";
@@ -38,6 +38,7 @@ export default async function RequestPage({
     consent?: string;
     crisis?: string;
     added?: string;
+    notes?: string;
   }>;
 }) {
   const { id } = await params;
@@ -53,8 +54,10 @@ export default async function RequestPage({
   const [signedConsent, intake] = await Promise.all([latestConsent(id), latestIntake(id)]);
   // Counsellor-only notes: readable only by the client's counsellor; others see just how many there are.
   const isTheirCounsellor = r.assigned_to === me.id;
+  // The owner can open them in an emergency; opening them is logged in the team notes.
+  const emergencyNotes = !isTheirCounsellor && isOwner(me) && sp.notes === "emergency";
   const { rows: privateNotes } = await pool.query<{ id: string; body: string; created_at: Date; staff_name: string | null }>(
-    isTheirCounsellor
+    isTheirCounsellor || emergencyNotes
       ? `SELECT n.id, n.body, n.created_at, s.name AS staff_name FROM counsellor_notes n LEFT JOIN staff s ON s.id = n.staff_id
          WHERE n.request_id = $1 ORDER BY n.created_at DESC`
       : "SELECT id, '' AS body, created_at, NULL AS staff_name FROM counsellor_notes WHERE request_id = $1",
@@ -205,6 +208,7 @@ export default async function RequestPage({
             <Steps
               requestId={r.id}
               canAct={r.assigned_to === me.id || manager}
+              counsellorName={r.assigned_name ?? me.name}
               s={{
                 accepted: r.accepted_at,
                 discoveryOffered: r.discovery_offered_at,
@@ -298,10 +302,30 @@ export default async function RequestPage({
                 ))}
               </>
             ) : (
-              <p className="small">
-                🔒 {privateNotes.length ? `${privateNotes.length} note${privateNotes.length === 1 ? "" : "s"}` : "Notes"} written by the
-                client&apos;s counsellor. Only the counsellor can read them.
-              </p>
+              <>
+                {emergencyNotes ? (
+                  <>
+                    <p className="notice small">Emergency access: opening these notes was recorded in the team notes.</p>
+                    {privateNotes.length === 0 && <p className="small">No notes yet.</p>}
+                    {privateNotes.map((n) => (
+                      <div className="note" key={n.id}>
+                        <span className="meta">{n.staff_name ?? "Counsellor"} · {formatDate(n.created_at)}</span>
+                        <span className="body" style={{ whiteSpace: "pre-wrap" }}>{n.body}</span>
+                      </div>
+                    ))}
+                  </>
+                ) : (
+                  <p className="small">
+                    🔒 {privateNotes.length ? `${privateNotes.length} note${privateNotes.length === 1 ? "" : "s"}` : "Notes"} written by the
+                    client&apos;s counsellor. Only the counsellor can read them.
+                  </p>
+                )}
+                {isOwner(me) && !emergencyNotes && privateNotes.length > 0 && (
+                  <form action={openCounsellorNotesAction.bind(null, r.id)}>
+                    <button type="submit" className="ghost small-btn">Open in an emergency</button>
+                  </form>
+                )}
+              </>
             )}
           </section>
 
@@ -332,15 +356,16 @@ export default async function RequestPage({
 
           {manager && (
             <form action={deleteRequest.bind(null, r.id)} className="card form" style={{ gap: 12 }}>
-              <h2 style={{ fontSize: 18 }}>Delete request</h2>
+              <h2 style={{ fontSize: 18 }}>Delete client profile</h2>
               <p className="small">
                 Use this when the person asks for their data to be erased, or when it&apos;s no longer needed. This
-                removes the request and all notes permanently.
+                permanently removes the profile, notes, messages, forms and sessions. If the client has invoices, those
+                are kept (the law requires 10 years) with only the name, address and sessions they show.
               </p>
               {sp.confirmDelete && <p className="err">Tick the box to confirm.</p>}
               <label className="consent">
                 <input type="checkbox" name="confirm" value="yes" />
-                <span>Delete {r.first_name}&apos;s request permanently</span>
+                <span>Delete {r.first_name}&apos;s profile permanently</span>
               </label>
               <div className="actions"><button type="submit" className="danger">Delete</button></div>
             </form>

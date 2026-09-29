@@ -77,7 +77,13 @@ export default async function RequestsPage({
           {!manager && " You only see your own clients, and the pool."}
         </p>
       </div>
-      {sp.deleted && <p className="flash" role="status">Request deleted.</p>}
+      {sp.deleted && (
+        <p className="flash" role="status">
+          {sp.deleted === "kept"
+            ? "Client profile deleted. Their invoices are kept, as the law requires for 10 years, with only the name, address and sessions they show."
+            : "Client profile deleted."}
+        </p>
+      )}
       {sp.declined && <p className="flash" role="status">Declined. The client has been passed to another counsellor.</p>}
       {sp.gone && <p className="flash" role="status">Someone else took that client just before you.</p>}
       {newlyAssigned.length > 0 && (

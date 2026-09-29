@@ -362,3 +362,8 @@ CREATE TABLE IF NOT EXISTS intake_forms (
   user_agent             text NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS intake_forms_request_idx ON intake_forms (request_id, signed_at DESC);
+
+-- The owner (Amanda Mataija): sees the bank statements and can open counsellors' private notes in an
+-- emergency. Other admins see everything else.
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS is_owner boolean NOT NULL DEFAULT false;
+UPDATE staff SET is_owner = true WHERE lower(email) = 'amandamataija89@gmail.com' AND NOT is_owner;

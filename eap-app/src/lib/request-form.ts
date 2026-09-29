@@ -1,7 +1,7 @@
 // The employee request form: its options and validation. Shared by the page and the server action.
 
 export const CONTACT_METHODS = ["Email", "Phone call", "Text message"] as const;
-export const LANGUAGES = ["English", "Czech", "Russian", "Spanish", "Other"] as const;
+export const LANGUAGES = ["English", "Czech", "Russian", "Spanish", "Serbo-Croatian", "Italian", "French", "Other"] as const;
 export const FORMATS = ["Online", "In person in Prague", "No preference"] as const;
 export const AGE_RANGES = ["18–24", "25–34", "35–44", "45–54", "55–64", "65 or over", "Prefer not to say"] as const;
 export const GENDERS = ["Woman", "Man", "Non-binary", "Another gender", "Prefer not to say"] as const;

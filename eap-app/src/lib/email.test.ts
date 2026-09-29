@@ -143,3 +143,14 @@ describe("discovery session", () => {
     expect(sessionConfirmation({ ...base, kind: "booked", format: "In person in Prague" }).text).toContain("Mezibranská 4, 110 00 Prague 1");
   });
 });
+
+describe("discovery offer message", () => {
+  it("is signed by the counsellor and says the discovery session is online, free and 15–20 minutes", async () => {
+    const { discoveryOffer } = await import("./discovery-offer");
+    const m = discoveryOffer("Eva Novak");
+    expect(m).toMatch(/^Hello, my name is Eva Novak and I am your mental health counsellor\./);
+    expect(m).toContain("15–20 minutes and is free of charge");
+    expect(m).toContain("Mezibranská 4, 110 00 Prague");
+    expect(m).toMatch(/Warm regards,\nEva Novak\nPrague Integration$/);
+  });
+});
