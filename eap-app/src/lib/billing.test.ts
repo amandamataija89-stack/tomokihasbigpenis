@@ -102,3 +102,14 @@ describe("QR Platba", () => {
     );
   });
 });
+
+describe("exact prices", () => {
+  it("are offered instead of steps when set", async () => {
+    const { priceChoices, parsePriceOptions } = await import("./billing");
+    expect(parsePriceOptions("3000, 2000, 2 200, 2500")).toEqual([2000, 2200, 2500, 3000]);
+    expect(parsePriceOptions("")).toEqual([]);
+    expect(parsePriceOptions("2000, abc")).toBeUndefined();
+    expect(priceChoices({ service: "Couple counselling", min_net_czk: 2000, max_net_czk: 3000, price_options: [2000, 2200, 2500, 3000] })).toEqual([2000, 2200, 2500, 3000]);
+    expect(priceChoices({ service: "x", min_net_czk: 1400, max_net_czk: 1600, price_options: [] })).toEqual([1400, 1500, 1600]);
+  });
+});

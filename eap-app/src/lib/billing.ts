@@ -13,18 +13,38 @@ export const PAYMENT_METHODS = ["Bank transfer", "Cash", "Card"] as const;
 // in steps of PRICE_STEP. Sessions and payments store the price with VAT (what the client pays).
 export const PRICE_STEP = 100;
 
-export type PriceRow = { service: string; min_net_czk: number | null; max_net_czk: number | null };
+export type PriceRow = { service: string; min_net_czk: number | null; max_net_czk: number | null; price_options?: number[] };
+
+/** The prices a counsellor can choose for a kind of support: its exact prices if set, else steps across the range. */
+export function priceChoices(row: PriceRow | null | undefined): number[] {
+  if (!row) return [];
+  if (row.price_options?.length) return [...row.price_options].sort((a, b) => a - b);
+  return row.min_net_czk != null ? priceSteps(row.min_net_czk, row.max_net_czk ?? row.min_net_czk) : [];
+}
+
+/** "2000, 2200, 2 500" → [2000, 2200, 2500]; "" → []; anything else undefined. */
+export function parsePriceOptions(raw: unknown): number[] | undefined {
+  const parts = String(raw ?? "").split(/[;,/]|\s{2,}|\n/).map((p) => p.trim()).filter(Boolean);
+  const out: number[] = [];
+  for (const p of parts) {
+    const n = parsePrice(p);
+    if (n === undefined || n === null) return undefined;
+    if (!out.includes(n)) out.push(n);
+  }
+  return out.sort((a, b) => a - b);
+}
 
 export async function priceList(): Promise<PriceRow[]> {
-  const { rows } = await pool.query<PriceRow>("SELECT service, min_net_czk, max_net_czk FROM price_list ORDER BY service");
+  const { rows } = await pool.query<PriceRow>("SELECT service, min_net_czk, max_net_czk, price_options FROM price_list ORDER BY service");
   return rows;
 }
 
-export async function setPriceRange(service: string, min: number | null, max: number | null): Promise<void> {
+export async function setPriceRange(service: string, min: number | null, max: number | null, options: number[] = []): Promise<void> {
   await pool.query(
-    `INSERT INTO price_list (service, min_net_czk, max_net_czk, updated_at) VALUES ($1, $2, $3, now())
-     ON CONFLICT (service) DO UPDATE SET min_net_czk = EXCLUDED.min_net_czk, max_net_czk = EXCLUDED.max_net_czk, updated_at = now()`,
-    [service, min, max],
+    `INSERT INTO price_list (service, min_net_czk, max_net_czk, price_options, updated_at) VALUES ($1, $2, $3, $4, now())
+     ON CONFLICT (service) DO UPDATE SET min_net_czk = EXCLUDED.min_net_czk, max_net_czk = EXCLUDED.max_net_czk,
+       price_options = EXCLUDED.price_options, updated_at = now()`,
+    [service, min, max, options],
   );
 }
 

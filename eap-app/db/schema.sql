@@ -370,3 +370,9 @@ UPDATE staff SET is_owner = true WHERE lower(email) = 'amandamataija89@gmail.com
 
 -- When a counsellor is usually free for sessions (their own words, e.g. "Mon–Wed 9:00–17:00"), shown to the team.
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS availability_note text NOT NULL DEFAULT '';
+
+-- Exact prices to choose from (without VAT), instead of steps of 100 CZK across the range; empty = steps.
+ALTER TABLE price_list ADD COLUMN IF NOT EXISTS price_options integer[] NOT NULL DEFAULT '{}';
+UPDATE price_list SET price_options = '{2000,2200,2500,3000}', min_net_czk = 2000, max_net_czk = 3000
+  WHERE service = 'Couple counselling' AND NOT EXISTS (SELECT 1 FROM app_state WHERE key = 'couple_prices_set');
+INSERT INTO app_state (key, value) VALUES ('couple_prices_set', '1') ON CONFLICT (key) DO NOTHING;
