@@ -1,10 +1,24 @@
 import type { SignedIntake } from "@/lib/intake";
+import { sendIntakeAction } from "../../../actions";
 import { formatDate } from "../../../format";
 
 const yn = (v: string, details: string) => (v === "yes" ? <><b>Yes</b>{details ? `: ${details}` : ""}</> : v === "no" ? "No" : "—");
 
-// The client's intake & registration answers.
-export function IntakeCard({ intake }: { intake: SignedIntake }) {
+// The client's intake & registration answers, or whether the form is still to be filled in.
+export function IntakeCard({ requestId, intake, sentAt }: { requestId: string; intake: SignedIntake | null; sentAt: Date | null }) {
+  if (!intake)
+    return (
+      <section className="card stack" id="intake">
+        <h2>Intake &amp; registration form</h2>
+        <p className="notice">
+          <b>Not filled in yet.</b> The client fills it in before the free discovery session.{" "}
+          {sentAt ? `The link was emailed on ${formatDate(sentAt)}.` : "It's emailed with the discovery session invitation."}
+        </p>
+        <form action={sendIntakeAction.bind(null, requestId)}>
+          <button type="submit" className="ghost small-btn">{sentAt ? "Email the link again" : "Email the intake form now"}</button>
+        </form>
+      </section>
+    );
   const a = intake.answers;
   return (
     <section className="card stack" id="intake">
