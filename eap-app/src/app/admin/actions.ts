@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { discoveryOffer } from "@/lib/discovery-offer";
 import { endSession, isManager, requireManager, requireOwner, requireStaff, ROLES, startSession, type Role, type Staff } from "@/lib/auth";
 import { inviteFeedback } from "@/lib/feedback";
-import { assignWaitingAndNotify, DEFAULT_MONTHLY_CAPACITY, offerToNext } from "@/lib/assign";
+import { assignWaitingAndNotify, CLIENT_TYPES, DEFAULT_MONTHLY_CAPACITY, offerToNext } from "@/lib/assign";
 import { generateCompanyCode } from "@/lib/codes";
 import { sessionLimit, STATUSES, STATUS_LABELS, type ClientKind, type Status } from "@/lib/data";
 import { pool } from "@/lib/db";
@@ -226,8 +226,10 @@ function availabilityFields(formData: FormData, maxCapacity: number) {
     .filter((l): l is string => typeof l === "string" && (LANGUAGES as readonly string[]).includes(l) && l !== "Other");
   const capacity = Number(formData.get("capacity"));
   const away = String(formData.get("awayUntil") ?? "");
+  const accepts = formData.getAll("accepts").filter((c): c is string => typeof c === "string" && (CLIENT_TYPES as readonly string[]).includes(c));
   return {
     languages,
+    accepts,
     capacity: Number.isInteger(capacity) && capacity >= 0 && capacity <= maxCapacity ? capacity : null,
     takesClients: formData.get("takesClients") === "yes",
     awayUntil: /^\d{4}-\d{2}-\d{2}$/.test(away) ? away : null,
@@ -292,8 +294,8 @@ export async function updateStaff(staffId: string, formData: FormData) {
   const newRole = me.role === "admin" && ROLES.includes(role) && !(staffId === me.id && role !== "admin") ? role : rows[0].role;
   await pool.query(
     `UPDATE staff SET takes_clients = $2, monthly_capacity = COALESCE($3, monthly_capacity), languages = $4,
-       away_until = $5, role = $6, is_admin = ($6 = 'admin') WHERE id = $1`,
-    [staffId, f.takesClients, f.capacity, f.languages, f.awayUntil, newRole],
+       away_until = $5, role = $6, is_admin = ($6 = 'admin'), accepts = $7 WHERE id = $1`,
+    [staffId, f.takesClients, f.capacity, f.languages, f.awayUntil, newRole, f.accepts],
   );
   await assignWaitingAndNotify();
   revalidatePath("/admin/team");
@@ -309,9 +311,9 @@ export async function updateMyAvailability(formData: FormData) {
   const f = availabilityFields(formData, Math.max(DEFAULT_MONTHLY_CAPACITY, rows[0]?.monthly_capacity ?? 0));
   await pool.query(
     `UPDATE staff SET takes_clients = $2, monthly_capacity = COALESCE($3, monthly_capacity), languages = $4, away_until = $5,
-       availability_note = $6
+       availability_note = $6, accepts = $7
      WHERE id = $1`,
-    [me.id, f.takesClients, f.capacity, f.languages, f.awayUntil, String(formData.get("availabilityNote") ?? "").trim().slice(0, 500)],
+    [me.id, f.takesClients, f.capacity, f.languages, f.awayUntil, String(formData.get("availabilityNote") ?? "").trim().slice(0, 500), f.accepts],
   );
   await assignWaitingAndNotify();
   redirect("/admin/availability?saved=1");

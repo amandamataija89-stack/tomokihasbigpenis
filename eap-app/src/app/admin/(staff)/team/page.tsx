@@ -98,6 +98,7 @@ export default async function TeamPage({
                     : `${t.assignedThisMonth} / ${t.capacity}${full ? " · full" : ""}`}
                 </span>
               </div>
+              <p className="small"><b>Takes:</b> {t.accepts?.length ? t.accepts.join(", ") : "no new client types"}</p>
               {m.availability_note && <p className="small" style={{ whiteSpace: "pre-wrap" }}><b>Available:</b> {m.availability_note}</p>}
               <p className="small"><Link href={`/admin/team/${t.id}`}>See their clients and month →</Link></p>
               {m.invited && (
@@ -120,6 +121,7 @@ export default async function TeamPage({
                   maxCapacity={100}
                   takesClients={m.takes_clients}
                   awayUntil={m.away_until ?? ""}
+                  accepts={t.accepts}
                 />
                 <div className="actions"><button type="submit" className="ghost small-btn">Save</button></div>
               </form>

@@ -75,6 +75,7 @@ export default async function AvailabilityPage({ searchParams }: { searchParams:
           maxCapacity={Math.max(5, mine.capacity)}
           takesClients={taking}
           awayUntil={rows[0].away_until ?? ""}
+          accepts={mine.accepts}
         />
         <p className="small">To take more than 5 new clients a month, ask your coordinator.</p>
         <div className="actions"><button type="submit">Save</button></div>

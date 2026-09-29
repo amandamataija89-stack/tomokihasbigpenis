@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { pool } from "@/lib/db";
 import { notFound } from "next/navigation";
-import { speaks } from "@/lib/assign";
+import { speaks, takesType, typesFor } from "@/lib/assign";
 import { isManager, isOwner, requireStaff } from "@/lib/auth";
 import { getRequest, listNotes, listSessions, listStaffWithLoad, STATUSES, STATUS_LABELS } from "@/lib/data";
 import { acceptCase, addCounsellorNote, openCounsellorNotesAction, addNote, setCrisisAction, declineCase, deleteRequest, emailFeedbackLink, updateRequest } from "../../../actions";
@@ -83,6 +83,8 @@ export default async function RequestPage({
     const load = `${s.assignedThisMonth}/${s.capacity} EAP this month`;
     const warn = !s.available
       ? ", not taking new clients"
+      : !takesType(s, r.service, r.kind)
+        ? `, doesn't take ${typesFor(r.service, r.kind).join(" or ").toLowerCase()}`
       : s.assignedThisMonth >= s.capacity && r.kind === "eap"
         ? ", full"
         : !speaks(s, r.language)

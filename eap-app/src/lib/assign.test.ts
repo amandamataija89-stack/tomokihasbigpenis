@@ -87,3 +87,15 @@ describe("declined offers", () => {
     expect(chooseTherapist([t("Anna", 0)], "English", false, ["Anna"])).toMatchObject({ reason: "no-therapists" });
   });
 });
+
+describe("client types", () => {
+  it("offers EAP clients only to counsellors who take individuals", () => {
+    expect(pick([t("Anna", 0, { accepts: ["Couples"] }), t("Boris", 3, { accepts: ["Individuals", "Students"] })])).toBe("Boris");
+  });
+  it("matches the kind of support", async () => {
+    const { takesType } = await import("./assign");
+    expect(takesType({ accepts: ["Individuals"] }, "Couple counselling", "private")).toBe(false);
+    expect(takesType({ accepts: ["Children"] }, "Children or teenager counselling", "private")).toBe(true);
+    expect(takesType({ accepts: [] }, "ADHD testing", "private")).toBe(true);
+  });
+});

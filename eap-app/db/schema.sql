@@ -410,3 +410,6 @@ CREATE TABLE IF NOT EXISTS group_attendance (
   member_id  uuid NOT NULL REFERENCES group_members(id) ON DELETE CASCADE,
   PRIMARY KEY (session_id, member_id)
 );
+
+-- Which clients a counsellor takes (see CLIENT_TYPES in src/lib/assign.ts). All by default.
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS accepts text[] NOT NULL DEFAULT '{Individuals,Couples,Teenagers,Children,Students}';

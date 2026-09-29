@@ -17,7 +17,25 @@ export type TherapistLoad = {
   assignedThisMonth: number;
   lastAssignedAt: Date | null;
   available?: boolean; // taking new clients, not away, and signed up
+  accepts?: string[]; // client types they take (CLIENT_TYPES)
 };
+
+// The clients a counsellor can choose to take, on My availability.
+export const CLIENT_TYPES = ["Individuals", "Couples", "Teenagers", "Children", "Students"] as const;
+
+/** The client types a kind of support needs (any one of them will do); [] = no preference. */
+export function typesFor(service: string, kind: "eap" | "private"): string[] {
+  if (service === "Couple counselling") return ["Couples"];
+  if (service === "Children or teenager counselling") return ["Teenagers", "Children"];
+  if (service === "Individual counselling" || kind === "eap") return ["Individuals"];
+  return [];
+}
+
+/** Whether the counsellor takes this kind of client (true when not known). */
+export function takesType(t: Pick<TherapistLoad, "accepts">, service: string, kind: "eap" | "private"): boolean {
+  const need = typesFor(service, kind);
+  return !t.accepts || need.length === 0 || need.some((n) => t.accepts!.includes(n));
+}
 
 // A therapist with no languages listed is treated as taking any language.
 // "Other" can't be matched automatically, so anyone may take it.
@@ -42,7 +60,8 @@ export function chooseTherapist(
   declinedBy: readonly string[] = [],
 ): Choice {
   // Someone who already declined this client (or let the offer lapse) isn't offered it again.
-  const therapists = all.filter((t) => !declinedBy.includes(t.id));
+  // EAP clients are individuals: only counsellors who take individuals are offered them.
+  const therapists = all.filter((t) => !declinedBy.includes(t.id) && takesType(t, "", "eap"));
   if (therapists.length === 0) return { therapist: null, reason: "no-therapists" };
   // A crisis case never waits: if everyone is full it goes over someone's limit, least-loaded first.
   const open = crisis && therapists.every((t) => t.assignedThisMonth >= t.capacity)
@@ -79,8 +98,9 @@ export async function therapistLoads(db: Queryable = pool, onlyTakingClients = t
     assigned: number;
     last_assigned_at: Date | null;
     available: boolean;
+    accepts: string[];
   }>(
-    `SELECT s.id, s.name, s.email, s.monthly_capacity, s.languages,
+    `SELECT s.id, s.name, s.email, s.monthly_capacity, s.languages, s.accepts,
        (s.takes_clients AND s.password_hash <> '!'
          AND (s.away_until IS NULL OR s.away_until < (now() AT TIME ZONE 'Europe/Prague')::date)) AS available,
        count(r.id) FILTER (WHERE r.assigned_at >= ${MONTH_START_SQL} AND r.kind = 'eap')::int AS assigned,
@@ -104,6 +124,7 @@ export async function therapistLoads(db: Queryable = pool, onlyTakingClients = t
     assignedThisMonth: r.assigned,
     lastAssignedAt: r.last_assigned_at,
     available: r.available,
+    accepts: r.accepts,
   }));
 }
 

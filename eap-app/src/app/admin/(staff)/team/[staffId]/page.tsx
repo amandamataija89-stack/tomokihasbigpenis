@@ -25,12 +25,13 @@ export default async function CounsellorProfile({
     email: string;
     role: Role;
     availability_note: string;
+    accepts: string[];
     takes_clients: boolean;
     monthly_capacity: number;
     languages: string[];
     away_until: string | null;
   }>(
-    `SELECT name, email, role, takes_clients, availability_note, monthly_capacity, languages, to_char(away_until, 'YYYY-MM-DD') AS away_until
+    `SELECT name, email, role, takes_clients, availability_note, accepts, monthly_capacity, languages, to_char(away_until, 'YYYY-MM-DD') AS away_until
      FROM staff WHERE id = $1`,
     [staffId],
   );
@@ -81,6 +82,7 @@ export default async function CounsellorProfile({
           {s.away_until ? ` · away until ${s.away_until}` : ""}
           {s.languages.length ? ` · ${s.languages.join(", ")}` : ""}
         </p>
+        <p className="small"><b>Takes:</b> {s.accepts.length ? s.accepts.join(", ") : "no new client types"}</p>
         {s.availability_note && <p className="small" style={{ whiteSpace: "pre-wrap" }}><b>Available:</b> {s.availability_note}</p>}
       </div>
 
