@@ -116,7 +116,7 @@ export default async function MonthlyBilling({ searchParams }: { searchParams: P
 
       {sp.created && (
         <p className="flash" role="status">
-          {sp.created === "0" ? "No new invoices: every session held this month is already invoiced or paid." : `${sp.created} monthly invoice${sp.created === "1" ? "" : "s"} created, due in 14 days.`}
+          {sp.created === "0" ? "No new invoices: every session held this month is already invoiced or paid." : `${sp.created} monthly invoice${sp.created === "1" ? "" : "s"} created, due ${settings.dueDay ? `on day ${settings.dueDay} of the month` : `${settings.dueDays} days after issue`}.`}
           {sp.noprice && sp.noprice !== "0" && ` ${sp.noprice} client${sp.noprice === "1" ? " has" : "s have"} sessions without a price, left out: choose their price and create again.`}
         </p>
       )}
@@ -140,7 +140,7 @@ export default async function MonthlyBilling({ searchParams }: { searchParams: P
               <button type="submit" disabled={toEmail[0].to_invoice === 0}>Issue monthly invoices now</button>
               <span className="small">
                 {toEmail[0].to_invoice
-                  ? `${toEmail[0].to_invoice} running invoice${toEmail[0].to_invoice === 1 ? "" : "s"} not issued yet. Issuing gives each a number, a due date 14 days later, the client's variable symbol and a QR payment code.`
+                  ? `${toEmail[0].to_invoice} running invoice${toEmail[0].to_invoice === 1 ? "" : "s"} not issued yet. Issuing gives each a number, a due date (the 5th of the month, or as set under Pricing & invoices), the client's variable symbol and a QR payment code.`
                   : "Nothing left to invoice for this month."}
               </span>
             </form>

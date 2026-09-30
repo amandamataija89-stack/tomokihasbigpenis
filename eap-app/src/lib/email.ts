@@ -356,7 +356,7 @@ export function invoiceOverdueEmail(to: string, firstName: string, info: Invoice
   return {
     to,
     subject: `Připomínka platby / Payment reminder: faktura ${info.number} – Prague Integration`,
-    text: `Dobrý den / Hello ${firstName},\n\nfaktura č. ${info.number} byla splatná ${info.dueOn} a zatím jsme neobdrželi platbu. Pokud jste již zaplatili, děkujeme a tuto zprávu prosím ignorujte.\nInvoice no. ${info.number} was due on ${info.dueOn} and we haven't received the payment yet. If you've already paid, thank you, and please ignore this message.\n\n${payLines({ ...info, dueOn: null })}\n\nDěkujeme / Thank you,\nPrague Integration\n+420 608 573 256\ncontact@pragueintegration.cz\n`,
+    text: `Dobrý den / Hello ${firstName},\n\nfaktura č. ${info.number} byla splatná ${info.dueOn} a zatím jsme neobdrželi platbu. Pokud jste již zaplatili, děkujeme a tuto zprávu prosím ignorujte.\nInvoice no. ${info.number} was due on ${info.dueOn} and we haven't received the payment yet. If you've already paid, thank you, and please ignore this message.\n\n${payLines({ ...info, dueOn: null })}\n\nUpozorňujeme, že při prodlení s úhradou můžeme účtovat zákonný úrok z prodlení (§ 1970 občanského zákoníku, nařízení vlády č. 351/2013 Sb.).\nPlease note that for late payment we may charge statutory late-payment interest under Czech law (Section 1970 of the Civil Code, Government Regulation No. 351/2013 Coll.).\n\nDěkujeme / Thank you,\nPrague Integration\n+420 608 573 256\ncontact@pragueintegration.cz\n`,
     attachments: qrPngBase64 ? [{ filename: `qr-platba-${info.number}.png`, content: qrPngBase64 }] : undefined,
   };
 }

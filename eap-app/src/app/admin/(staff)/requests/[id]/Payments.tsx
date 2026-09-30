@@ -1,6 +1,7 @@
 import type { ClientSession } from "@/lib/data";
 import { PAYMENT_METHODS, type PackageState, type Payment } from "@/lib/billing";
 import {
+  setInvoiceDueDateAction,
   createInvoiceAction,
   createInvoiceAndDownloadAction,
   emailInvoice,
@@ -20,7 +21,8 @@ const czk = (n: number) => `${n.toLocaleString("cs-CZ")} CZK`;
 
 const FLASH: Record<string, [ok: boolean, text: string]> = {
   paid: [true, "Payment recorded."],
-  invoiced: [true, "Invoice created. It's due in 14 days."],
+  invoiced: [true, "Invoice created. It's due on the 5th of the month (see the due date below)."],
+  duedate: [true, "Due date changed."],
   markedpaid: [true, "Invoice marked paid."],
   edited: [true, "Invoice updated. If it was already emailed, it will be sent again with the next invoice emails."],
   reminded: [true, "Payment reminder emailed."],
@@ -75,6 +77,7 @@ export function Payments({
   manager,
   emailInvoices = false,
   admin = false,
+  canSetDueDate = false,
 }: {
   requestId: string;
   sessions: ClientSession[];
@@ -85,7 +88,8 @@ export function Payments({
   pdf?: string; // an invoice just created, to offer for download
   manager: boolean; // counsellors see the amounts only, not invoices
   emailInvoices?: boolean; // the client asked for invoices by email
-  admin?: boolean; // only admins export (download) invoices
+  admin?: boolean; // only the owner exports (downloads) invoices
+  canSetDueDate?: boolean; // admins change due dates
 }) {
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Prague" }).format(new Date());
   const number = new Map(sessions.map((s, i) => [s.id, i + 1]));
@@ -187,7 +191,7 @@ export function Payments({
                 <span>Email the invoice with the QR payment code to the client now</span>
               </label>
               <div className="actions" style={{ gap: 8 }}>
-                <button formAction={createInvoiceAction.bind(null, requestId)}>Create invoice to pay (due in 14 days)</button>
+                <button formAction={createInvoiceAction.bind(null, requestId)}>Create invoice to pay (due on the 5th)</button>
                 {admin && (
                   <button formAction={createInvoiceAndDownloadAction.bind(null, requestId)} className="ghost">
                     Create invoice and export PDF
@@ -279,6 +283,13 @@ export function Payments({
                       <span>and email it</span>
                     </label>
                     <button type="submit" className="ghost small-btn">Issue now</button>
+                  </form>
+                )}
+                {!p.paid_on && p.invoice_number && canSetDueDate && (
+                  <form action={setInvoiceDueDateAction.bind(null, requestId, p.id)} className="actions mark-paid" style={{ gap: 8 }}>
+                    <label className="small" htmlFor={`due-${p.id}`}>Due date</label>
+                    <input id={`due-${p.id}`} type="date" name="dueOn" defaultValue={p.due_on ?? ""} className="date-input" />
+                    <button type="submit" className="ghost small-btn">Change due date</button>
                   </form>
                 )}
                 {!p.paid_on && p.due_on && p.due_on < today && (

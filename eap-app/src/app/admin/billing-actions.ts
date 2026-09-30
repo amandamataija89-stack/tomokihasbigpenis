@@ -261,7 +261,7 @@ export async function emailInvoice(requestId: string, paymentId: string) {
   back(requestId, "emailed");
 }
 
-/** An invoice to pay for the ticked sessions, due in 14 days; emailed straight away if asked. */
+/** An invoice to pay for the ticked sessions, due on the 5th; emailed straight away if asked. */
 export async function createInvoiceAction(requestId: string, formData: FormData) {
   return createInvoice(requestId, formData, false);
 }
@@ -287,11 +287,11 @@ async function createInvoice(requestId: string, formData: FormData, download: bo
   }
   const id = await createInvoiceToPay({ requestId, sessionIds, amount: amount ?? null, staffId: staff.id });
   if (!id) back(requestId, "nosessions");
-  const { rows } = await pool.query<{ invoice_number: string; amount_czk: number }>(
-    "SELECT invoice_number, amount_czk FROM payments WHERE id = $1",
+  const { rows } = await pool.query<{ invoice_number: string; amount_czk: number; due_on: string }>(
+    "SELECT invoice_number, amount_czk, to_char(due_on, 'DD.MM.YYYY') AS due_on FROM payments WHERE id = $1",
     [id],
   );
-  await note(requestId, staff.id, `Invoice ${rows[0].invoice_number} issued for ${czk(rows[0].amount_czk)}, to pay within 14 days.`);
+  await note(requestId, staff.id, `Invoice ${rows[0].invoice_number} issued for ${czk(rows[0].amount_czk)}, due ${rows[0].due_on}.`);
   // "Create invoice and download PDF": back to the page with the download button, without emailing it.
   if (download) redirect(`/admin/requests/${requestId}?billing=created&pdf=${id}#payments`);
   if (formData.get("send") === "yes") await emailOrFlag(requestId, id!);
@@ -339,7 +339,7 @@ export async function issueNowAction(requestId: string, paymentId: string, formD
   );
   if (!rows[0]) back(requestId, "missing");
   const number = await issueInvoice(paymentId);
-  await note(requestId, staff.id, `Invoice ${number} issued early for ${czk(rows[0].amount_czk)}, to pay within 14 days.`);
+  await note(requestId, staff.id, `Invoice ${number} issued early for ${czk(rows[0].amount_czk)}.`);
   if (formData.get("send") === "yes") await emailOrFlag(requestId, paymentId);
   back(requestId, "invoiced");
 }
@@ -512,7 +512,27 @@ export async function saveInvoiceSettingsAction(formData: FormData) {
     vatRate: [0, 12, 21].includes(Number(formData.get("vatRate"))) ? Number(formData.get("vatRate")) : current.vatRate,
     nextNumber,
     dueDays: Number.isInteger(dueDays) && dueDays >= 0 && dueDays <= 90 ? dueDays : current.dueDays,
+    dueDay: (() => {
+      const raw = String(formData.get("dueDay") ?? "").trim();
+      const n = Number(raw);
+      return raw === "" ? null : Number.isInteger(n) && n >= 1 && n <= 28 ? n : current.dueDay ?? 5;
+    })(),
   });
   revalidatePath("/admin/pricing");
   redirect("/admin/pricing?saved=invoice");
+}
+
+/** An admin sets an unpaid invoice's due date by hand. */
+export async function setInvoiceDueDateAction(requestId: string, paymentId: string, formData: FormData) {
+  const staff = await requireBillingManager(requestId);
+  if (staff.role !== "admin") back(requestId, "error");
+  const due = String(formData.get("dueOn") ?? "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(due)) back(requestId, "error");
+  const { rows } = await pool.query<{ invoice_number: string | null }>(
+    `UPDATE payments SET due_on = $3, overdue_reminded_at = NULL
+     WHERE id = $2 AND request_id = $1 AND paid_on IS NULL RETURNING invoice_number`,
+    [requestId, paymentId, due],
+  );
+  if (rows[0]) await note(requestId, staff.id, `Due date of invoice ${rows[0].invoice_number ?? "(draft)"} set to ${due}.`);
+  back(requestId, "duedate");
 }

@@ -302,6 +302,7 @@ export default async function RequestPage({
               manager={manager}
               emailInvoices={r.email_invoices}
               admin={isOwner(me)}
+              canSetDueDate={me.role === "admin"}
             />
           )}
         </div>
