@@ -310,3 +310,7 @@ footer.site a { color: inherit; }
 table.attendance th, table.attendance td.att-cell { text-align: center; white-space: nowrap; }
 table.attendance td.att-cell input[type="checkbox"] { width: 20px; height: 20px; }
 table.attendance td.att-cell .small-btn { margin-left: 6px; }
+.crisis-protocol { border-left: 4px solid #b3261e; }
+.crisis-numbers { display: flex; flex-wrap: wrap; gap: 8px 18px; background: #fbeeee; border-radius: 8px; padding: 10px 14px; font-size: 15px; }
+.crisis-step { border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px 12px; display: grid; gap: 6px; }
+.crisis-step.high { border-color: #e0a7a2; }

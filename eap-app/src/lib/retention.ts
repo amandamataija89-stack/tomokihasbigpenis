@@ -93,6 +93,7 @@ export async function eraseClient(id: string): Promise<"deleted" | "reduced"> {
   await pool.query("DELETE FROM client_messages WHERE request_id = $1", [id]);
   await pool.query("DELETE FROM message_links WHERE request_id = $1", [id]);
   await pool.query("DELETE FROM intake_forms WHERE request_id = $1", [id]);
+  await pool.query("DELETE FROM crisis_checklists WHERE request_id = $1", [id]);
   await pool.query("DELETE FROM consent_forms WHERE request_id = $1", [id]);
   await pool.query("DELETE FROM client_sessions WHERE request_id = $1 AND payment_id IS NULL", [id]);
   await pool.query(

@@ -808,3 +808,33 @@ export async function setupFirstAdmin(_prev: SetupState, formData: FormData): Pr
   await startSession(id);
   redirect("/admin/team?welcome=1");
 }
+
+/** Saves the crisis protocol checklist. What changed is written in the team notes, with who and when. */
+export async function saveCrisisChecklistAction(requestId: string, formData: FormData) {
+  const { staff } = await requireCase(requestId);
+  const { CRISIS_KEYS, crisisChecklist, labelOf } = await import("@/lib/crisis");
+  const before = await crisisChecklist(requestId);
+  const checked = formData.getAll("checked").map(String).filter((k) => CRISIS_KEYS.includes(k));
+  const riskRaw = String(formData.get("risk") ?? "");
+  const risk = riskRaw === "low" || riskRaw === "high" ? riskRaw : "";
+  const emergencyCall = String(formData.get("emergencyCall") ?? "").trim().slice(0, 1000);
+  const report = String(formData.get("report") ?? "").trim().slice(0, 8000);
+  await pool.query(
+    `INSERT INTO crisis_checklists (request_id, checked, risk, emergency_call, report, updated_at, updated_by)
+     VALUES ($1, $2, $3, $4, $5, now(), $6)
+     ON CONFLICT (request_id) DO UPDATE SET checked = EXCLUDED.checked, risk = EXCLUDED.risk,
+       emergency_call = EXCLUDED.emergency_call, report = EXCLUDED.report, updated_at = now(), updated_by = EXCLUDED.updated_by`,
+    [requestId, checked, risk, emergencyCall, report, staff.id],
+  );
+  const added = checked.filter((k) => !before.checked.includes(k)).map(labelOf);
+  const removed = before.checked.filter((k) => !checked.includes(k)).map(labelOf);
+  const changes = [
+    added.length && `ticked: ${added.join("; ")}`,
+    removed.length && `unticked: ${removed.join("; ")}`,
+    risk !== before.risk && `risk level: ${risk === "high" ? "HIGH" : risk === "low" ? "low to moderate" : "not set"}`,
+    emergencyCall !== before.emergency_call && "emergency call details updated",
+    report !== before.report && "crisis report updated",
+  ].filter(Boolean);
+  if (changes.length) await note(requestId, staff.id, `Crisis protocol – ${changes.join(". ")}.`);
+  redirect(`/admin/requests/${requestId}?crisisSaved=1#crisis-protocol`);
+}

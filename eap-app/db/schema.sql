@@ -426,3 +426,15 @@ ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS offer_late_alerted_at time
 
 -- The second reminder, 24 hours before the session (the first goes 48 hours before).
 ALTER TABLE client_sessions ADD COLUMN IF NOT EXISTS reminder24_sent_at timestamptz;
+
+-- The crisis protocol checklist on a crisis case (src/lib/crisis.ts): what was ticked, the risk level
+-- and the report. Every save is also written in the team notes, with who and when.
+CREATE TABLE IF NOT EXISTS crisis_checklists (
+  request_id      uuid PRIMARY KEY REFERENCES support_requests(id) ON DELETE CASCADE,
+  checked         text[] NOT NULL DEFAULT '{}',
+  risk            text NOT NULL DEFAULT '', -- '', 'low', 'high'
+  emergency_call  text NOT NULL DEFAULT '', -- time, person, service contacted (if confidentiality was breached)
+  report          text NOT NULL DEFAULT '', -- assessment, risk factors, actions taken
+  updated_at      timestamptz NOT NULL DEFAULT now(),
+  updated_by      uuid REFERENCES staff(id) ON DELETE SET NULL
+);

@@ -13,6 +13,8 @@ import { Sessions } from "./Sessions";
 import { Payments } from "./Payments";
 import { ConsentCard } from "./ConsentCard";
 import { IntakeCard } from "./IntakeCard";
+import { CrisisProtocol } from "./CrisisProtocol";
+import { crisisChecklist } from "@/lib/crisis";
 import { Steps } from "./Steps";
 import { latestIntake } from "@/lib/intake";
 import { latestConsent } from "@/lib/consent";
@@ -39,6 +41,7 @@ export default async function RequestPage({
     crisis?: string;
     added?: string;
     notes?: string;
+    crisisSaved?: string;
   }>;
 }) {
   const { id } = await params;
@@ -51,7 +54,7 @@ export default async function RequestPage({
   // The client's messages count as read once whoever looks after them opens the case.
   if (r.assigned_to === me.id || (!r.assigned_to && manager)) await markClientMessagesRead(id);
   const isPrivate = r.kind === "private";
-  const [signedConsent, intake] = await Promise.all([latestConsent(id), latestIntake(id)]);
+  const [signedConsent, intake, crisisList] = await Promise.all([latestConsent(id), latestIntake(id), crisisChecklist(id)]);
   // Counsellor-only notes: readable only by the client's counsellor; others see just how many there are.
   const isTheirCounsellor = r.assigned_to === me.id;
   // The owner can open them in an emergency; opening them is logged in the team notes.
@@ -119,6 +122,16 @@ export default async function RequestPage({
           <a href="#consent">Consent form {signedConsent ? "✓ signed" : "– not signed yet"}</a>
           {signedConsent && <a href={`/admin/consent/${r.id}`} target="_blank" rel="noopener">Consent PDF</a>}
         </nav>
+      )}
+      {r.crisis && (
+        <CrisisProtocol
+          requestId={r.id}
+          list={crisisList}
+          phone={signedConsent?.phone || intake?.answers.phone || r.phone || ""}
+          location={[signedConsent?.localAddress, signedConsent?.homeAddress || r.address].filter(Boolean).join("\n")}
+          emergencyContact={signedConsent ? `${signedConsent.emergencyName} – ${signedConsent.emergencyContact}` : ""}
+          saved={!!sp.crisisSaved}
+        />
       )}
       {sp.saved && <p className="flash" role="status">Saved.</p>}
       {sp.added && <p className="flash" role="status">Client added.</p>}
