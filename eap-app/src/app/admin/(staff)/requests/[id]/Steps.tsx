@@ -46,7 +46,8 @@ export function Steps({ requestId, s, canAct, counsellorName }: { requestId: str
           {!s.discoverySession && canAct && (
             <form action={bookDiscoveryAction.bind(null, requestId)} className="step-form">
               <input type="datetime-local" name="startsAt" aria-label="Discovery session date and time" />
-              <button type="submit" className="small-btn">Book free discovery session + send intake form</button>
+              <button type="submit" className="small-btn">Book free discovery session + send calendar invite and intake form</button>
+              <span className="small">The client is emailed the time, the online meeting link, a calendar invitation to add it to their calendar, and the intake form.</span>
             </form>
           )}
           {s.discoverySession && !s.intakeDone && canAct && (

@@ -232,10 +232,12 @@ export function sessionConfirmation(s: SessionEmail): Mail {
     : "";
   const body =
     s.kind === "cancelled"
-      ? `\n\nWe'll be in touch to find a new time.`
-      : `\n${s.discovery ? "Free of charge" : sessionOf(s.number, s.total)}\n${where}${policy}${intake}${pay}${
-          s.calendar ? "\n\nTo add it to your calendar, open the attached session.ics." : ""
-        }`;
+      ? `\n\nWe'll be in touch to find a new time.${s.calendar ? " To remove it from your calendar, open the attached cancelled-session.ics." : ""}`
+      : `\n${s.discovery ? "Free of charge" : sessionOf(s.number, s.total)}\n${where}${
+          s.calendar
+            ? "\n\nPlease add it to your calendar: open the attached calendar invitation (session.ics) and choose \"Add\" or \"Accept\". It works with Google Calendar, Outlook and Apple Calendar, and reminds you an hour before."
+            : ""
+        }${policy}${intake}${pay}`;
   return {
     attachments: [
       ...(s.payment && s.kind !== "cancelled" ? [{ filename: "qr-platba.png", content: s.payment.qrPngBase64 }] : []),

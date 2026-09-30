@@ -162,3 +162,12 @@ describe("24-hour reminder", () => {
     expect(r.text).toContain("less than 48 hours away, a cancellation is charged as a session");
   });
 });
+
+describe("calendar invitation in booking emails", () => {
+  it("asks the client to add the discovery session to their calendar, right after the time", () => {
+    const m = sessionConfirmation({ ...base, kind: "booked", format: "Online", discovery: true, calendar: "QkVHSU4=", intakeLink: "https://x/intake/t" });
+    expect(m.text).toContain("Please add it to your calendar: open the attached calendar invitation (session.ics)");
+    expect(m.text.indexOf("add it to your calendar")).toBeLessThan(m.text.indexOf("intake & registration form"));
+    expect(m.attachments?.map((a) => a.filename)).toContain("session.ics");
+  });
+});
