@@ -40,6 +40,7 @@ export default async function MonthlyBilling({ searchParams }: { searchParams: P
   }> }) {
   const me = await requireManager();
   const owner = isOwner(me); // only the owner sees the bank statement
+  const admin = me.role === "admin"; // only admins export invoices
   const sp = await searchParams;
   const thisMonth = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Prague", year: "numeric", month: "2-digit" }).format(new Date());
   const month = /^\d{4}-\d{2}$/.test(sp.month ?? "") ? sp.month! : thisMonth;
@@ -151,10 +152,13 @@ export default async function MonthlyBilling({ searchParams }: { searchParams: P
               <span className="small">{toEmail[0].n ? `${toEmail[0].n} not emailed yet.` : "Nothing to email."}</span>
             </form>
           </li>
-          <li className="actions" style={{ gap: 8 }}>
-            <a className="button ghost" href={`/admin/invoices/export?month=${month}`} target="_blank" rel="noopener">Export invoices (PDF)</a>
-            <a className="button ghost" href={`/admin/invoices/export?month=${month}&format=csv`}>Export list (CSV)</a>
-          </li>
+          {admin && (
+            <li className="actions" style={{ gap: 8 }}>
+              <a className="button" href={`/admin/invoices/export?month=${month}`} target="_blank" rel="noopener">Export monthly invoices (PDF)</a>
+              <a className="button ghost" href={`/admin/invoices/export?month=${month}&format=csv`}>Export list (CSV)</a>
+              <span className="small">Admins only.</span>
+            </li>
+          )}
         </ol>
       </section>
 

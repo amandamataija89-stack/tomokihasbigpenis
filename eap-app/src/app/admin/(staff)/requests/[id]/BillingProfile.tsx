@@ -14,8 +14,10 @@ export function BillingProfile({
   manager,
   flash,
   consent,
+  admin = false,
 }: {
   r: RequestRow;
+  admin?: boolean; // only admins export invoices
   consent?: { fullName: string; homeAddress: string; localAddress: string; email: string } | null; // from the signed consent form
   range: PriceRow | null;
   vatPayer: boolean;
@@ -111,9 +113,11 @@ export function BillingProfile({
         <h2>3. Invoices</h2>
         <p className="small">
           Create an invoice for each payment under Payments.{" "}
-          <a href={`/admin/invoices/export?client=${r.id}`} target="_blank" rel="noopener">
-            Export all of this client&apos;s invoices (PDF)
-          </a>
+          {admin && (
+            <a href={`/admin/invoices/export?client=${r.id}`} target="_blank" rel="noopener">
+              Export all of this client&apos;s invoices (PDF)
+            </a>
+          )}
         </p>
         <p>
           Variable symbol: <b className="mono">{r.variable_symbol ?? "given with the first invoice"}</b>

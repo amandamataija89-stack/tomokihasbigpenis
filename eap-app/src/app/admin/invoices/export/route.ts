@@ -9,8 +9,8 @@ import { invoicesCsv, invoicesPdf, loadInvoices, monthPaymentIds } from "@/lib/i
 export async function GET(req: Request) {
   const staff = await currentStaff();
   if (!staff) return new Response("Please sign in.", { status: 401 });
-  // Invoices are for coordinators and admins; counsellors only see amounts on the client's page.
-  if (!isManager(staff)) return new Response("Not found", { status: 404 });
+  // Exporting invoices is for admins only.
+  if (staff.role !== "admin") return new Response("Not found", { status: 404 });
   const url = new URL(req.url);
   const client = url.searchParams.get("client");
   const month = url.searchParams.get("month");

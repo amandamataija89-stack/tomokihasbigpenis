@@ -17,7 +17,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ paymentI
     [paymentId],
   );
   if (!rows[0] || (!isManager(staff) && rows[0].assigned_to !== staff.id)) return new Response("Not found", { status: 404 });
-  await logAccess(rows[0].id, staff.id, "Downloaded an invoice");
+  // Coordinators can open an invoice; saving it as a file (exporting) is for admins only.
+  const download = !!new URL(req.url).searchParams.get("download");
+  if (download && staff.role !== "admin") return new Response("Only admins can export invoices.", { status: 403 });
+  await logAccess(rows[0].id, staff.id, download ? "Exported an invoice" : "Opened an invoice");
   // A running monthly invoice (a draft) is shown as a preview; it's numbered when issued.
   const data = await loadInvoice(paymentId, true);
   const pdf = await renderInvoice(data);
@@ -25,7 +28,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ paymentI
     headers: {
       "Content-Type": "application/pdf",
       // ?download=1 saves the file; otherwise it opens in the browser.
-      "Content-Disposition": `${new URL(req.url).searchParams.get("download") ? "attachment" : "inline"}; filename="${invoiceFileName(data.number)}"`,
+      "Content-Disposition": `${download ? "attachment" : "inline"}; filename="${invoiceFileName(data.number)}"`,
       "Cache-Control": "private, no-store",
     },
   });
