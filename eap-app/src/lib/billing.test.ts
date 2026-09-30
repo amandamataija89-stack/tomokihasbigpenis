@@ -123,3 +123,15 @@ describe("student discount", () => {
     expect(discounted(2500, true)).toBe(2250);
   });
 });
+
+describe("due dates", () => {
+  it("are on the 5th, at least 3 days after issue", async () => {
+    const { dueDateFor } = await import("./billing");
+    const s = { dueDay: 5, dueDays: 14 };
+    expect(dueDateFor("2026-10-01", s)).toBe("2026-10-05"); // monthly invoice issued on the 1st
+    expect(dueDateFor("2026-10-03", s)).toBe("2026-11-05"); // too close: next month's 5th
+    expect(dueDateFor("2026-09-30", s)).toBe("2026-10-05");
+    expect(dueDateFor("2026-12-20", s)).toBe("2027-01-05");
+    expect(dueDateFor("2026-10-01", { dueDay: null, dueDays: 14 })).toBe("2026-10-15");
+  });
+});

@@ -7,6 +7,7 @@ import { alertOverdueInvoices, autoMonthlyInvoices } from "@/lib/invoice-mail";
 import { monthEndReminders, sendMonthlyExport } from "@/lib/month-end";
 import { dailyRetention } from "@/lib/retention";
 import { remindUnmarkedSessions } from "@/lib/warnings";
+import { remindUnsignedConsents } from "@/lib/consent";
 
 export const dynamic = "force-dynamic";
 
@@ -26,13 +27,14 @@ export async function GET(request: Request) {
   const digestSent = await sendDailyDigest();
   const sessionReminders = await sendSessionReminders();
   const unmarkedReminders = await remindUnmarkedSessions();
+  const consentReminders = await remindUnsignedConsents();
   const monthlyInvoices = await autoMonthlyInvoices();
   const overdueInvoices = await alertOverdueInvoices();
   const monthEnd = await monthEndReminders();
   const exportSent = await sendMonthlyExport();
   const retention = await dailyRetention();
   return Response.json({
-    offerReminders, released, assigned, reminders, lateOffers, digestSent, sessionReminders, unmarkedReminders,
+    offerReminders, released, assigned, reminders, lateOffers, digestSent, sessionReminders, unmarkedReminders, consentReminders,
     monthlyInvoices, overdueInvoices, monthEnd, exportSent, retention,
   });
 }

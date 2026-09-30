@@ -4,6 +4,7 @@ import { CONSENT_SECTIONS, CONSENT_TITLE } from "@/lib/consent-text";
 import { latestConsent } from "@/lib/consent";
 import { pool } from "@/lib/db";
 import { conversationFor } from "@/lib/messages";
+import { signConsent } from "./actions";
 import { ConsentForm } from "./ConsentForm";
 
 export const metadata: Metadata = { title: "Informed consent – Prague Integration", robots: { index: false } };
@@ -63,7 +64,7 @@ export default async function ConsentPage({ params, searchParams }: { params: Pr
           </section>
         ))}
       </article>
-      <ConsentForm token={token} email={rows[0]?.email ?? ""} fullName={rows[0]?.full_name ?? ""} address={rows[0]?.address ?? ""} />
+      <ConsentForm sign={signConsent.bind(null, token)} email={rows[0]?.email ?? ""} fullName={rows[0]?.full_name ?? ""} address={rows[0]?.address ?? ""} />
       <SiteFooter />
     </main>
   );

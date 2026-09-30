@@ -52,7 +52,7 @@ export default function Terms() {
       <ul>
         <li>The price per session is agreed with your counsellor from our current price list, and is shown before your sessions are booked. Prices are in CZK and VAT (currently 21 %) is added.</li>
         <li>We invoice monthly for the sessions of the previous month (or when agreed, e.g. for a prepaid package). Invoices are sent by email and are also available on your private page.</li>
-        <li>Invoices are due within 14 days, by bank transfer with your variable symbol (the QR code on the invoice fills this in). If a payment is late, we&apos;ll send a reminder; we may pause booking new sessions until overdue invoices are paid.</li>
+        <li>Invoices are due on the date shown on them (normally the 5th of the month), by bank transfer with your variable symbol (the QR code on the invoice fills this in). If a payment is late, we&apos;ll send a reminder and may charge statutory late-payment interest under Czech law (§ 1970 of the Civil Code and Government Regulation No. 351/2013 Coll.); we may pause booking new sessions until overdue invoices are paid.</li>
         <li>Prepaid packages are used for sessions in the order they&apos;re booked.</li>
       </ul>
 

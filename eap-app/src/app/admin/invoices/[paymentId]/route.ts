@@ -1,5 +1,5 @@
 import { logAccess } from "@/lib/access-log";
-import { currentStaff, isManager } from "@/lib/auth";
+import { currentStaff, isManager, isOwner } from "@/lib/auth";
 import { pool } from "@/lib/db";
 import { invoiceFileName, loadInvoice, renderInvoice } from "@/lib/invoice-pdf";
 
@@ -17,9 +17,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ paymentI
     [paymentId],
   );
   if (!rows[0] || (!isManager(staff) && rows[0].assigned_to !== staff.id)) return new Response("Not found", { status: 404 });
-  // Coordinators can open an invoice; saving it as a file (exporting) is for admins only.
+  // Coordinators and admins can open an invoice; saving it as a file (exporting) is for the owner only.
   const download = !!new URL(req.url).searchParams.get("download");
-  if (download && staff.role !== "admin") return new Response("Only admins can export invoices.", { status: 403 });
+  if (download && !isOwner(staff)) return new Response("Only the owner can export invoices.", { status: 403 });
   await logAccess(rows[0].id, staff.id, download ? "Exported an invoice" : "Opened an invoice");
   // A running monthly invoice (a draft) is shown as a preview; it's numbered when issued.
   const data = await loadInvoice(paymentId, true);

@@ -1,13 +1,13 @@
 import ExcelJS from "exceljs";
-import { currentStaff } from "@/lib/auth";
+import { currentStaff, isOwner } from "@/lib/auth";
 import { monthPayouts } from "@/lib/payouts";
 import { NOTICE } from "@/lib/sessions-export";
 
-// Excel sheet of a month's counsellor payouts. Admins only.
+// Excel sheet of a month's counsellor payouts. The owner only.
 export async function GET(req: Request) {
   const staff = await currentStaff();
   if (!staff) return new Response("Please sign in.", { status: 401 });
-  if (staff.role !== "admin") return new Response("Not found", { status: 404 });
+  if (!isOwner(staff)) return new Response("Not found", { status: 404 });
   const month = new URL(req.url).searchParams.get("month") ?? "";
   if (!/^\d{4}-\d{2}$/.test(month)) return new Response("Choose a month.", { status: 400 });
   const payouts = await monthPayouts(month);

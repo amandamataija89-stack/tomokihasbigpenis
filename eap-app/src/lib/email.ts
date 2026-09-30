@@ -356,7 +356,7 @@ export function invoiceOverdueEmail(to: string, firstName: string, info: Invoice
   return {
     to,
     subject: `Připomínka platby / Payment reminder: faktura ${info.number} – Prague Integration`,
-    text: `Dobrý den / Hello ${firstName},\n\nfaktura č. ${info.number} byla splatná ${info.dueOn} a zatím jsme neobdrželi platbu. Pokud jste již zaplatili, děkujeme a tuto zprávu prosím ignorujte.\nInvoice no. ${info.number} was due on ${info.dueOn} and we haven't received the payment yet. If you've already paid, thank you, and please ignore this message.\n\n${payLines({ ...info, dueOn: null })}\n\nDěkujeme / Thank you,\nPrague Integration\n+420 608 573 256\ncontact@pragueintegration.cz\n`,
+    text: `Dobrý den / Hello ${firstName},\n\nfaktura č. ${info.number} byla splatná ${info.dueOn} a zatím jsme neobdrželi platbu. Pokud jste již zaplatili, děkujeme a tuto zprávu prosím ignorujte.\nInvoice no. ${info.number} was due on ${info.dueOn} and we haven't received the payment yet. If you've already paid, thank you, and please ignore this message.\n\n${payLines({ ...info, dueOn: null })}\n\nUpozorňujeme, že při prodlení s úhradou můžeme účtovat zákonný úrok z prodlení (§ 1970 občanského zákoníku, nařízení vlády č. 351/2013 Sb.).\nPlease note that for late payment we may charge statutory late-payment interest under Czech law (Section 1970 of the Civil Code, Government Regulation No. 351/2013 Coll.).\n\nDěkujeme / Thank you,\nPrague Integration\n+420 608 573 256\ncontact@pragueintegration.cz\n`,
     attachments: qrPngBase64 ? [{ filename: `qr-platba-${info.number}.png`, content: qrPngBase64 }] : undefined,
   };
 }
@@ -557,5 +557,80 @@ export function counsellorSuspended(to: string, counsellorName: string, isCounse
     text: isCounsellor
       ? `Hi ${counsellorName},\n\nAfter three formal warnings you're suspended from new clients. You keep working with your current clients. The management will lift the suspension once things are back in order.\n`
       : `${counsellorName} has had three formal warnings and is now suspended from new clients (not offered or assigned any). Their current clients aren't affected.\n\nLift the suspension on their profile when it's resolved: ${appUrl()}/admin/team\n`,
+  };
+}
+
+/** After a private session is held (or late-cancelled): pay within 24 hours, with the client's variable symbol. */
+export function paymentAfterSession(
+  to: string,
+  firstName: string,
+  p: { when: string; amount: number; account: string; iban: string; variableSymbol: string; qrPngBase64: string; late: boolean; messageLink?: string },
+): Mail {
+  const amount = `${p.amount.toLocaleString("cs-CZ")} Kč`;
+  return {
+    to,
+    subject: `Platba za sezení / Payment for your session – ${p.when}`,
+    text: `Dobrý den / Hello ${firstName},\n\n${
+      p.late
+        ? `sezení ${p.when} bylo zrušeno méně než 48 hodin předem, proto se účtuje.\nYour session on ${p.when} was cancelled less than 48 hours before, so it is charged.`
+        : `děkujeme za sezení dne ${p.when}.\nThank you for your session on ${p.when}.`
+    }\n\nProsíme o úhradu do 24 hodin / Please pay within 24 hours:\n\nČástka / Amount: ${amount}\nÚčet / Account: ${p.account}\nIBAN: ${p.iban}\nVariabilní symbol / Variable symbol: ${p.variableSymbol}\n\nVždy prosím uveďte svůj variabilní symbol ${p.variableSymbol} – podle něj platbu přiřadíme. Nebo naskenujte QR kód v příloze ve své bankovní aplikaci, vše vyplní za vás.\nPlease always use your variable symbol ${p.variableSymbol}: it's how we match your payment. Or scan the attached QR code in your banking app and it fills everything in for you.${
+      p.messageLink ? `\n\nVaše platby a faktury / Your payments and invoices: ${p.messageLink}` : ""
+    }\n\nDěkujeme / Thank you,\nPrague Integration\n+420 608 573 256\ncontact@pragueintegration.cz\n`,
+    attachments: [{ filename: `qr-platba-${p.variableSymbol}.png`, content: p.qrPngBase64 }],
+  };
+}
+
+/** To the coordinator: the counsellor asks for the consent form and payment details to be sent. */
+export function consentToSendAlert(to: string, clientNickname: string, counsellorName: string, requestId: string): Mail {
+  return {
+    to,
+    subject: `Please send the onboarding details: ${clientNickname}`,
+    text: `${counsellorName} says ${clientNickname} would like to start counselling. Please send them the onboarding details, the consent form and payment details (Steps with this client → "Send onboarding details"):\n${appUrl()}/admin/requests/${requestId}#steps\n`,
+  };
+}
+
+/** To the counsellor (and coordinators): the client signed the consent form. */
+export function consentSignedStaffEmail(to: string, clientNickname: string, requestId: string): Mail {
+  return {
+    to,
+    subject: `${clientNickname} signed the consent form`,
+    text: `${clientNickname} has signed the informed consent form. You can start their counselling sessions now.\n\n${appUrl()}/admin/requests/${requestId}#consent\n`,
+  };
+}
+
+/** To the counsellor: the client hasn't signed within 72 hours; they were reminded. */
+export function consentUnsignedStaffEmail(to: string, clientNickname: string, requestId: string): Mail {
+  return {
+    to,
+    subject: `${clientNickname} hasn't signed the consent form yet`,
+    text: `${clientNickname} hasn't signed the consent form 72 hours after it was sent. We've emailed them a reminder. Please don't start a counselling session until it's signed.\n\n${appUrl()}/admin/requests/${requestId}#consent\n`,
+  };
+}
+
+/** To the client: a reminder to sign the consent form. */
+export function consentReminderEmail(to: string, firstName: string, link: string): Mail {
+  return {
+    to,
+    subject: "Reminder: please sign your consent form – Prague Integration",
+    text: `Hi ${firstName},\n\nA friendly reminder to read and sign our informed consent form. We need it before your first counselling session (about 5 minutes):\n\n${link}\n\n(Keep this link to yourself.)\n\nThank you,\nPrague Integration\n+420 608 573 256\ncontact@pragueintegration.cz\n`,
+  };
+}
+
+/** A group member is asked to sign the consent form. */
+export function groupConsentRequestEmail(to: string, firstName: string, groupName: string, link: string): Mail {
+  return {
+    to,
+    subject: `Please sign your consent form for ${groupName} – Prague Integration`,
+    text: `Hi ${firstName},\n\nBefore you join ${groupName}, please read and sign our informed consent form online. It takes about 5 minutes: you'll add your contact details and an emergency contact, and sign with your finger or mouse.\n\n${link}\n\n(Keep this link to yourself.) If the participant is under 18, a parent or guardian signs on their behalf.\n\nThank you,\nPrague Integration\n+420 608 573 256\ncontact@pragueintegration.cz\n`,
+  };
+}
+
+/** To the group's leader: a member signed the consent form. */
+export function groupConsentSignedStaffEmail(to: string, memberName: string, groupName: string, groupId: string): Mail {
+  return {
+    to,
+    subject: `${memberName} signed the consent form (${groupName})`,
+    text: `${memberName} has signed the informed consent form for ${groupName}.\n\n${appUrl()}/admin/groups/${groupId}#members\n`,
   };
 }

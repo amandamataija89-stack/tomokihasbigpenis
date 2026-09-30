@@ -63,7 +63,7 @@ Who does what: **counsellors** choose each client's type of counselling and pric
    Unpaid invoices follow price and session changes automatically; one already emailed is sent again.
 3. **Month end**: counsellors see "My month" (sessions, amounts, and admin still to do) and get a reminder
    email in the last 3 days of the month if anything's missing.
-4. **Automatically, from the 1st**: last month's invoices are issued (number, due date 14 days later, the
+4. **Issuing invoices** is done by an admin on Monthly billing ("Issue monthly invoices now") or per client ("Issue now"); invoices are due on the 5th. With **automatic invoicing** switched on (Pricing & invoices, off by default), from the 1st last month's invoices are issued (number, due date 14 days later, the
    client's variable symbol, QR Platba code). They stay in the app and appear on the client's private page;
    **from the 3rd** they're emailed (PDF + QR) only to clients who asked for invoices by email (a tick box
    under Invoices on the client's page). The admin gets the month's invoices as one PDF and a CSV.

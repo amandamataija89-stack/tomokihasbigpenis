@@ -34,6 +34,7 @@ export type InvoiceData = {
   customerName: string;
   customerEmail: string;
   customerAddress: string;
+  customerIsBusiness?: boolean; // invoiced to a company (IČO): the flat 1 200 CZK recovery fee applies
   lines: InvoiceLine[];
   total: number;
   supplier: InvoiceSettings;
@@ -169,6 +170,7 @@ export async function loadInvoice(paymentId: string, preview = false): Promise<I
     customerName,
     customerEmail,
     customerAddress,
+    customerIsBusiness: !!p.billing_ico,
     lines: invoiceLines(p.service, p.amount_czk, p.package_sessions ? { sessions: p.package_sessions } : null, sessions, items),
     total: p.amount_czk,
     supplier,
@@ -204,6 +206,7 @@ export async function renderInvoice(d: InvoiceData): Promise<Uint8Array> {
   const ink = rgb(0.13, 0.15, 0.2);
   const muted = rgb(0.42, 0.45, 0.5);
   const green = rgb(0.18, 0.45, 0.33);
+  const red = rgb(0.7, 0.15, 0.12);
   const L = 50;
   const R = 545;
 
@@ -233,6 +236,12 @@ export async function renderInvoice(d: InvoiceData): Promise<Uint8Array> {
   right(`č. / No. ${d.number}`, R, 780, bold, 14);
   right(`Datum vystavení / Issued: ${day(d.issuedOn)}`, R, 762);
   if (vatPayer) right(`DUZP / Tax point: ${isoDay(d.taxDate)}`, R, 748);
+  const todayPrague = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Prague" }).format(new Date());
+  const overdue = d.paidOn === null && !d.draft && !!d.dueOn && d.dueOn < todayPrague;
+  if (d.paidOn === null && !d.draft && d.dueOn) {
+    const due = `Splatnost / Due date: ${isoDay(d.dueOn)}`;
+    text(page, due, R - bold.widthOfTextAtSize(due, 11), vatPayer ? 732 : 746, { font: bold, size: 11, color: overdue ? red : ink });
+  }
 
   // Supplier and customer
   let y = 715;
@@ -275,7 +284,7 @@ export async function renderInvoice(d: InvoiceData): Promise<Uint8Array> {
         ? ["Způsob úhrady / Payment", "Bankovní převod / Bank transfer"]
         : ["Způsob úhrady / Payment", `${METHOD_CS[d.method] ?? d.method} / ${d.method}`],
       unpaid
-        ? ["Datum splatnosti / Due date", d.dueOn ? isoDay(d.dueOn) : d.draft ? `${s.dueDays} dní po vystavení / ${s.dueDays} days after issue` : "—"]
+        ? ["Datum splatnosti / Due date", d.dueOn ? isoDay(d.dueOn) : d.draft ? (s.dueDay ? `${s.dueDay}. dne měsíce / day ${s.dueDay} of the month` : `${s.dueDays} dní po vystavení / ${s.dueDays} days after issue`) : "—"]
         : ["Uhrazeno dne / Paid on", isoDay(d.paidOn!)],
       ["Variabilní symbol", d.variableSymbol],
       s.bankAccount ? ["Účet / Account", s.bankAccount] : null,
@@ -364,10 +373,30 @@ export async function renderInvoice(d: InvoiceData): Promise<Uint8Array> {
   y -= 22;
   const status = d.draft
     ? "NÁVRH – VYSTAVENO BUDE 1. DNE MĚSÍCE / DRAFT – ISSUED ON THE 1ST"
+    : overdue
+    ? `PO SPLATNOSTI / OVERDUE (${isoDay(d.dueOn!)}) – UHRAĎTE IHNED / PAY NOW, VS ${d.variableSymbol}`
     : unpaid
     ? `K ÚHRADĚ DO ${d.dueOn ? isoDay(d.dueOn) : ""} / PLEASE PAY BY ${d.dueOn ? isoDay(d.dueOn) : ""}, VS ${d.variableSymbol}`
     : "UHRAZENO – NEPLAŤTE / PAID – NOTHING TO PAY";
-  text(pg, status, R - bold.widthOfTextAtSize(status, 10), y, { font: bold, size: 10, color: unpaid ? ink : green });
+  text(pg, status, R - bold.widthOfTextAtSize(status, 10), y, { font: bold, size: 10, color: overdue ? red : unpaid ? ink : green });
+  if (unpaid) {
+    // Czech rules on late payment: statutory interest (Civil Code § 1970, Government Regulation 351/2013 Coll.:
+    // the ČNB repo rate + 8 percentage points a year); for business customers also the flat recovery fee.
+    y -= 20;
+    const late = [
+      `Při prodlení s úhradou jsme oprávněni účtovat zákonný úrok z prodlení podle § 1970 občanského zákoníku a nařízení vlády č. 351/2013 Sb. (repo sazba ČNB + 8 procentních bodů ročně)${
+        d.customerIsBusiness ? " a paušální náhradu nákladů spojených s uplatněním pohledávky 1 200 Kč" : ""
+      }.`,
+      `Late payment: we may charge statutory late-payment interest under Section 1970 of the Czech Civil Code and Government Regulation No. 351/2013 Coll. (CNB repo rate + 8 percentage points a year)${
+        d.customerIsBusiness ? " and a flat fee of CZK 1,200 for recovery costs" : ""
+      }.`,
+    ];
+    for (const para of late)
+      for (const w of wrap(para, R - L, regular, 8)) {
+        text(pg, w, L, y, { size: 8, color: muted });
+        y -= 10;
+      }
+  }
 
   // Footer note
   let yf = 70;

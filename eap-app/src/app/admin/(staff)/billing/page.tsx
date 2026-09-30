@@ -40,7 +40,7 @@ export default async function MonthlyBilling({ searchParams }: { searchParams: P
   }> }) {
   const me = await requireManager();
   const owner = isOwner(me); // only the owner sees the bank statement
-  const admin = me.role === "admin"; // only admins export invoices
+  const admin = owner; // only the owner exports invoices and sessions
   const sp = await searchParams;
   const thisMonth = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Prague", year: "numeric", month: "2-digit" }).format(new Date());
   const month = /^\d{4}-\d{2}$/.test(sp.month ?? "") ? sp.month! : thisMonth;
@@ -116,7 +116,7 @@ export default async function MonthlyBilling({ searchParams }: { searchParams: P
 
       {sp.created && (
         <p className="flash" role="status">
-          {sp.created === "0" ? "No new invoices: every session held this month is already invoiced or paid." : `${sp.created} monthly invoice${sp.created === "1" ? "" : "s"} created, due in 14 days.`}
+          {sp.created === "0" ? "No new invoices: every session held this month is already invoiced or paid." : `${sp.created} monthly invoice${sp.created === "1" ? "" : "s"} created, due ${settings.dueDay ? `on day ${settings.dueDay} of the month` : `${settings.dueDays} days after issue`}.`}
           {sp.noprice && sp.noprice !== "0" && ` ${sp.noprice} client${sp.noprice === "1" ? " has" : "s have"} sessions without a price, left out: choose their price and create again.`}
         </p>
       )}
@@ -130,9 +130,17 @@ export default async function MonthlyBilling({ searchParams }: { searchParams: P
         <h2>Invoices for {monthName(month)}</h2>
         <ol className="steps">
           <li className="small" style={{ listStyle: "none", marginLeft: -20 }}>
-            <b>Automatic:</b> last month&apos;s invoices are created on the 1st and kept here (you also get the PDF and CSV
-            by email). They&apos;re emailed on the 3rd only to clients who asked for invoices by email (tick it on the
-            client&apos;s page, under Invoices). Use the buttons to do it sooner, or after changes.
+            {settings.autoInvoicing ? (
+              <>
+                <b>Automatic:</b> last month&apos;s invoices are issued on the 1st and emailed on the 3rd to clients who asked for
+                invoices by email. Use the buttons to do it sooner, or after changes.
+              </>
+            ) : (
+              <>
+                <b>Issued by you:</b> sessions collect on each client&apos;s draft invoice as they&apos;re marked done. Nothing is
+                issued or sent automatically: press the buttons below when you&apos;re ready.
+              </>
+            )}
           </li>
           <li>
             <form action={createMonthlyInvoicesAction} className="actions" style={{ gap: 8 }}>
@@ -140,7 +148,7 @@ export default async function MonthlyBilling({ searchParams }: { searchParams: P
               <button type="submit" disabled={toEmail[0].to_invoice === 0}>Issue monthly invoices now</button>
               <span className="small">
                 {toEmail[0].to_invoice
-                  ? `${toEmail[0].to_invoice} running invoice${toEmail[0].to_invoice === 1 ? "" : "s"} not issued yet. Issuing gives each a number, a due date 14 days later, the client's variable symbol and a QR payment code.`
+                  ? `${toEmail[0].to_invoice} running invoice${toEmail[0].to_invoice === 1 ? "" : "s"} not issued yet. Issuing gives each a number, a due date (the 5th of the month, or as set under Pricing & invoices), the client's variable symbol and a QR payment code.`
                   : "Nothing left to invoice for this month."}
               </span>
             </form>
@@ -156,7 +164,8 @@ export default async function MonthlyBilling({ searchParams }: { searchParams: P
             <li className="actions" style={{ gap: 8 }}>
               <a className="button" href={`/admin/invoices/export?month=${month}`} target="_blank" rel="noopener">Export monthly invoices (PDF)</a>
               <a className="button ghost" href={`/admin/invoices/export?month=${month}&format=csv`}>Export list (CSV)</a>
-              <span className="small">Admins only.</span>
+              <a className="button ghost" href={`/admin/sessions/export?month=${month}`}>Export sessions (Excel)</a>
+              <span className="small">Only you (owner). Confidential – do not distribute.</span>
             </li>
           )}
         </ol>

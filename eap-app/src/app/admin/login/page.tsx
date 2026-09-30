@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { Brand } from "@/components/Brand";
+import { Brand, SiteFooter } from "@/components/Brand";
 import Link from "next/link";
 import { currentStaff } from "@/lib/auth";
 import { adminExists } from "@/lib/staff-accounts";
@@ -19,6 +19,7 @@ export default async function LoginPage() {
         </p>
       )}
       <LoginForm />
+      <SiteFooter staff />
     </main>
   );
 }

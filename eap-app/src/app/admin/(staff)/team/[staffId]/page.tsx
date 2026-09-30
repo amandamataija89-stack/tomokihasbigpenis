@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireManager, ROLE_LABELS, type Role } from "@/lib/auth";
+import { isOwner, requireManager, ROLE_LABELS, type Role } from "@/lib/auth";
 import { FINISHED, listRequests, sessionLimit, STATUS_LABELS, type Filter } from "@/lib/data";
 import { pool } from "@/lib/db";
 import { warningsFor, WARNINGS_BEFORE_SUSPENSION } from "@/lib/warnings";
@@ -181,7 +181,7 @@ export default async function CounsellorProfile({
             {sessionMonth < currentMonth() && (
               <Link href={`/admin/team/${staffId}?month=${shiftMonth(sessionMonth, 1)}#sessions`}>{monthLabel(shiftMonth(sessionMonth, 1))} →</Link>
             )}
-            {me.role === "admin" && (
+            {isOwner(me) && (
               <a href={`/admin/sessions/export?month=${sessionMonth}&counsellor=${staffId}`} title="Confidential – do not distribute">
                 Export to Excel (confidential)
               </a>

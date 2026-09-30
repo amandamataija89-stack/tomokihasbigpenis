@@ -129,7 +129,10 @@ export async function sendMonthlyExport(now = new Date()): Promise<boolean> {
   const ids = await monthPaymentIds(month);
   if (!ids.length) return false;
   if (!(await once(`monthly_export:${month}`))) return false;
-  const { rows: admins } = await pool.query<{ email: string }>("SELECT email FROM staff WHERE role = 'admin' AND password_hash <> '!'");
+  // To the owner (or, if none is set, the admins).
+  const { rows: admins } = await pool.query<{ email: string }>(
+    `SELECT email FROM staff WHERE password_hash <> '!' AND (is_owner OR (role = 'admin' AND NOT EXISTS (SELECT 1 FROM staff WHERE is_owner)))`,
+  );
   const list = await loadInvoices(ids);
   const pdf = Buffer.from(await invoicesPdf(list)).toString("base64");
   const csv = Buffer.from(await invoicesCsv(list), "utf8").toString("base64");

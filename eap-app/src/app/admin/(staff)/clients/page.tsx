@@ -1,6 +1,6 @@
 import { CounsellorFilter, counsellorOptions, isStaffId } from "../CounsellorFilter";
 import Link from "next/link";
-import { isManager, requireStaff } from "@/lib/auth";
+import { isOwner, isManager, requireStaff } from "@/lib/auth";
 import { STATUS_LABELS, type Status } from "@/lib/data";
 import { pool } from "@/lib/db";
 
@@ -21,6 +21,7 @@ type Row = {
   service: string;
   status: Status;
   counsellor: string | null;
+  counsellor_id: string | null;
   signed_up_this_month: boolean;
   month_held: number;
   month_late: number;
@@ -43,7 +44,7 @@ export default async function ClientsByMonth({ searchParams }: { searchParams: P
   const staffList = manager ? await counsellorOptions() : [];
   const inMonth = "to_char(cs.starts_at AT TIME ZONE 'Europe/Prague', 'YYYY-MM') = $1";
   const { rows } = await pool.query<Row>(
-    `SELECT r.id, r.first_name, r.full_name, r.kind, c.name AS company_name, r.service, r.status, s.name AS counsellor,
+    `SELECT r.id, r.first_name, r.full_name, r.kind, c.name AS company_name, r.service, r.status, s.name AS counsellor, r.assigned_to AS counsellor_id,
        to_char(r.created_at AT TIME ZONE 'Europe/Prague', 'YYYY-MM') = $1 AS signed_up_this_month,
        count(cs.id) FILTER (WHERE ${inMonth} AND cs.done_at IS NOT NULL)::int AS month_held,
        count(cs.id) FILTER (WHERE ${inMonth} AND cs.late_cancelled)::int AS month_late,
@@ -65,6 +66,19 @@ export default async function ClientsByMonth({ searchParams }: { searchParams: P
   const held = rows.reduce((a, r) => a + r.month_held, 0);
   const booked = rows.reduce((a, r) => a + r.month_booked, 0);
   const newClients = rows.filter((r) => r.signed_up_this_month).length;
+  // Each counsellor's month (coordinators and admins, when not already looking at one counsellor).
+  const byCounsellor = [...rows.reduce((m, r) => {
+    const k = r.counsellor_id ?? "";
+    const c = m.get(k) ?? { id: k, name: r.counsellor ?? "Not assigned", clients: 0, newClients: 0, held: 0, late: 0, booked: 0 };
+    c.clients++;
+    if (r.signed_up_this_month) c.newClients++;
+    c.held += r.month_held;
+    c.late += r.month_late;
+    c.booked += r.month_booked;
+    return m.set(k, c);
+  }, new Map<string, { id: string; name: string; clients: number; newClients: number; held: number; late: number; booked: number }>()).values()].sort(
+    (a, b) => b.held - a.held || a.name.localeCompare(b.name),
+  );
   const withSessions = rows.filter((r) => r.month_held > 0).length;
   const link = (m: string, k = kind) => `/admin/clients?month=${m}${k !== "all" ? `&kind=${k}` : ""}${counsellor ? `&counsellor=${counsellor}` : ""}`;
 
@@ -86,7 +100,7 @@ export default async function ClientsByMonth({ searchParams }: { searchParams: P
         {month < thisMonth && <Link href={link(shift(month, 1))}>{monthName(shift(month, 1))} →</Link>}
         {month !== thisMonth && <Link href={link(thisMonth)}>This month</Link>}
       </nav>
-      {me.role === "admin" && <ExportLink month={month} counsellor={counsellor} />}
+      <ExportLink month={month} counsellor={isOwner(me) ? counsellor : ""} own={!isOwner(me)} />
       <nav className="tabs" aria-label="Kind of client">
         <Link href={link(month, "all")} aria-current={kind === "all" ? "page" : undefined}>All clients</Link>
         <Link href={link(month, "eap")} aria-current={kind === "eap" ? "page" : undefined}>EAP</Link>
@@ -99,6 +113,31 @@ export default async function ClientsByMonth({ searchParams }: { searchParams: P
         <div><span className="big-num">{held}</span><span className="of"> sessions held ({withSessions} clients)</span></div>
         <div><span className="big-num">{booked}</span><span className="of"> still booked</span></div>
       </section>
+
+      {manager && !counsellor && byCounsellor.length > 0 && (
+        <section className="stack" style={{ gap: 8 }}>
+          <h2 style={{ fontSize: 20 }}>By counsellor in {monthName(month)}</h2>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Counsellor</th><th>Clients</th><th>New</th><th>Sessions held</th><th>Late cancellations</th><th>Still booked</th></tr>
+              </thead>
+              <tbody>
+                {byCounsellor.map((c) => (
+                  <tr key={c.id || "none"}>
+                    <td>{c.id ? <Link href={`/admin/clients?month=${month}&counsellor=${c.id}`}>{c.name}</Link> : <span className="small">{c.name}</span>}</td>
+                    <td>{c.clients}</td>
+                    <td>{c.newClients}</td>
+                    <td><b>{c.held}</b></td>
+                    <td>{c.late}</td>
+                    <td>{c.booked}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       <div className="table-wrap">
         {rows.length === 0 ? (
@@ -157,12 +196,13 @@ export default async function ClientsByMonth({ searchParams }: { searchParams: P
   );
 }
 
-// Admins only. The sheet holds clients' personal data, so it carries a do-not-distribute warning.
-function ExportLink({ month, counsellor }: { month: string; counsellor: string }) {
+// The owner exports anyone's sessions, everyone else their own. The sheet holds clients' personal data,
+// so it carries a do-not-distribute warning.
+function ExportLink({ month, counsellor, own }: { month: string; counsellor: string; own: boolean }) {
   return (
     <p className="notice small">
       <a href={`/admin/sessions/export?month=${month}${counsellor ? `&counsellor=${counsellor}` : ""}`}>
-        <b>Export {counsellor ? "their" : "all"} sessions to Excel</b>
+        <b>Export {own ? "my" : counsellor ? "their" : "all"} sessions to Excel</b>
       </a>{" "}
       · Confidential – do not distribute. The file contains clients&apos; personal data: keep it for Prague Integration
       work only, don&apos;t forward or share it, and delete it when you no longer need it.

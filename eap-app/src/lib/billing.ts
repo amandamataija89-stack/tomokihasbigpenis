@@ -305,7 +305,9 @@ export type InvoiceSettings = {
   email: string;
   phone: string;
   nextNumber: string; // e.g. 2026001; the digits at the end go up by one for each invoice
-  dueDays: number;
+  dueDays: number; // used when dueDay is empty
+  dueDay: number | null; // invoices are due on this day of the month (e.g. the 5th)
+  autoInvoicing: boolean; // issue invoices automatically (monthly on the 1st; per-session clients when a session is done)
 };
 
 export const DEFAULT_INVOICE_SETTINGS: InvoiceSettings = {
@@ -323,7 +325,30 @@ export const DEFAULT_INVOICE_SETTINGS: InvoiceSettings = {
   phone: "+420 608 573 256",
   nextNumber: `${new Date().getFullYear()}001`,
   dueDays: 14,
+  dueDay: 5,
+  autoInvoicing: false,
 };
+
+/** Minimum days between issuing an invoice and its due date. */
+export const MIN_DAYS_TO_PAY = 3;
+
+/**
+ * The due date for an invoice issued on a day (YYYY-MM-DD): the next dueDay of a month (e.g. the 5th) that
+ * is at least MIN_DAYS_TO_PAY days away, so a monthly invoice issued on the 1st is due on the 5th; or, with
+ * no dueDay set, dueDays after issue.
+ */
+export function dueDateFor(issued: string, s: Pick<InvoiceSettings, "dueDay" | "dueDays">): string {
+  const [y, m, d] = issued.split("-").map(Number);
+  const iso = (dt: Date) => dt.toISOString().slice(0, 10);
+  if (!s.dueDay) return iso(new Date(Date.UTC(y, m - 1, d + s.dueDays)));
+  const earliest = new Date(Date.UTC(y, m - 1, d + MIN_DAYS_TO_PAY));
+  for (let k = 0; k < 3; k++) {
+    const days = new Date(Date.UTC(y, m + k, 0)).getUTCDate(); // days in that month
+    const candidate = new Date(Date.UTC(y, m - 1 + k, Math.min(s.dueDay, days)));
+    if (candidate >= earliest) return iso(candidate);
+  }
+  return iso(earliest);
+}
 
 export async function invoiceSettings(db: Queryable = pool): Promise<InvoiceSettings> {
   const { rows } = await db.query<{ value: string }>("SELECT value FROM app_state WHERE key = 'invoice_settings'");
@@ -387,13 +412,13 @@ export function issueInvoice(paymentId: string): Promise<string> {
         [JSON.stringify({ ...settings, nextNumber: nextInvoiceNumber(number) })],
       );
     }
-    const { dueDays } = await invoiceSettings(c);
-    // An invoice to pay is due dueDays (14) after it's issued.
+    // An invoice to pay is due on the 5th (see dueDateFor), unless an admin already set a date.
+    const due = dueDateFor(new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Prague" }).format(new Date()), await invoiceSettings(c));
     await c.query(
       `UPDATE payments SET invoice_number = $2, invoiced_at = COALESCE(invoiced_at, now()),
-         due_on = CASE WHEN paid_on IS NULL THEN COALESCE(due_on, (now() AT TIME ZONE 'Europe/Prague')::date + $3::int) END
+         due_on = CASE WHEN paid_on IS NULL THEN COALESCE(due_on, $3::date) END
        WHERE id = $1`,
-      [paymentId, number, dueDays],
+      [paymentId, number, due],
     );
     return number;
   });
@@ -413,7 +438,7 @@ export async function ensureVariableSymbol(requestId: string, db: Queryable = po
 
 /**
  * Issues an invoice to pay for sessions that are neither paid nor on another invoice. It gets its
- * number now and is due 14 days from today. Returns its id, or null if there was nothing to invoice.
+ * number now and is due on the next due day (see dueDateFor). Returns its id, or null if there was nothing to invoice.
  */
 export async function createInvoiceToPay(p: {
   requestId: string;
@@ -421,6 +446,7 @@ export async function createInvoiceToPay(p: {
   amount: number | null;
   staffId: string | null;
   period?: string;
+  issue?: boolean; // false: leave it as a draft for an admin to issue
 }): Promise<string | null> {
   // A typed amount stays; otherwise the amount follows the sessions (see recomputeInvoice).
   const manual = p.amount !== null;
@@ -444,7 +470,7 @@ export async function createInvoiceToPay(p: {
     await ensureVariableSymbol(p.requestId, c);
     return rows[0].id;
   });
-  if (id) await issueInvoice(id);
+  if (id && p.issue !== false) await issueInvoice(id);
   return id;
 }
 
@@ -553,7 +579,7 @@ export async function createMonthlyInvoices(
     `SELECT r.id AS request_id, r.first_name,
        COALESCE(array_agg(cs.id ORDER BY cs.starts_at) FILTER (WHERE cs.price_czk IS NOT NULL), '{}') AS ids,
        count(*) FILTER (WHERE cs.price_czk IS NULL)::int AS no_price,
-       (SELECT p.id FROM payments p WHERE p.request_id = r.id AND p.period = $1 AND p.paid_on IS NULL
+       (SELECT p.id FROM payments p WHERE p.request_id = r.id AND p.period = $1 AND p.paid_on IS NULL AND p.invoice_number IS NULL
         ORDER BY p.created_at LIMIT 1) AS existing
      FROM client_sessions cs JOIN support_requests r ON r.id = cs.request_id
      WHERE r.kind = 'private' AND cs.done_at IS NOT NULL AND cs.paid_at IS NULL AND cs.payment_id IS NULL
@@ -650,12 +676,35 @@ export async function addToMonthlyInvoice(sessionId: string): Promise<string | n
   );
   const s = rows[0];
   if (!s || s.kind !== "private" || s.price_czk === null) return null;
+  // Invoiced per session: this session gets its own invoice, issued now (emailed only if the client asked).
+  const { rows: mode } = await pool.query<{ per_session: boolean; email: boolean }>(
+    "SELECT invoice_per_session AS per_session, email_invoices AS email FROM support_requests WHERE id = $1",
+    [s.request_id],
+  );
+  if (mode[0]?.per_session) {
+    // Issued straight away only with automatic invoicing on; otherwise a draft for an admin to issue.
+    const auto = (await invoiceSettings()).autoInvoicing;
+    const id = await createInvoiceToPay({
+      requestId: s.request_id,
+      sessionIds: [sessionId],
+      amount: null,
+      staffId: null,
+      period: monthOfSession(s.starts_at),
+      issue: auto,
+    });
+    if (id && auto && mode[0].email) {
+      const { sendInvoice } = await import("./invoice-mail");
+      await sendInvoice(id).catch((err) => console.error("EAP session invoice email failed:", err));
+    }
+    return id;
+  }
   const period = monthOfSession(s.starts_at);
   const id = await inTransaction(async (c) => {
     // One running invoice per client and month.
     await c.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`invoice:${s.request_id}:${period}`]);
     const { rows: open } = await c.query<{ id: string }>(
-      "SELECT id FROM payments WHERE request_id = $1 AND period = $2 AND paid_on IS NULL ORDER BY created_at LIMIT 1",
+      // A draft only: an issued invoice (a tax document) never changes.
+      "SELECT id FROM payments WHERE request_id = $1 AND period = $2 AND paid_on IS NULL AND invoice_number IS NULL ORDER BY created_at LIMIT 1",
       [s.request_id, period],
     );
     let paymentId = open[0]?.id;

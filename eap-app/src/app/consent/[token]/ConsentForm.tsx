@@ -2,10 +2,21 @@
 
 import { useActionState, useState } from "react";
 import { SignaturePad } from "@/components/SignaturePad";
-import { signConsent, type ConsentState } from "./actions";
+import type { ConsentState } from "./actions";
 
-export function ConsentForm({ token, email, fullName, address }: { token: string; email: string; fullName: string; address: string }) {
-  const [state, action, pending] = useActionState(signConsent.bind(null, token), {} as ConsentState);
+// Also used by group members (with their own sign action).
+export function ConsentForm({
+  sign,
+  email,
+  fullName,
+  address,
+}: {
+  sign: (prev: ConsentState, formData: FormData) => Promise<ConsentState>;
+  email: string;
+  fullName: string;
+  address: string;
+}) {
+  const [state, action, pending] = useActionState(sign, {} as ConsentState);
   const e = state.errors ?? {};
   const v = state.values ?? {};
   const [minor, setMinor] = useState(v.forMinor === "yes");
@@ -67,6 +78,9 @@ export function ConsentForm({ token, email, fullName, address }: { token: string
           </label>
           {err("agree")}
         </div>
+        <p className="small">
+          How we look after your data: our <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a>.
+        </p>
         {text("signedName", minor ? "Type the parent's or guardian's full name" : "Type your full name")}
         <div className="field">
           <label>Signature</label>

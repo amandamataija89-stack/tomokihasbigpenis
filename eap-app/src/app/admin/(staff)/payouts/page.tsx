@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireStaff } from "@/lib/auth";
+import { isOwner, requireStaff } from "@/lib/auth";
 import { currentMonth, monthLabel, shiftMonth } from "@/lib/month-end";
 import { monthPayouts, type Payout } from "@/lib/payouts";
 import { formatDate } from "../../format";
@@ -29,7 +29,7 @@ export default async function PayoutsPage({ searchParams }: { searchParams: Prom
         <Link href={`/admin/payouts?month=${shiftMonth(month, -1)}`}>← {monthLabel(shiftMonth(month, -1))}</Link>
         <Link href={`/admin/payouts?month=${month}`} aria-current="page">{monthLabel(month)}</Link>
         {month < currentMonth() && <Link href={`/admin/payouts?month=${shiftMonth(month, 1)}`}>{monthLabel(shiftMonth(month, 1))} →</Link>}
-        {admin && payouts.length > 0 && (
+        {isOwner(me) && payouts.length > 0 && (
           <a href={`/admin/payouts/export?month=${month}`} title="Confidential – do not distribute">Export to Excel (confidential)</a>
         )}
       </nav>

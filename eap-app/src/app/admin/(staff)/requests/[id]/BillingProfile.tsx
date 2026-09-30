@@ -144,6 +144,17 @@ export function BillingProfile({
           </label>
         </div>
         <div className="field">
+          <fieldset className="stack" style={{ gap: 4, border: 0, padding: 0, margin: "0 0 8px" }}>
+            <legend className="small"><b>Invoicing</b></legend>
+            <label className="consent small-consent">
+              <input type="radio" name="invoicing" value="monthly" defaultChecked={!r.invoice_per_session} />
+              <span>One monthly invoice with all the month&apos;s sessions</span>
+            </label>
+            <label className="consent small-consent">
+              <input type="radio" name="invoicing" value="session" defaultChecked={r.invoice_per_session} />
+              <span>A separate invoice for each session (a draft for each session as it&apos;s marked done)</span>
+            </label>
+          </fieldset>
           <label className="consent">
             <input type="checkbox" name="emailInvoices" value="yes" defaultChecked={r.email_invoices} />
             <span><b>Client asked for invoices by email</b> (otherwise invoices stay here in the app and on their private page)</span>

@@ -5,6 +5,8 @@ import { pool } from "@/lib/db";
 import { getGroup, GROUP_KINDS, groupMembers, groupSessions } from "@/lib/groups";
 import {
   addGroupSessionAction,
+  sendAllGroupConsentsAction,
+  sendGroupConsentAction,
   addMemberAction,
   deleteGroupAction,
   removeGroupSessionAction,
@@ -24,6 +26,8 @@ const FLASH: Record<string, string> = {
   session: "Session added. Tick who attended once it has happened.",
   sessionremoved: "Session removed.",
   attendance: "Attendance saved.",
+  consentsent: "Consent form emailed. They sign it online; the tick and date fill in by themselves.",
+  consentall: "Consent form emailed to everyone who hasn't signed.",
 };
 const ERRORS: Record<string, string> = {
   member: "Enter the member's name, surname and a valid email.",
@@ -70,8 +74,13 @@ export default async function GroupPage({
         {unsigned > 0 && (
           <p className="notice small">
             <b>{unsigned} {unsigned === 1 ? "member hasn't" : "members haven't"} signed the consent form yet.</b> They
-            should sign it before taking part.
+            should sign it before taking part.{" "}
           </p>
+        )}
+        {unsigned > 0 && (
+          <form action={sendAllGroupConsentsAction.bind(null, g.id)}>
+            <button type="submit" className="small-btn">Send the consent form to everyone who hasn&apos;t signed</button>
+          </form>
         )}
         {members.length === 0 ? (
           <p className="small">No members yet.</p>
@@ -88,6 +97,17 @@ export default async function GroupPage({
                     <td>{m.surname}</td>
                     <td className="mono">{m.email}</td>
                     <td>
+                      {m.signed_online ? (
+                        <span>
+                          ✓ Signed online {m.consent_signed_on}{" "}
+                          <a href={`/admin/groups/${g.id}/consent/${m.id}`} target="_blank" rel="noopener" className="small">PDF</a>
+                        </span>
+                      ) : (
+                        <>
+                          <form action={sendGroupConsentAction.bind(null, g.id, m.id)} className="actions" style={{ gap: 6, marginBottom: 6 }}>
+                            <button type="submit" className="small-btn">{m.consent_sent_at ? "Send again" : "Send consent form"}</button>
+                            {m.consent_sent_at && <span className="small">sent {formatDate(m.consent_sent_at)}</span>}
+                          </form>
                       <form action={setConsentAction.bind(null, g.id, m.id)} className="actions" style={{ gap: 6 }}>
                         <label className="consent small-consent">
                           <input type="checkbox" name="signed" value="yes" defaultChecked={!!m.consent_signed_on} />
@@ -96,6 +116,8 @@ export default async function GroupPage({
                         <input type="date" name="consentSignedOn" defaultValue={m.consent_signed_on ?? today} className="date-input" aria-label="Signed on" />
                         <button type="submit" className="ghost small-btn">Save</button>
                       </form>
+                        </>
+                      )}
                     </td>
                     <td>{m.attended} of {sessions.length}</td>
                     <td>
@@ -115,8 +137,12 @@ export default async function GroupPage({
             <label><span className="small">Name</span><input name="firstName" type="text" /></label>
             <label><span className="small">Surname</span><input name="surname" type="text" /></label>
             <label><span className="small">Email</span><input name="email" type="email" /></label>
-            <label><span className="small">Consent form signed on (if signed)</span><input name="consentSignedOn" type="date" className="date-input" /></label>
+            <label><span className="small">Consent form signed on paper (if so)</span><input name="consentSignedOn" type="date" className="date-input" /></label>
           </div>
+          <label className="consent small-consent">
+            <input type="checkbox" name="sendConsent" value="yes" defaultChecked />
+            <span>Email them the consent form to sign online now</span>
+          </label>
           <div className="actions"><button type="submit" className="small-btn">Add member</button></div>
         </form>
       </section>

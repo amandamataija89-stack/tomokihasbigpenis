@@ -1,4 +1,10 @@
-import { bookDiscoveryAction, offerDiscoveryAction, sendIntakeAction } from "../../../actions";
+import {
+  bookDiscoveryAction,
+  offerDiscoveryAction,
+  requestConsentFromCoordinatorAction,
+  sendConsentAndPaymentAction,
+  sendIntakeAction,
+} from "../../../actions";
 import { formatDate } from "../../../format";
 import { discoveryOffer } from "@/lib/discovery-offer";
 
@@ -9,6 +15,7 @@ type StepState = {
   intakeSent: Date | null;
   intakeDone: Date | null;
   firstFullSession: Date | null;
+  consentRequested: Date | null;
   consentSent: Date | null;
   consentSigned: Date | null;
 };
@@ -17,7 +24,21 @@ const Done = ({ when, text }: { when: Date | null; text: string }) =>
   when ? <span className="step-done">✓ {text} {formatDate(when)}</span> : null;
 
 // The steps with a new private client, in order, with what's done and the button for what's next.
-export function Steps({ requestId, s, canAct, counsellorName }: { requestId: string; s: StepState; canAct: boolean; counsellorName: string }) {
+export function Steps({
+  requestId,
+  s,
+  canAct,
+  counsellorName,
+  manager = false,
+  flash,
+}: {
+  requestId: string;
+  s: StepState;
+  canAct: boolean;
+  counsellorName: string;
+  manager?: boolean; // coordinators and admins send the consent form and payment details
+  flash?: string;
+}) {
   return (
     <section className="card stack" id="steps">
       <h2>Steps with this client</h2>
@@ -57,12 +78,33 @@ export function Steps({ requestId, s, canAct, counsellorName }: { requestId: str
             </form>
           )}
         </li>
-        <li className={s.firstFullSession ? "done" : s.discoverySession ? "current" : ""}>
-          <b>If they choose counselling: book the first full session</b> under Sessions below. The consent form and payment
-          information (price, variable symbol, QR code, pay within 24 hours after each session) go to the client automatically.
-          {s.firstFullSession && <span className="step-done">✓ First full session {formatDate(s.firstFullSession)}</span>}
-          <Done when={s.consentSigned} text="Consent form signed" />
-          {s.consentSent && !s.consentSigned && <span className="small"> Consent form sent {formatDate(s.consentSent)}, not signed yet.</span>}
+        <li className={s.consentSent ? "done" : s.discoverySession ? "current" : ""}>
+          <b>If they choose counselling: onboarding details.</b> The counsellor informs the coordinator, who sends the client
+          the onboarding details: the consent form to sign and the payment details (price, account, their variable symbol,
+          pay within 24 hours after each session). The client has 72 hours to sign; then they get a reminder.
+          {flash === "requested" && <p className="flash" role="status">The coordinator has been informed and will send the onboarding details.</p>}
+          {flash === "sent" && <p className="flash" role="status">Onboarding details (consent form + payment details) sent to the client.</p>}
+          <Done when={s.consentRequested} text="Coordinator informed" />
+          <Done when={s.consentSent} text="Sent to the client" />
+          {!s.consentSent && canAct && !manager && !s.consentRequested && (
+            <form action={requestConsentFromCoordinatorAction.bind(null, requestId)} className="step-form">
+              <button type="submit" className="small-btn">Inform the coordinator to send the onboarding details</button>
+            </form>
+          )}
+          {manager && !s.consentSigned && (
+            <form action={sendConsentAndPaymentAction.bind(null, requestId)} className="step-form">
+              <button type="submit" className={s.consentSent ? "ghost small-btn" : "small-btn"}>
+                {s.consentSent ? "Send the onboarding details again" : "Send onboarding details (consent form + payment details)"}
+              </button>
+            </form>
+          )}
+        </li>
+        <li className={s.consentSigned ? "done" : s.consentSent ? "current" : ""}>
+          <b>Consent form signed: counselling sessions can start.</b> You&apos;re emailed when they sign. Until then, sessions
+          can be booked but not started (marked done).
+          <Done when={s.consentSigned} text="Signed" />
+          {s.consentSent && !s.consentSigned && <span className="small"> Waiting for the client to sign (sent {formatDate(s.consentSent)}).</span>}
+          {s.firstFullSession && <span className="step-done"> · First full session {formatDate(s.firstFullSession)}</span>}
         </li>
       </ol>
     </section>

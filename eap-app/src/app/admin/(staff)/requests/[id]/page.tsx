@@ -262,6 +262,8 @@ export default async function RequestPage({
             <Steps
               requestId={r.id}
               canAct={r.assigned_to === me.id || manager}
+              manager={manager}
+              flash={sp.consent}
               counsellorName={r.assigned_name ?? me.name}
               s={{
                 accepted: r.accepted_at,
@@ -273,13 +275,14 @@ export default async function RequestPage({
                 intakeSent: r.intake_sent_at,
                 intakeDone: intake?.signed_at ?? null,
                 firstFullSession: sessions.find((x) => !x.is_discovery)?.starts_at ?? null,
+                consentRequested: r.consent_requested_at,
                 consentSent: r.consent_form_sent_at,
                 consentSigned: signedConsent?.signed_at ?? null,
               }}
             />
           )}
           {isPrivate && <IntakeCard requestId={r.id} intake={intake} sentAt={r.intake_sent_at} />}
-          {isPrivate && <ConsentCard requestId={r.id} signed={signedConsent} sentAt={r.consent_form_sent_at} flash={sp.consent} />}
+          {isPrivate && <ConsentCard requestId={r.id} manager={manager} signed={signedConsent} sentAt={r.consent_form_sent_at} flash={sp.consent} />}
           <Messages requestId={r.id} nickname={r.first_name} messages={messages} flash={sp.msg} />
           <Sessions
             manager={manager}
@@ -289,6 +292,7 @@ export default async function RequestPage({
             clientEmail={r.email}
             defaultPrice={defaultPrice}
             error={sp.session}
+            consentMissing={isPrivate && !signedConsent}
           />
           {isPrivate && (
             <Payments
@@ -301,7 +305,8 @@ export default async function RequestPage({
               pdf={sp.pdf}
               manager={manager}
               emailInvoices={r.email_invoices}
-              admin={me.role === "admin"}
+              admin={isOwner(me)}
+              canSetDueDate={me.role === "admin"}
             />
           )}
         </div>
@@ -338,7 +343,7 @@ export default async function RequestPage({
           </form>
 
           {isPrivate && settings && (
-            <BillingProfile r={r} range={priceRange} vatPayer={settings.vatPayer} vatRate={settings.vatRate} manager={manager} flash={sp.billing} consent={signedConsent} admin={me.role === "admin"} />
+            <BillingProfile r={r} range={priceRange} vatPayer={settings.vatPayer} vatRate={settings.vatRate} manager={manager} flash={sp.billing} consent={signedConsent} admin={isOwner(me)} />
           )}
 
           <section className="card stack counsellor-notes" id="counsellor-notes">

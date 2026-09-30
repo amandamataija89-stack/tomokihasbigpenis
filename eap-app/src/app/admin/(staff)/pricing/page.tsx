@@ -137,7 +137,22 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
         <div className="field"><label htmlFor="nextNumber">Next invoice number</label>
           <input id="nextNumber" name="nextNumber" type="text" className="price-input" defaultValue={settings.nextNumber} />
           <span className="small">Goes up by one for each new invoice. Set it to continue your current numbering.</span></div>
+        <div className="field"><label htmlFor="dueDay">Invoices are due on day … of the month</label>
+          <input id="dueDay" name="dueDay" type="number" min={1} max={28} className="price-input" defaultValue={settings.dueDay ?? ""} />
+          <span className="small">
+            Normally 5: a monthly invoice issued on the 1st is due on the 5th; one issued later in the month is due on the next
+            month&apos;s 5th (always at least 3 days to pay). Leave empty to use {settings.dueDays} days after issue instead. You can
+            also change the due date on any single invoice, on the client&apos;s page.
+          </span></div>
         <input type="hidden" name="dueDays" value={settings.dueDays} />
+        <label className="consent">
+          <input type="checkbox" name="autoInvoicing" value="yes" defaultChecked={settings.autoInvoicing} />
+          <span>
+            <b>Issue invoices automatically</b> (monthly invoices on the 1st; &quot;invoice per session&quot; clients when a session is
+            marked done). Off: sessions still collect on draft invoices, and you issue them yourself (Monthly billing →
+            Issue monthly invoices now, or Issue now on a client&apos;s page).
+          </span>
+        </label>
         <div className="actions"><button type="submit">Save invoice details</button></div>
       </form>
 

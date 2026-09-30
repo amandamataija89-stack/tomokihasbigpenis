@@ -5,11 +5,13 @@ import { formatDate } from "../../../format";
 // The client's informed consent form: whether it's signed, their emergency contact, and sending the link.
 export function ConsentCard({
   requestId,
+  manager = false,
   signed,
   sentAt,
   flash,
 }: {
   requestId: string;
+  manager?: boolean; // coordinators and admins send the consent form
   signed: SignedConsent | null;
   sentAt: Date | null;
   flash?: string;
@@ -38,11 +40,15 @@ export function ConsentCard({
         <>
           <p className="notice">
             <b>Not signed yet.</b> The client must sign before their first full session.{" "}
-            {sentAt ? `The link was emailed on ${formatDate(sentAt)}.` : "It's emailed automatically when the first session is booked."}
+            {sentAt
+              ? `The link was emailed on ${formatDate(sentAt)}. The client has 72 hours to sign; then they're reminded.`
+              : "The coordinator sends it with the payment details (Steps with this client, step 4)."}
           </p>
+          {manager && sentAt && (
           <form action={sendConsentAction.bind(null, requestId)}>
-            <button type="submit" className="ghost small-btn">{sentAt ? "Email the link again" : "Email the consent form now"}</button>
+            <button type="submit" className="ghost small-btn">Email the link again</button>
           </form>
+          )}
         </>
       )}
     </section>

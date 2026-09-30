@@ -60,10 +60,14 @@ export async function addMemberAction(groupId: string, formData: FormData) {
   const email = text(formData, "email", 200).toLowerCase();
   const signed = text(formData, "consentSignedOn", 10);
   if (!firstName || !surname || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) back(groupId, "member", "#members");
-  await pool.query(
-    "INSERT INTO group_members (group_id, first_name, surname, email, consent_signed_on) VALUES ($1, $2, $3, $4, $5)",
+  const { rows } = await pool.query<{ id: string }>(
+    "INSERT INTO group_members (group_id, first_name, surname, email, consent_signed_on) VALUES ($1, $2, $3, $4, $5) RETURNING id",
     [groupId, firstName, surname, email, /^\d{4}-\d{2}-\d{2}$/.test(signed) ? signed : null],
   );
+  if (formData.get("sendConsent") === "yes" && !signed) {
+    const { sendGroupConsentRequest } = await import("@/lib/group-consent");
+    await sendGroupConsentRequest(rows[0].id).catch((err) => console.error("EAP group consent email failed:", err));
+  }
   back(groupId, "added", "#members");
 }
 
@@ -111,4 +115,26 @@ export async function saveAttendanceAction(groupId: string, sessionId: string, f
     [sessionId, groupId, present],
   );
   back(groupId, "attendance", "#attendance");
+}
+
+/** Emails one member the consent form to sign online. */
+export async function sendGroupConsentAction(groupId: string, memberId: string) {
+  await requireGroup(groupId);
+  const { sendGroupConsentRequest } = await import("@/lib/group-consent");
+  const ok = await sendGroupConsentRequest(memberId).catch((err) => (console.error("EAP group consent email failed:", err), false));
+  back(groupId, ok ? "consentsent" : "error", "#members");
+}
+
+/** Emails the consent form to every member who hasn't signed it yet. */
+export async function sendAllGroupConsentsAction(groupId: string) {
+  await requireGroup(groupId);
+  const { sendGroupConsentRequest } = await import("@/lib/group-consent");
+  const { rows } = await pool.query<{ id: string }>(
+    `SELECT id FROM group_members m WHERE group_id = $1
+       AND NOT EXISTS (SELECT 1 FROM group_consent_forms WHERE member_id = m.id)`,
+    [groupId],
+  );
+  let n = 0;
+  for (const r of rows) if (await sendGroupConsentRequest(r.id).catch(() => false)) n++;
+  redirect(`/admin/groups/${groupId}?done=consentall&n=${n}#members`);
 }

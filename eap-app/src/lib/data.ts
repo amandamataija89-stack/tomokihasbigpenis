@@ -71,9 +71,11 @@ export type RequestRow = {
   session_price_czk: number | null; // private clients: their price with VAT (what they pay per session)
   session_price_net_czk: number | null; // the same without VAT, as chosen by their counsellor (before any student discount)
   student_discount: boolean;
-  email_invoices: boolean; // the client asked for invoices by email // STUDENT_DISCOUNT_PERCENT off
+  email_invoices: boolean; // the client asked for invoices by email
+  invoice_per_session: boolean; // a separate invoice for each session instead of a monthly one // STUDENT_DISCOUNT_PERCENT off
   variable_symbol: string | null; // private clients: on all their invoices
   address: string; // private clients: residential address from the sign-up form
+  consent_requested_at: Date | null;
   consent_form_sent_at: Date | null; // when the client was last emailed the link to sign the consent form
   discovery_offered_at: Date | null; // steps with a private client (see Steps on the case page)
   intake_sent_at: Date | null;

@@ -138,6 +138,9 @@ export function IntakeForm({ token, prefill }: { token: string; prefill: Prefill
           </label>
           {err("declaration")}
         </div>
+        <p className="small">
+          How we look after your data: our <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a>.
+        </p>
         {text("signedName", "Client's name (type your full name)")}
         <div className="field">
           <label>Signature</label>
