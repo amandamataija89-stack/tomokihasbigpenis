@@ -280,7 +280,7 @@ export async function startCounselling(requestId: string, staffId: string | null
   );
   const r = rows[0];
   if (!r || r.kind !== "private" || r.agreed) return false;
-  const { discounted, ensureVariableSymbol, invoiceSettings, STUDENT_DISCOUNT_PERCENT } = await import("./billing");
+  const { discounted, ensureVariableSymbol, invoiceSettings, qrPlatba, STUDENT_DISCOUNT_PERCENT } = await import("./billing");
   const { clientMessageLink } = await import("./messages");
   const settings = await invoiceSettings();
   const vs = await ensureVariableSymbol(requestId);
@@ -299,6 +299,11 @@ export async function startCounselling(requestId: string, staffId: string | null
       account: settings.bankAccount,
       iban: settings.iban,
       messageLink: await clientMessageLink(requestId),
+      // A QR code for one session's price, so the client can pay each session within 24 hours.
+      qrPngBase64:
+        r.price !== null && r.price > 0 && settings.iban
+          ? (await (await import("./invoice-pdf")).qrPng(qrPlatba({ iban: settings.iban, amountCzk: r.price, variableSymbol: vs, message: "Sezeni" }))).toString("base64")
+          : undefined,
     }),
   );
   await pool.query(

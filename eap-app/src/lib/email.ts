@@ -449,12 +449,13 @@ export function counsellingStartEmail(
   to: string,
   firstName: string,
   consentLink: string,
-  p: { priceText: string; variableSymbol: string; account: string; iban: string; messageLink: string },
+  p: { priceText: string; variableSymbol: string; account: string; iban: string; messageLink: string; qrPngBase64?: string },
 ): Mail {
   return {
     to,
     subject: "Starting counselling: consent form and payment – Prague Integration",
-    text: `Hi ${firstName},\n\nWe're glad you'd like to continue. Two things before your first full session:\n\n1. Please read and sign our informed consent form (about 5 minutes):\n${consentLink}\n\n2. Payment: ${p.priceText} per session. Please pay each session within 24 hours after it ends, by bank transfer to account ${p.account}${p.iban ? ` (IBAN ${p.iban})` : ""} with your variable symbol ${p.variableSymbol} – it identifies your payments. With each booked session you'll receive a QR code that fills this in for you, and you'll also find them on your private page:\n${p.messageLink}\n\nCancellations: please give at least 48 hours' notice; otherwise the full session fee is charged.\n\nPrague Integration\n+420 608 573 256\ncontact@pragueintegration.cz\n`,
+    text: `Hi ${firstName},\n\nWe're glad you'd like to continue. Two things before your first full session:\n\n1. Please read and sign our informed consent form (about 5 minutes):\n${consentLink}\n\n2. Payment. These are your payment details${p.qrPngBase64 ? " and your QR code (attached)" : ""}:\n\nPrice: ${p.priceText} per session\nAccount: ${p.account}${p.iban ? `\nIBAN: ${p.iban}` : ""}\nVariable symbol: ${p.variableSymbol}\n\nPlease pay within 24 hours after each session. Always use your variable symbol ${p.variableSymbol}: it's how we match your payment.${p.qrPngBase64 ? " Scan the attached QR code in your banking app and it fills everything in for one session." : ""}\n\nInvoices are issued monthly. You'll find them on your private page, and we're happy to email them if you ask:\n${p.messageLink}\n\nCancellations: please give at least 48 hours' notice; otherwise the full session fee is charged.\n\nPrague Integration\n+420 608 573 256\ncontact@pragueintegration.cz\n`,
+    ...(p.qrPngBase64 ? { attachments: [{ filename: `qr-platba-${p.variableSymbol}.png`, content: p.qrPngBase64 }] } : {}),
   };
 }
 

@@ -182,3 +182,22 @@ describe("payment after a session", () => {
     expect(m.attachments?.[0].filename).toBe("qr-platba-100101.png");
   });
 });
+
+describe("onboarding email", () => {
+  it("gives the payment details and QR code, pay within 24 hours, monthly invoices", async () => {
+    const { counsellingStartEmail } = await import("./email");
+    const m = counsellingStartEmail("a@example.com", "Anna", "https://x/consent/t", {
+      priceText: "2 420 CZK",
+      variableSymbol: "100101",
+      account: "5454387003/5500",
+      iban: "CZ45",
+      messageLink: "https://x/m/t",
+      qrPngBase64: "x",
+    });
+    expect(m.text).toContain("Variable symbol: 100101");
+    expect(m.text).toContain("within 24 hours after each session");
+    expect(m.text).toContain("Invoices are issued monthly");
+    expect(m.text).not.toContain("each booked session");
+    expect(m.attachments?.[0].filename).toBe("qr-platba-100101.png");
+  });
+});

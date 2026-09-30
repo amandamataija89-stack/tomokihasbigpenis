@@ -523,10 +523,6 @@ async function emailClient(
   );
   const r = rows[0];
   if (!r) return "";
-  // Private clients get how to pay for this session, with its QR code.
-  const { sessionPayment } = await import("@/lib/session-qr");
-  const pay = kind !== "cancelled" && !r.is_discovery ? await sessionPayment(sessionId) : null;
-  const { qrPng } = pay ? await import("@/lib/invoice-pdf") : { qrPng: null };
   const online = r.is_discovery || r.format === "Online";
   const calendar = sessionIcs({
     id: sessionId,
@@ -556,16 +552,6 @@ async function emailClient(
         intakeLink: extra.intakeLink,
         meetingLink: r.meeting_link || undefined,
         calendar: Buffer.from(calendar).toString("base64"),
-        payment:
-          pay && qrPng
-            ? {
-                amount: pay.amount,
-                variableSymbol: pay.variableSymbol,
-                account: pay.account,
-                iban: pay.iban,
-                qrPngBase64: (await qrPng(pay.qr)).toString("base64"),
-              }
-            : undefined,
       }),
     );
     return " Confirmation emailed to the client.";
@@ -730,35 +716,6 @@ export async function setSessionOutcome(sessionId: string, outcome: "done" | "la
         ? `Late cancellation by the client: counts as a session (${counted}).`
         : "Session no longer marked done or late-cancelled.",
   );
-  // Private clients: pay within 24 hours, with their variable symbol (unless it's already on an issued invoice).
-  if (outcome !== "undo") {
-    const { sessionPayment } = await import("@/lib/session-qr");
-    const pay = await sessionPayment(sessionId);
-    if (pay) {
-      const { rows: c } = await pool.query<{ email: string; first_name: string; discovery: boolean }>(
-        `SELECT r.email, r.first_name, cs.is_discovery AS discovery FROM client_sessions cs JOIN support_requests r ON r.id = cs.request_id WHERE cs.id = $1`,
-        [sessionId],
-      );
-      if (c[0] && !c[0].discovery && pay.amount > 0) {
-        const { qrPng } = await import("@/lib/invoice-pdf");
-        const { paymentAfterSession } = await import("@/lib/email");
-        await sendEmail(
-          paymentAfterSession(c[0].email, c[0].first_name, {
-            when: new Intl.DateTimeFormat("cs-CZ", { day: "numeric", month: "numeric", year: "numeric", timeZone: "Europe/Prague" }).format(pay.startsAt),
-            amount: pay.amount,
-            account: pay.account,
-            iban: pay.iban,
-            variableSymbol: pay.variableSymbol,
-            qrPngBase64: (await qrPng(pay.qr)).toString("base64"),
-            late: outcome === "late",
-            messageLink: await clientMessageLink(requestId),
-          }),
-        )
-          .then(() => note(requestId, staff.id, `Payment details (amount, account, variable symbol ${pay.variableSymbol}, QR code) emailed to the client: pay within 24 hours.`))
-          .catch((err) => console.error("EAP payment request email failed:", err));
-      }
-    }
-  }
   await syncStatusWithSessions(requestId, staff.id);
   redirect(`/admin/requests/${requestId}#sessions`);
 }
@@ -1002,4 +959,40 @@ export async function sendConsentAndPaymentAction(requestId: string) {
     console.error("EAP consent email failed:", err);
   }
   redirect(`/admin/requests/${requestId}?consent=sent#steps`);
+}
+
+// Payment details for one session (amount, account, variable symbol, QR code), emailed only when the
+// client asks for them: nothing about payment is sent automatically after a session.
+export async function emailSessionPaymentAction(sessionId: string) {
+  const requestId = await sessionRequest(sessionId);
+  const { staff } = await requireCase(requestId);
+  const { sessionPayment } = await import("@/lib/session-qr");
+  const pay = await sessionPayment(sessionId);
+  const { rows: c } = await pool.query<{ email: string; first_name: string; discovery: boolean; late: boolean }>(
+    `SELECT r.email, r.first_name, cs.is_discovery AS discovery, cs.late_cancelled AS late
+     FROM client_sessions cs JOIN support_requests r ON r.id = cs.request_id WHERE cs.id = $1`,
+    [sessionId],
+  );
+  if (!pay || !c[0] || c[0].discovery || pay.amount <= 0) redirect(`/admin/requests/${requestId}?session=nopay#sessions`);
+  const { qrPng } = await import("@/lib/invoice-pdf");
+  const { paymentAfterSession } = await import("@/lib/email");
+  try {
+    await sendEmail(
+      paymentAfterSession(c[0].email, c[0].first_name, {
+        when: new Intl.DateTimeFormat("cs-CZ", { day: "numeric", month: "numeric", year: "numeric", timeZone: "Europe/Prague" }).format(pay.startsAt),
+        amount: pay.amount,
+        account: pay.account,
+        iban: pay.iban,
+        variableSymbol: pay.variableSymbol,
+        qrPngBase64: (await qrPng(pay.qr)).toString("base64"),
+        late: c[0].late,
+        messageLink: await clientMessageLink(requestId),
+      }),
+    );
+    await note(requestId, staff.id, `Payment details (amount, account, variable symbol ${pay.variableSymbol}, QR code) emailed to the client at their request.`);
+  } catch (err) {
+    console.error("EAP payment details email failed:", err);
+    redirect(`/admin/requests/${requestId}?session=payfail#sessions`);
+  }
+  redirect(`/admin/requests/${requestId}?session=paysent#sessions`);
 }
