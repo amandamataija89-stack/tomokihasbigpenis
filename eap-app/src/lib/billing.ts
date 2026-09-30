@@ -307,6 +307,7 @@ export type InvoiceSettings = {
   nextNumber: string; // e.g. 2026001; the digits at the end go up by one for each invoice
   dueDays: number; // used when dueDay is empty
   dueDay: number | null; // invoices are due on this day of the month (e.g. the 5th)
+  autoInvoicing: boolean; // issue invoices automatically (monthly on the 1st; per-session clients when a session is done)
 };
 
 export const DEFAULT_INVOICE_SETTINGS: InvoiceSettings = {
@@ -325,6 +326,7 @@ export const DEFAULT_INVOICE_SETTINGS: InvoiceSettings = {
   nextNumber: `${new Date().getFullYear()}001`,
   dueDays: 14,
   dueDay: 5,
+  autoInvoicing: false,
 };
 
 /** Minimum days between issuing an invoice and its due date. */
@@ -444,6 +446,7 @@ export async function createInvoiceToPay(p: {
   amount: number | null;
   staffId: string | null;
   period?: string;
+  issue?: boolean; // false: leave it as a draft for an admin to issue
 }): Promise<string | null> {
   // A typed amount stays; otherwise the amount follows the sessions (see recomputeInvoice).
   const manual = p.amount !== null;
@@ -467,7 +470,7 @@ export async function createInvoiceToPay(p: {
     await ensureVariableSymbol(p.requestId, c);
     return rows[0].id;
   });
-  if (id) await issueInvoice(id);
+  if (id && p.issue !== false) await issueInvoice(id);
   return id;
 }
 
@@ -576,7 +579,7 @@ export async function createMonthlyInvoices(
     `SELECT r.id AS request_id, r.first_name,
        COALESCE(array_agg(cs.id ORDER BY cs.starts_at) FILTER (WHERE cs.price_czk IS NOT NULL), '{}') AS ids,
        count(*) FILTER (WHERE cs.price_czk IS NULL)::int AS no_price,
-       (SELECT p.id FROM payments p WHERE p.request_id = r.id AND p.period = $1 AND p.paid_on IS NULL
+       (SELECT p.id FROM payments p WHERE p.request_id = r.id AND p.period = $1 AND p.paid_on IS NULL AND p.invoice_number IS NULL
         ORDER BY p.created_at LIMIT 1) AS existing
      FROM client_sessions cs JOIN support_requests r ON r.id = cs.request_id
      WHERE r.kind = 'private' AND cs.done_at IS NOT NULL AND cs.paid_at IS NULL AND cs.payment_id IS NULL
@@ -679,8 +682,17 @@ export async function addToMonthlyInvoice(sessionId: string): Promise<string | n
     [s.request_id],
   );
   if (mode[0]?.per_session) {
-    const id = await createInvoiceToPay({ requestId: s.request_id, sessionIds: [sessionId], amount: null, staffId: null });
-    if (id && mode[0].email) {
+    // Issued straight away only with automatic invoicing on; otherwise a draft for an admin to issue.
+    const auto = (await invoiceSettings()).autoInvoicing;
+    const id = await createInvoiceToPay({
+      requestId: s.request_id,
+      sessionIds: [sessionId],
+      amount: null,
+      staffId: null,
+      period: monthOfSession(s.starts_at),
+      issue: auto,
+    });
+    if (id && auto && mode[0].email) {
       const { sendInvoice } = await import("./invoice-mail");
       await sendInvoice(id).catch((err) => console.error("EAP session invoice email failed:", err));
     }
@@ -691,7 +703,8 @@ export async function addToMonthlyInvoice(sessionId: string): Promise<string | n
     // One running invoice per client and month.
     await c.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`invoice:${s.request_id}:${period}`]);
     const { rows: open } = await c.query<{ id: string }>(
-      "SELECT id FROM payments WHERE request_id = $1 AND period = $2 AND paid_on IS NULL ORDER BY created_at LIMIT 1",
+      // A draft only: an issued invoice (a tax document) never changes.
+      "SELECT id FROM payments WHERE request_id = $1 AND period = $2 AND paid_on IS NULL AND invoice_number IS NULL ORDER BY created_at LIMIT 1",
       [s.request_id, period],
     );
     let paymentId = open[0]?.id;

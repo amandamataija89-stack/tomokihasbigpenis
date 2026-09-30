@@ -171,3 +171,14 @@ describe("calendar invitation in booking emails", () => {
     expect(m.attachments?.map((a) => a.filename)).toContain("session.ics");
   });
 });
+
+describe("payment after a session", () => {
+  it("asks to pay within 24 hours with the account and the client's variable symbol", async () => {
+    const { paymentAfterSession } = await import("./email");
+    const m = paymentAfterSession("a@example.com", "Klára", { when: "3. 10. 2026", amount: 1815, account: "5454387003/5500", iban: "CZ45", variableSymbol: "100101", qrPngBase64: "x", late: false });
+    expect(m.text).toContain("Please pay within 24 hours");
+    expect(m.text).toContain("Variable symbol: 100101");
+    expect(m.text).toContain("5454387003/5500");
+    expect(m.attachments?.[0].filename).toBe("qr-platba-100101.png");
+  });
+});

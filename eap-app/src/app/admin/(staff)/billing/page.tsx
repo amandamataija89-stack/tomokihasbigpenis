@@ -130,9 +130,17 @@ export default async function MonthlyBilling({ searchParams }: { searchParams: P
         <h2>Invoices for {monthName(month)}</h2>
         <ol className="steps">
           <li className="small" style={{ listStyle: "none", marginLeft: -20 }}>
-            <b>Automatic:</b> last month&apos;s invoices are created on the 1st and kept here (you also get the PDF and CSV
-            by email). They&apos;re emailed on the 3rd only to clients who asked for invoices by email (tick it on the
-            client&apos;s page, under Invoices). Use the buttons to do it sooner, or after changes.
+            {settings.autoInvoicing ? (
+              <>
+                <b>Automatic:</b> last month&apos;s invoices are issued on the 1st and emailed on the 3rd to clients who asked for
+                invoices by email. Use the buttons to do it sooner, or after changes.
+              </>
+            ) : (
+              <>
+                <b>Issued by you:</b> sessions collect on each client&apos;s draft invoice as they&apos;re marked done. Nothing is
+                issued or sent automatically: press the buttons below when you&apos;re ready.
+              </>
+            )}
           </li>
           <li>
             <form action={createMonthlyInvoicesAction} className="actions" style={{ gap: 8 }}>

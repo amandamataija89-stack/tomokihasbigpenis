@@ -559,3 +559,24 @@ export function counsellorSuspended(to: string, counsellorName: string, isCounse
       : `${counsellorName} has had three formal warnings and is now suspended from new clients (not offered or assigned any). Their current clients aren't affected.\n\nLift the suspension on their profile when it's resolved: ${appUrl()}/admin/team\n`,
   };
 }
+
+/** After a private session is held (or late-cancelled): pay within 24 hours, with the client's variable symbol. */
+export function paymentAfterSession(
+  to: string,
+  firstName: string,
+  p: { when: string; amount: number; account: string; iban: string; variableSymbol: string; qrPngBase64: string; late: boolean; messageLink?: string },
+): Mail {
+  const amount = `${p.amount.toLocaleString("cs-CZ")} Kč`;
+  return {
+    to,
+    subject: `Platba za sezení / Payment for your session – ${p.when}`,
+    text: `Dobrý den / Hello ${firstName},\n\n${
+      p.late
+        ? `sezení ${p.when} bylo zrušeno méně než 48 hodin předem, proto se účtuje.\nYour session on ${p.when} was cancelled less than 48 hours before, so it is charged.`
+        : `děkujeme za sezení dne ${p.when}.\nThank you for your session on ${p.when}.`
+    }\n\nProsíme o úhradu do 24 hodin / Please pay within 24 hours:\n\nČástka / Amount: ${amount}\nÚčet / Account: ${p.account}\nIBAN: ${p.iban}\nVariabilní symbol / Variable symbol: ${p.variableSymbol}\n\nVždy prosím uveďte svůj variabilní symbol ${p.variableSymbol} – podle něj platbu přiřadíme. Nebo naskenujte QR kód v příloze ve své bankovní aplikaci, vše vyplní za vás.\nPlease always use your variable symbol ${p.variableSymbol}: it's how we match your payment. Or scan the attached QR code in your banking app and it fills everything in for you.${
+      p.messageLink ? `\n\nVaše platby a faktury / Your payments and invoices: ${p.messageLink}` : ""
+    }\n\nDěkujeme / Thank you,\nPrague Integration\n+420 608 573 256\ncontact@pragueintegration.cz\n`,
+    attachments: [{ filename: `qr-platba-${p.variableSymbol}.png`, content: p.qrPngBase64 }],
+  };
+}

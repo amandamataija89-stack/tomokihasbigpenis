@@ -512,6 +512,7 @@ export async function saveInvoiceSettingsAction(formData: FormData) {
     vatRate: [0, 12, 21].includes(Number(formData.get("vatRate"))) ? Number(formData.get("vatRate")) : current.vatRate,
     nextNumber,
     dueDays: Number.isInteger(dueDays) && dueDays >= 0 && dueDays <= 90 ? dueDays : current.dueDays,
+    autoInvoicing: formData.get("autoInvoicing") === "yes",
     dueDay: (() => {
       const raw = String(formData.get("dueDay") ?? "").trim();
       const n = Number(raw);

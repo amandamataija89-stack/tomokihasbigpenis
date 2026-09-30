@@ -119,6 +119,9 @@ export const EMAIL_INVOICES_ON_DAY = 3;
  * emailed to the clients, so the coordinator has two days to check them.
  */
 export async function autoMonthlyInvoices(now = new Date()): Promise<{ created: number; emailed: number }> {
+  // Off unless switched on under Pricing & invoices: invoices are then issued by hand on Monthly billing.
+  const { invoiceSettings } = await import("./billing");
+  if (!(await invoiceSettings()).autoInvoicing) return { created: 0, emailed: 0 };
   const month = previousMonth(now);
   // Automatic invoicing starts with the month it was switched on (the first run records it), so turning
   // it on never invoices or emails clients for earlier months.

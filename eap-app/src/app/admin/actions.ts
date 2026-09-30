@@ -726,6 +726,35 @@ export async function setSessionOutcome(sessionId: string, outcome: "done" | "la
         ? `Late cancellation by the client: counts as a session (${counted}).`
         : "Session no longer marked done or late-cancelled.",
   );
+  // Private clients: pay within 24 hours, with their variable symbol (unless it's already on an issued invoice).
+  if (outcome !== "undo") {
+    const { sessionPayment } = await import("@/lib/session-qr");
+    const pay = await sessionPayment(sessionId);
+    if (pay) {
+      const { rows: c } = await pool.query<{ email: string; first_name: string; discovery: boolean }>(
+        `SELECT r.email, r.first_name, cs.is_discovery AS discovery FROM client_sessions cs JOIN support_requests r ON r.id = cs.request_id WHERE cs.id = $1`,
+        [sessionId],
+      );
+      if (c[0] && !c[0].discovery && pay.amount > 0) {
+        const { qrPng } = await import("@/lib/invoice-pdf");
+        const { paymentAfterSession } = await import("@/lib/email");
+        await sendEmail(
+          paymentAfterSession(c[0].email, c[0].first_name, {
+            when: new Intl.DateTimeFormat("cs-CZ", { day: "numeric", month: "numeric", year: "numeric", timeZone: "Europe/Prague" }).format(pay.startsAt),
+            amount: pay.amount,
+            account: pay.account,
+            iban: pay.iban,
+            variableSymbol: pay.variableSymbol,
+            qrPngBase64: (await qrPng(pay.qr)).toString("base64"),
+            late: outcome === "late",
+            messageLink: await clientMessageLink(requestId),
+          }),
+        )
+          .then(() => note(requestId, staff.id, `Payment details (amount, account, variable symbol ${pay.variableSymbol}, QR code) emailed to the client: pay within 24 hours.`))
+          .catch((err) => console.error("EAP payment request email failed:", err));
+      }
+    }
+  }
   await syncStatusWithSessions(requestId, staff.id);
   redirect(`/admin/requests/${requestId}#sessions`);
 }

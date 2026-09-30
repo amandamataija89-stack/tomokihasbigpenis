@@ -152,7 +152,7 @@ export function BillingProfile({
             </label>
             <label className="consent small-consent">
               <input type="radio" name="invoicing" value="session" defaultChecked={r.invoice_per_session} />
-              <span>A separate invoice for each session (issued when it&apos;s marked done)</span>
+              <span>A separate invoice for each session (a draft for each session as it&apos;s marked done)</span>
             </label>
           </fieldset>
           <label className="consent">

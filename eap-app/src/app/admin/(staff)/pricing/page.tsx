@@ -145,6 +145,14 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
             also change the due date on any single invoice, on the client&apos;s page.
           </span></div>
         <input type="hidden" name="dueDays" value={settings.dueDays} />
+        <label className="consent">
+          <input type="checkbox" name="autoInvoicing" value="yes" defaultChecked={settings.autoInvoicing} />
+          <span>
+            <b>Issue invoices automatically</b> (monthly invoices on the 1st; &quot;invoice per session&quot; clients when a session is
+            marked done). Off: sessions still collect on draft invoices, and you issue them yourself (Monthly billing →
+            Issue monthly invoices now, or Issue now on a client&apos;s page).
+          </span>
+        </label>
         <div className="actions"><button type="submit">Save invoice details</button></div>
       </form>
 
