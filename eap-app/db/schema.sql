@@ -367,6 +367,8 @@ CREATE INDEX IF NOT EXISTS intake_forms_request_idx ON intake_forms (request_id,
 -- emergency. Other admins see everything else.
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS is_owner boolean NOT NULL DEFAULT false;
 UPDATE staff SET is_owner = true WHERE lower(email) = 'amandamataija89@gmail.com' AND NOT is_owner;
+-- The owner is always an admin (full access, including sending the onboarding details).
+UPDATE staff SET role = 'admin' WHERE is_owner AND role <> 'admin';
 
 -- When a counsellor is usually free for sessions (their own words, e.g. "Mon–Wed 9:00–17:00"), shown to the team.
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS availability_note text NOT NULL DEFAULT '';
