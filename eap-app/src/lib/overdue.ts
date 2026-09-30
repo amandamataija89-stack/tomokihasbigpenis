@@ -1,6 +1,6 @@
 import { pool } from "./db";
 import { contactDue, contactReminderAt } from "./deadlines";
-import { contactMissed, formatDeadline, overdueWarning, sendEmail } from "./email";
+import { contactMissed, formatDeadline, lateDiscoveryOffer, overdueWarning, sendEmail } from "./email";
 import { coordinatorEmails } from "./offers";
 
 type Open = {
@@ -59,4 +59,37 @@ export async function warnOverdue(now = new Date()): Promise<{ warned: number; m
     }
   }
   return { warned, missed, failed };
+}
+
+/**
+ * Hourly: a private client whose counsellor hasn't offered the free discovery session (or messaged or
+ * booked them) within 24 hours of being assigned goes back to the pool (only coordinators and admins
+ * see it), and they're told, to assign someone else: we promise another counsellor after 24 hours.
+ */
+export async function alertLateDiscoveryOffers(now = new Date()): Promise<number> {
+  const { rows } = await pool.query<{ id: string; first_name: string; crisis: boolean; counsellor: string | null; assigned_at: Date }>(
+    `SELECT r.id, r.first_name, r.crisis, s.name AS counsellor, r.assigned_at
+     FROM support_requests r JOIN staff s ON s.id = r.assigned_to
+     WHERE r.kind = 'private' AND r.status NOT IN ('completed', 'closed') AND r.offer_late_alerted_at IS NULL
+       AND r.discovery_offered_at IS NULL AND r.assigned_at < $1::timestamptz - interval '24 hours'
+       AND NOT EXISTS (SELECT 1 FROM client_messages m WHERE m.request_id = r.id AND m.sender = 'staff')
+       AND NOT EXISTS (SELECT 1 FROM client_sessions cs WHERE cs.request_id = r.id)`,
+    [now],
+  );
+  if (!rows.length) return 0;
+  const to = await coordinatorEmails();
+  for (const r of rows) {
+    await Promise.allSettled(to.map((t) => sendEmail(lateDiscoveryOffer(t, r.first_name, r.id, r.counsellor ?? "their counsellor", r.crisis))));
+    await pool.query(
+      `UPDATE support_requests SET offer_late_alerted_at = now(), assigned_to = NULL, assigned_at = NULL, accepted_at = NULL,
+         respond_by = NULL, status = 'new', updated_at = now()
+       WHERE id = $1`,
+      [r.id],
+    );
+    await pool.query("INSERT INTO request_notes (request_id, body) VALUES ($1, $2)", [
+      r.id,
+      `Not contacted within 24 hours of ${r.counsellor ?? "the counsellor"} being assigned: back in the pool for the coordinator to assign someone else.`,
+    ]);
+  }
+  return rows.length;
 }

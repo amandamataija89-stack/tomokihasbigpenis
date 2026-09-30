@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { discoveryOffer } from "@/lib/discovery-offer";
+import { DISCOVERY_MINUTES, SESSION_MINUTES, sessionIcs } from "@/lib/ics";
 import { endSession, isManager, requireManager, requireOwner, requireStaff, ROLES, startSession, type Role, type Staff } from "@/lib/auth";
 import { inviteFeedback } from "@/lib/feedback";
 import { assignWaitingAndNotify, CLIENT_TYPES, DEFAULT_MONTHLY_CAPACITY, offerToNext } from "@/lib/assign";
@@ -55,14 +56,13 @@ async function acceptIfPending(requestId: string, c: Awaited<ReturnType<typeof r
   if (c.assignedTo === c.staff.id && !c.acceptedAt) await acceptOffer(requestId, c.staff.id);
 }
 
-export async function login(
-  _prev: { error?: string; email?: string },
-  formData: FormData,
-): Promise<{ error?: string; email?: string }> {
+export type LoginState = { error?: string; email?: string; step?: "code"; restart?: boolean; at?: number };
+
+export async function login(_prev: LoginState, formData: FormData): Promise<LoginState> {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
-  const { rows } = await pool.query<{ id: string; password_hash: string }>(
-    "SELECT id, password_hash FROM staff WHERE email = $1",
+  const { rows } = await pool.query<{ id: string; password_hash: string; name: string; email: string }>(
+    "SELECT id, password_hash, name, email FROM staff WHERE email = $1",
     [email],
   );
   if (rows[0]?.password_hash === "!") {
@@ -76,7 +76,26 @@ export async function login(
     await new Promise((r) => setTimeout(r, 400));
     return { error: "That email and password don't match a staff login.", email };
   }
+  // Second step: a code by email, unless this device was remembered.
+  const { sendLoginCode, trustedDevice } = await import("@/lib/two-step");
+  if (!(await trustedDevice(rows[0].id))) {
+    try {
+      await sendLoginCode(rows[0]);
+    } catch (err) {
+      console.error("EAP sign-in code email failed:", err);
+      return { error: "We couldn't email your sign-in code. Please try again in a minute.", email };
+    }
+    return { step: "code", email, at: Date.now() };
+  }
   await startSession(rows[0].id);
+  redirect("/admin");
+}
+
+export async function verifyLoginCode(_prev: LoginState, formData: FormData): Promise<LoginState> {
+  const { checkLoginCode } = await import("@/lib/two-step");
+  const r = await checkLoginCode(String(formData.get("code") ?? ""), formData.get("remember") === "yes");
+  if (!r.ok) return r.restart ? { error: r.error, restart: true, at: Date.now() } : { error: r.error, step: "code" };
+  await startSession(r.staffId);
   redirect("/admin");
 }
 
@@ -297,6 +316,13 @@ export async function updateStaff(staffId: string, formData: FormData) {
        away_until = $5, role = $6, is_admin = ($6 = 'admin'), accepts = $7 WHERE id = $1`,
     [staffId, f.takesClients, f.capacity, f.languages, f.awayUntil, newRole, f.accepts],
   );
+  // Payout terms are for admins only.
+  if (me.role === "admin") {
+    const pct = Number(formData.get("payoutPercent"));
+    const fee = Number(formData.get("eapFee"));
+    if (Number.isInteger(pct) && pct >= 0 && pct <= 100 && Number.isInteger(fee) && fee >= 0)
+      await pool.query("UPDATE staff SET payout_percent = $2, eap_session_fee = $3 WHERE id = $1", [staffId, pct, fee]);
+  }
   await assignWaitingAndNotify();
   revalidatePath("/admin/team");
   redirect("/admin/team?saved=1");
@@ -306,16 +332,30 @@ export async function updateStaff(staffId: string, formData: FormData) {
 
 export async function updateMyAvailability(formData: FormData) {
   const me = await requireStaff();
+  const { rows: was } = await pool.query<{ takes_clients: boolean }>("SELECT takes_clients FROM staff WHERE id = $1", [me.id]);
   const { rows } = await pool.query<{ monthly_capacity: number }>("SELECT monthly_capacity FROM staff WHERE id = $1", [me.id]);
   // Counsellors can go down, or up to the usual 5; a higher limit is for a coordinator to set.
   const f = availabilityFields(formData, Math.max(DEFAULT_MONTHLY_CAPACITY, rows[0]?.monthly_capacity ?? 0));
   await pool.query(
     `UPDATE staff SET takes_clients = $2, monthly_capacity = COALESCE($3, monthly_capacity), languages = $4, away_until = $5,
-       availability_note = $6, accepts = $7
+       availability_note = $6, accepts = $7, meeting_link = $8
      WHERE id = $1`,
-    [me.id, f.takesClients, f.capacity, f.languages, f.awayUntil, String(formData.get("availabilityNote") ?? "").trim().slice(0, 500), f.accepts],
+    [
+      me.id,
+      f.takesClients,
+      f.capacity,
+      f.languages,
+      f.awayUntil,
+      String(formData.get("availabilityNote") ?? "").trim().slice(0, 500),
+      f.accepts,
+      /^https:\/\/\S+$/.test(String(formData.get("meetingLink") ?? "").trim()) ? String(formData.get("meetingLink")).trim().slice(0, 300) : "",
+    ],
   );
   await assignWaitingAndNotify();
+  if (f.takesClients && !was[0]?.takes_clients) {
+    const { notifyWaitingMatches } = await import("@/lib/waiting-list");
+    await notifyWaitingMatches(me.id).catch((err) => console.error("EAP waiting list alert failed:", err));
+  }
   redirect("/admin/availability?saved=1");
 }
 
@@ -326,7 +366,11 @@ export async function setTakingClientsAction(taking: boolean) {
     `UPDATE staff SET takes_clients = $2, away_until = CASE WHEN $2 THEN NULL ELSE away_until END WHERE id = $1`,
     [me.id, taking],
   );
-  if (taking) await assignWaitingAndNotify();
+  if (taking) {
+    await assignWaitingAndNotify();
+    const { notifyWaitingMatches } = await import("@/lib/waiting-list");
+    await notifyWaitingMatches(me.id).catch((err) => console.error("EAP waiting list alert failed:", err));
+  }
   redirect(`/admin/availability?saved=${taking ? "on" : "paused"}`);
 }
 
@@ -346,6 +390,7 @@ export async function declineCase(requestId: string, formData: FormData) {
 
 export async function takeCase(requestId: string) {
   const staff = await requireStaff();
+  if (!isManager(staff)) redirect("/admin"); // the pool is for coordinators and admins only
   const ok = await takeFromPool(requestId, staff.id);
   redirect(ok ? `/admin/requests/${requestId}?taken=1` : "/admin?status=pool&gone=1");
 }
@@ -459,8 +504,9 @@ async function emailClient(
     number: number;
     kind: ClientKind;
     is_discovery: boolean;
+    meeting_link: string | null;
   }>(
-    `SELECT r.id AS request_id, r.email, r.first_name, r.format, r.kind, s.name AS therapist, cs.starts_at, cs.is_discovery,
+    `SELECT r.id AS request_id, r.email, r.first_name, r.format, r.kind, s.name AS therapist, s.meeting_link, cs.starts_at, cs.is_discovery,
        (SELECT count(*)::int FROM client_sessions o
         WHERE o.request_id = r.id AND o.starts_at <= cs.starts_at AND NOT o.is_discovery) AS number
      FROM client_sessions cs
@@ -475,6 +521,17 @@ async function emailClient(
   const { sessionPayment } = await import("@/lib/session-qr");
   const pay = kind !== "cancelled" && !r.is_discovery ? await sessionPayment(sessionId) : null;
   const { qrPng } = pay ? await import("@/lib/invoice-pdf") : { qrPng: null };
+  const online = r.is_discovery || r.format === "Online";
+  const calendar = sessionIcs({
+    id: sessionId,
+    start: r.starts_at,
+    minutes: r.is_discovery ? DISCOVERY_MINUTES : SESSION_MINUTES,
+    summary: `${r.is_discovery ? "Free discovery session" : "Counselling session"}${r.therapist ? ` with ${r.therapist}` : ""} – Prague Integration`,
+    location: online ? r.meeting_link || "Online" : r.format === "In person in Prague" ? "Prague Integration, Mezibranská 4, 110 00 Prague 1" : "",
+    description: `${online && r.meeting_link ? `Join online: ${r.meeting_link}\n` : ""}To change the time, reply to our email or call +420 608 573 256.`,
+    url: online && r.meeting_link ? r.meeting_link : undefined,
+    cancelled: kind === "cancelled",
+  });
   try {
     await sendEmail(
       sessionConfirmation({
@@ -491,6 +548,8 @@ async function emailClient(
         lateCancelHours: kind === "booked" && r.number === 1 && !r.is_discovery ? LATE_CANCEL_HOURS : undefined,
         discovery: r.is_discovery,
         intakeLink: extra.intakeLink,
+        meetingLink: r.meeting_link || undefined,
+        calendar: Buffer.from(calendar).toString("base64"),
         payment:
           pay && qrPng
             ? {
@@ -620,7 +679,7 @@ export async function moveSession(sessionId: string, formData: FormData) {
   const { staff } = await requireCase(requestId);
   const startsAt = sessionDate(formData);
   if (!startsAt) redirect(`/admin/requests/${requestId}?session=date#sessions`);
-  await pool.query("UPDATE client_sessions SET starts_at = $2::timestamp AT TIME ZONE 'Europe/Prague', reminder_sent_at = NULL WHERE id = $1", [
+  await pool.query("UPDATE client_sessions SET starts_at = $2::timestamp AT TIME ZONE 'Europe/Prague', reminder_sent_at = NULL, reminder24_sent_at = NULL WHERE id = $1", [
     sessionId,
     startsAt,
   ]);
@@ -806,4 +865,55 @@ export async function setupFirstAdmin(_prev: SetupState, formData: FormData): Pr
   if (!id) return { error: "Setup is already done. Sign in instead.", ...keep };
   await startSession(id);
   redirect("/admin/team?welcome=1");
+}
+
+/** Saves the crisis protocol checklist. What changed is written in the team notes, with who and when. */
+export async function saveCrisisChecklistAction(requestId: string, formData: FormData) {
+  const { staff } = await requireCase(requestId);
+  const { CRISIS_KEYS, crisisChecklist, labelOf } = await import("@/lib/crisis");
+  const before = await crisisChecklist(requestId);
+  const checked = formData.getAll("checked").map(String).filter((k) => CRISIS_KEYS.includes(k));
+  const riskRaw = String(formData.get("risk") ?? "");
+  const risk = riskRaw === "low" || riskRaw === "high" ? riskRaw : "";
+  const emergencyCall = String(formData.get("emergencyCall") ?? "").trim().slice(0, 1000);
+  const report = String(formData.get("report") ?? "").trim().slice(0, 8000);
+  await pool.query(
+    `INSERT INTO crisis_checklists (request_id, checked, risk, emergency_call, report, updated_at, updated_by)
+     VALUES ($1, $2, $3, $4, $5, now(), $6)
+     ON CONFLICT (request_id) DO UPDATE SET checked = EXCLUDED.checked, risk = EXCLUDED.risk,
+       emergency_call = EXCLUDED.emergency_call, report = EXCLUDED.report, updated_at = now(), updated_by = EXCLUDED.updated_by`,
+    [requestId, checked, risk, emergencyCall, report, staff.id],
+  );
+  const added = checked.filter((k) => !before.checked.includes(k)).map(labelOf);
+  const removed = before.checked.filter((k) => !checked.includes(k)).map(labelOf);
+  const changes = [
+    added.length && `ticked: ${added.join("; ")}`,
+    removed.length && `unticked: ${removed.join("; ")}`,
+    risk !== before.risk && `risk level: ${risk === "high" ? "HIGH" : risk === "low" ? "low to moderate" : "not set"}`,
+    emergencyCall !== before.emergency_call && "emergency call details updated",
+    report !== before.report && "crisis report updated",
+  ].filter(Boolean);
+  if (changes.length) await note(requestId, staff.id, `Crisis protocol – ${changes.join(". ")}.`);
+  redirect(`/admin/requests/${requestId}?crisisSaved=1#crisis-protocol`);
+}
+
+/** Puts an unassigned client on the waiting list (optionally telling them), or takes them off it. */
+export async function setWaitingListAction(requestId: string, on: boolean, formData: FormData) {
+  const staff = await requireManager();
+  const { rows } = await pool.query<{ email: string; first_name: string }>(
+    `UPDATE support_requests SET waitlisted_at = CASE WHEN $2 THEN now() END, updated_at = now()
+     WHERE id = $1 AND ($2 = false OR assigned_to IS NULL) RETURNING email, first_name`,
+    [requestId, on],
+  );
+  if (!rows[0]) redirect(`/admin/requests/${requestId}`);
+  let told = false;
+  if (on && formData.get("tellClient") === "yes" && rows[0].email) {
+    const { waitingListEmail } = await import("@/lib/email");
+    told = await sendEmail(waitingListEmail(rows[0].email, rows[0].first_name)).then(
+      () => true,
+      (err) => (console.error("EAP waiting list email failed:", err), false),
+    );
+  }
+  await note(requestId, staff.id, on ? `Put on the waiting list.${told ? " The client was told by email." : ""}` : "Taken off the waiting list.");
+  redirect(`/admin/requests/${requestId}?waiting=${on ? "on" : "off"}`);
 }

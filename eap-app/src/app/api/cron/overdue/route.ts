@@ -1,7 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { assignWaitingAndNotify } from "@/lib/assign";
 import { releaseExpiredOffers, remindPendingOffers, sendDailyDigest } from "@/lib/offers";
-import { warnOverdue } from "@/lib/overdue";
+import { alertLateDiscoveryOffers, warnOverdue } from "@/lib/overdue";
 import { sendSessionReminders } from "@/lib/session-reminders";
 import { alertOverdueInvoices, autoMonthlyInvoices } from "@/lib/invoice-mail";
 import { monthEndReminders, sendMonthlyExport } from "@/lib/month-end";
@@ -21,6 +21,7 @@ export async function GET(request: Request) {
   const released = await releaseExpiredOffers();
   const assigned = (await assignWaitingAndNotify()).length; // e.g. places open at the start of a month
   const reminders = await warnOverdue();
+  const lateOffers = await alertLateDiscoveryOffers();
   const digestSent = await sendDailyDigest();
   const sessionReminders = await sendSessionReminders();
   const monthlyInvoices = await autoMonthlyInvoices();
@@ -29,7 +30,7 @@ export async function GET(request: Request) {
   const exportSent = await sendMonthlyExport();
   const retention = await dailyRetention();
   return Response.json({
-    offerReminders, released, assigned, reminders, digestSent, sessionReminders,
+    offerReminders, released, assigned, reminders, lateOffers, digestSent, sessionReminders,
     monthlyInvoices, overdueInvoices, monthEnd, exportSent, retention,
   });
 }

@@ -1,3 +1,4 @@
+import { logAccess } from "@/lib/access-log";
 import { currentStaff, isManager } from "@/lib/auth";
 import { latestConsent, renderConsentPdf } from "@/lib/consent";
 import { pool } from "@/lib/db";
@@ -15,6 +16,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ request
   if (!rows[0] || (!isManager(staff) && rows[0].assigned_to !== staff.id)) return new Response("Not found", { status: 404 });
   const signed = await latestConsent(requestId);
   if (!signed) return new Response("Not signed yet.", { status: 404 });
+  await logAccess(requestId, staff.id, "Downloaded the signed consent form");
   return new Response(Buffer.from(await renderConsentPdf(signed)), {
     headers: {
       "Content-Type": "application/pdf",

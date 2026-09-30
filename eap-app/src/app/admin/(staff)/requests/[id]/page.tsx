@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { speaks, takesType, typesFor } from "@/lib/assign";
 import { isManager, isOwner, requireStaff } from "@/lib/auth";
 import { getRequest, listNotes, listSessions, listStaffWithLoad, STATUSES, STATUS_LABELS } from "@/lib/data";
-import { acceptCase, addCounsellorNote, openCounsellorNotesAction, addNote, setCrisisAction, declineCase, deleteRequest, emailFeedbackLink, updateRequest } from "../../../actions";
+import { acceptCase, setWaitingListAction, addCounsellorNote, openCounsellorNotesAction, addNote, setCrisisAction, declineCase, deleteRequest, emailFeedbackLink, updateRequest } from "../../../actions";
 import { contactDue } from "@/lib/deadlines";
 import { formatDate } from "../../../format";
 import { listMessages, markClientMessagesRead } from "@/lib/messages";
@@ -13,6 +13,9 @@ import { Sessions } from "./Sessions";
 import { Payments } from "./Payments";
 import { ConsentCard } from "./ConsentCard";
 import { IntakeCard } from "./IntakeCard";
+import { CrisisProtocol } from "./CrisisProtocol";
+import { crisisChecklist } from "@/lib/crisis";
+import { accessLog, logAccess } from "@/lib/access-log";
 import { Steps } from "./Steps";
 import { latestIntake } from "@/lib/intake";
 import { latestConsent } from "@/lib/consent";
@@ -39,6 +42,8 @@ export default async function RequestPage({
     crisis?: string;
     added?: string;
     notes?: string;
+    crisisSaved?: string;
+    waiting?: string;
   }>;
 }) {
   const { id } = await params;
@@ -50,8 +55,14 @@ export default async function RequestPage({
   if (!r || (!manager && r.assigned_to !== me.id)) notFound();
   // The client's messages count as read once whoever looks after them opens the case.
   if (r.assigned_to === me.id || (!r.assigned_to && manager)) await markClientMessagesRead(id);
+  await logAccess(id, me.id, emergencyNotesRequested(sp.notes, me) ? "Opened the counsellor's private notes (emergency)" : "Opened the record");
   const isPrivate = r.kind === "private";
-  const [signedConsent, intake] = await Promise.all([latestConsent(id), latestIntake(id)]);
+  const [signedConsent, intake, crisisList, access] = await Promise.all([
+    latestConsent(id),
+    latestIntake(id),
+    crisisChecklist(id),
+    manager ? accessLog(id) : Promise.resolve([]),
+  ]);
   // Counsellor-only notes: readable only by the client's counsellor; others see just how many there are.
   const isTheirCounsellor = r.assigned_to === me.id;
   // The owner can open them in an emergency; opening them is logged in the team notes.
@@ -120,6 +131,16 @@ export default async function RequestPage({
           {signedConsent && <a href={`/admin/consent/${r.id}`} target="_blank" rel="noopener">Consent PDF</a>}
         </nav>
       )}
+      {r.crisis && (
+        <CrisisProtocol
+          requestId={r.id}
+          list={crisisList}
+          phone={signedConsent?.phone || intake?.answers.phone || r.phone || ""}
+          location={[signedConsent?.localAddress, signedConsent?.homeAddress || r.address].filter(Boolean).join("\n")}
+          emergencyContact={signedConsent ? `${signedConsent.emergencyName} – ${signedConsent.emergencyContact}` : ""}
+          saved={!!sp.crisisSaved}
+        />
+      )}
       {sp.saved && <p className="flash" role="status">Saved.</p>}
       {sp.added && <p className="flash" role="status">Client added.</p>}
       {sp.accepted && <p className="flash" role="status">Accepted. Please contact them by {formatDate(due)}.</p>}
@@ -143,6 +164,31 @@ export default async function RequestPage({
             <textarea id="reason" name="reason" placeholder="e.g. Fully booked until November, or I know this person" />
             <div className="actions"><button type="submit" className="ghost">Decline, pass to another counsellor</button></div>
           </form>
+        </section>
+      )}
+
+      {manager && !r.assigned_to && r.status !== "completed" && r.status !== "closed" && (
+        <section className="card stack waiting-list" id="waiting-list">
+          {sp.waiting === "on" && <p className="flash" role="status">On the waiting list.</p>}
+          {sp.waiting === "off" && <p className="flash" role="status">Taken off the waiting list.</p>}
+          {r.waitlisted_at ? (
+            <form action={setWaitingListAction.bind(null, r.id, false)} className="actions" style={{ gap: 10 }}>
+              <span>
+                <b>On the waiting list</b> since {formatDate(r.waitlisted_at)}. You&apos;ll get an email when a matching counsellor
+                starts taking clients.
+              </span>
+              <button type="submit" className="ghost small-btn">Take off the waiting list</button>
+            </form>
+          ) : (
+            <form action={setWaitingListAction.bind(null, r.id, true)} className="actions" style={{ gap: 10 }}>
+              <span>No suitable counsellor free?</span>
+              <label className="consent small-consent">
+                <input type="checkbox" name="tellClient" value="yes" defaultChecked />
+                <span>Email the client that they&apos;re on the waiting list</span>
+              </label>
+              <button type="submit" className="ghost small-btn">Put on the waiting list</button>
+            </form>
+          )}
         </section>
       )}
 
@@ -363,6 +409,17 @@ export default async function RequestPage({
           </form>
 
           {manager && (
+            <details className="card stack access-log">
+              <summary><b>Who opened this record</b> <span className="small">({access.length ? `last ${access.length}` : "nobody yet"})</span></summary>
+              <ul className="small">
+                {access.map((a, i) => (
+                  <li key={i}>{formatDate(a.at)} · {a.staff ?? "former staff"}{a.role ? ` (${a.role})` : ""} · {a.what}</li>
+                ))}
+              </ul>
+            </details>
+          )}
+
+          {manager && (
             <form action={deleteRequest.bind(null, r.id)} className="card form" style={{ gap: 12 }}>
               <h2 style={{ fontSize: 18 }}>Delete client profile</h2>
               <p className="small">
@@ -383,3 +440,5 @@ export default async function RequestPage({
     </main>
   );
 }
+
+const emergencyNotesRequested = (notes: string | undefined, me: { owner?: boolean }) => notes === "emergency" && me.owner === true;

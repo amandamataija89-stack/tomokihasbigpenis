@@ -8,7 +8,16 @@ import { AddStaffForm } from "./AddStaffForm";
 
 const monthName = () => new Intl.DateTimeFormat("en-GB", { month: "long", timeZone: "Europe/Prague" }).format(new Date());
 
-type Member = { id: string; role: Role; takes_clients: boolean; away_until: string | null; invited: boolean; availability_note: string };
+type Member = {
+  id: string;
+  role: Role;
+  takes_clients: boolean;
+  away_until: string | null;
+  invited: boolean;
+  availability_note: string;
+  payout_percent: number;
+  eap_session_fee: number;
+};
 
 export default async function TeamPage({
   searchParams,
@@ -20,7 +29,7 @@ export default async function TeamPage({
   const [loads, { rows: members }] = await Promise.all([
     therapistLoads(pool, false),
     pool.query<Member>(
-      `SELECT id, role, takes_clients, to_char(away_until, 'YYYY-MM-DD') AS away_until, password_hash = '!' AS invited, availability_note
+      `SELECT id, role, takes_clients, to_char(away_until, 'YYYY-MM-DD') AS away_until, password_hash = '!' AS invited, availability_note, payout_percent, eap_session_fee
        FROM staff`,
     ),
   ]);
@@ -114,6 +123,18 @@ export default async function TeamPage({
                     {ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
                   </select>
                 </div>
+                {me.role === "admin" && (
+                  <div className="actions" style={{ gap: 12 }}>
+                    <label className="small">
+                      Payout share of private fees (%){" "}
+                      <input name="payoutPercent" type="number" min={0} max={100} defaultValue={m.payout_percent} className="cap-input" />
+                    </label>
+                    <label className="small">
+                      Per EAP session (CZK){" "}
+                      <input name="eapFee" type="number" min={0} step={50} defaultValue={m.eap_session_fee} className="cap-input" />
+                    </label>
+                  </div>
+                )}
                 <AvailabilityFields
                   idPrefix={t.id}
                   languages={t.languages}

@@ -420,3 +420,58 @@ UPDATE price_list SET min_net_czk = 7000, max_net_czk = 7000, price_options = '{
 INSERT INTO app_state (key, value) VALUES ('adhd_price_set', '1') ON CONFLICT (key) DO NOTHING;
 -- Student discount (STUDENT_DISCOUNT_PERCENT, 10 %) on the client's price, ticked by their counsellor.
 ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS student_discount boolean NOT NULL DEFAULT false;
+
+-- Private clients: when the coordinator was told the discovery offer wasn't sent within 24 hours.
+ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS offer_late_alerted_at timestamptz;
+
+-- The second reminder, 24 hours before the session (the first goes 48 hours before).
+ALTER TABLE client_sessions ADD COLUMN IF NOT EXISTS reminder24_sent_at timestamptz;
+
+-- The crisis protocol checklist on a crisis case (src/lib/crisis.ts): what was ticked, the risk level
+-- and the report. Every save is also written in the team notes, with who and when.
+CREATE TABLE IF NOT EXISTS crisis_checklists (
+  request_id      uuid PRIMARY KEY REFERENCES support_requests(id) ON DELETE CASCADE,
+  checked         text[] NOT NULL DEFAULT '{}',
+  risk            text NOT NULL DEFAULT '', -- '', 'low', 'high'
+  emergency_call  text NOT NULL DEFAULT '', -- time, person, service contacted (if confidentiality was breached)
+  report          text NOT NULL DEFAULT '', -- assessment, risk factors, actions taken
+  updated_at      timestamptz NOT NULL DEFAULT now(),
+  updated_by      uuid REFERENCES staff(id) ON DELETE SET NULL
+);
+
+-- Two-step sign-in: after the password, a 6-digit code is emailed (valid 10 minutes, 5 tries).
+CREATE TABLE IF NOT EXISTS login_challenges (
+  token_hash text PRIMARY KEY,
+  staff_id   uuid NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+  code_hash  text NOT NULL,
+  attempts   integer NOT NULL DEFAULT 0,
+  expires_at timestamptz NOT NULL
+);
+-- Devices a staff member chose to remember for 30 days (no code needed there).
+CREATE TABLE IF NOT EXISTS trusted_devices (
+  token_hash text PRIMARY KEY,
+  staff_id   uuid NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+  expires_at timestamptz NOT NULL
+);
+
+-- Who opened which client's record, and when (GDPR accountability). Kept as long as the client record.
+CREATE TABLE IF NOT EXISTS access_log (
+  id         bigserial PRIMARY KEY,
+  request_id uuid NOT NULL REFERENCES support_requests(id) ON DELETE CASCADE,
+  staff_id   uuid REFERENCES staff(id) ON DELETE SET NULL,
+  what       text NOT NULL, -- e.g. 'Opened the record', 'Downloaded the consent form'
+  at         timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS access_log_request_idx ON access_log (request_id, at DESC);
+
+-- The counsellor's own online meeting room (Zoom / Google Meet link), sent with online sessions.
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS meeting_link text NOT NULL DEFAULT '';
+
+-- Waiting list: when no suitable counsellor is free, the coordinator puts the client on it. Cleared
+-- when they're assigned.
+ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS waitlisted_at timestamptz;
+
+-- Counsellor payouts: their share (%) of their private sessions' fees without VAT, and a fixed fee per
+-- EAP session held. Set by an admin on the Team page.
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS payout_percent integer NOT NULL DEFAULT 70 CHECK (payout_percent BETWEEN 0 AND 100);
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS eap_session_fee integer NOT NULL DEFAULT 0 CHECK (eap_session_fee >= 0);

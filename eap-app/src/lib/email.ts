@@ -189,6 +189,8 @@ export type SessionEmail = {
   payment?: { amount: number; variableSymbol: string; account: string; iban: string; qrPngBase64: string };
   discovery?: boolean; // the free discovery session
   intakeLink?: string; // sent with the discovery session invitation
+  meetingLink?: string; // the counsellor's online room, for online sessions
+  calendar?: string; // the session as a calendar invitation (.ics), base64
 };
 
 // What a late cancellation costs: one of the EAP sessions, or the full fee for a private client.
@@ -200,15 +202,16 @@ export const lateCancellationPolicy = (hours: number, total: number | null) =>
   `Cancellation policy: if you need to cancel or move a session, please tell us at least ${hours} hours before it starts. A session cancelled with less notice ${lateCancelCost(total)}.`;
 
 /** Where the session happens. The free discovery session is always online; other sessions follow the client's choice. */
-export function whereText(format: string, discovery?: boolean): string {
-  if (discovery || format === "Online") return "Where: online. Your therapist will send you the details for joining.";
+export function whereText(format: string, discovery?: boolean, meetingLink?: string): string {
+  if (discovery || format === "Online")
+    return meetingLink ? `Where: online. Join here: ${meetingLink}` : "Where: online. Your therapist will send you the details for joining.";
   if (format === "In person in Prague") return "Where: Prague Integration, Mezibranská 4, 110 00 Prague 1";
   return "";
 }
 
 // Contains only practical details, nothing about why the person is coming.
 export function sessionConfirmation(s: SessionEmail): Mail {
-  const where = whereText(s.format, s.discovery) || "Your therapist will let you know whether you'll meet online or in person.";
+  const where = whereText(s.format, s.discovery, s.meetingLink) || "Your therapist will let you know whether you'll meet online or in person.";
   const withWhom = s.therapistName ? ` with ${s.therapistName}` : "";
   const subject = {
     booked: s.discovery ? `Your free discovery session: ${s.when}` : `Your session is booked: ${s.when}`,
@@ -230,9 +233,14 @@ export function sessionConfirmation(s: SessionEmail): Mail {
   const body =
     s.kind === "cancelled"
       ? `\n\nWe'll be in touch to find a new time.`
-      : `\n${s.discovery ? "Free of charge" : sessionOf(s.number, s.total)}\n${where}${policy}${intake}${pay}`;
+      : `\n${s.discovery ? "Free of charge" : sessionOf(s.number, s.total)}\n${where}${policy}${intake}${pay}${
+          s.calendar ? "\n\nTo add it to your calendar, open the attached session.ics." : ""
+        }`;
   return {
-    attachments: s.payment && s.kind !== "cancelled" ? [{ filename: "qr-platba.png", content: s.payment.qrPngBase64 }] : undefined,
+    attachments: [
+      ...(s.payment && s.kind !== "cancelled" ? [{ filename: "qr-platba.png", content: s.payment.qrPngBase64 }] : []),
+      ...(s.calendar ? [{ filename: s.kind === "cancelled" ? "cancelled-session.ics" : "session.ics", content: s.calendar }] : []),
+    ],
     to: s.to,
     subject: `${subject} – Prague Integration`,
     text: `Hi ${s.firstName},\n\n${lead[0].toUpperCase()}${lead.slice(1)}\n\n${s.when} (Prague time)${body}\n\nIf you need to change the time, ${s.messageLink ? `message us on your private page (${s.messageLink})` : "reply to this email"} or call +420 608 573 256.\n\nPrague Integration\ncontact@pragueintegration.cz\n`,
@@ -272,17 +280,19 @@ export function feedbackInvitation(to: string, firstName: string, token: string)
   };
 }
 
-export function sessionReminder(s: Omit<SessionEmail, "kind"> & { cancelBy: string; lateCancelHours: number }): Mail {
-  const where = whereText(s.format, s.discovery);
+export function sessionReminder(s: Omit<SessionEmail, "kind"> & { cancelBy: string; lateCancelHours: number; final?: boolean }): Mail {
+  const where = whereText(s.format, s.discovery, s.meetingLink);
   const contact = `${s.messageLink ? `message us on your private page (${s.messageLink})` : "reply to this email"} or call +420 608 573 256`;
   const session = s.discovery ? "free discovery session" : "session";
   return {
     to: s.to,
-    subject: `Reminder: your ${session} on ${s.when} – Prague Integration`,
-    text: `Hi ${s.firstName},\n\nA reminder of your upcoming ${session}${s.therapistName ? ` with ${s.therapistName}` : ""}:\n\n${s.when} (Prague time)\n${s.discovery ? "Free of charge" : sessionOf(s.number, s.total)}${where ? `\n${where}` : ""}\n\n${
+    subject: `${s.final ? "Tomorrow" : "Reminder"}: your ${session} on ${s.when} – Prague Integration`,
+    text: `Hi ${s.firstName},\n\n${s.final ? "Just a reminder: your" : "A reminder of your upcoming"} ${session}${s.therapistName ? ` with ${s.therapistName}` : ""}${s.final ? " is tomorrow" : ""}:\n\n${s.when} (Prague time)\n${s.discovery ? "Free of charge" : sessionOf(s.number, s.total)}${where ? `\n${where}` : ""}\n\n${
       s.discovery
         ? `If you need to cancel or move it, please ${contact}.`
-        : `If you need to cancel or move it, please tell us by ${s.cancelBy}: ${contact}. After that, a cancellation ${lateCancelCost(s.total)}.`
+        : s.final
+          ? `If you can't come, please ${contact} as soon as possible. As it's now less than ${s.lateCancelHours} hours away, a cancellation ${lateCancelCost(s.total)}.`
+          : `If you need to cancel or move it, please tell us by ${s.cancelBy}: ${contact}. After that, a cancellation ${lateCancelCost(s.total)}.`
     }\n\nSee you soon,\nPrague Integration\n`,
   };
 }
@@ -443,5 +453,43 @@ export function counsellingStartEmail(
     to,
     subject: "Starting counselling: consent form and payment – Prague Integration",
     text: `Hi ${firstName},\n\nWe're glad you'd like to continue. Two things before your first full session:\n\n1. Please read and sign our informed consent form (about 5 minutes):\n${consentLink}\n\n2. Payment: ${p.priceText} per session. Please pay each session within 24 hours after it ends, by bank transfer to account ${p.account}${p.iban ? ` (IBAN ${p.iban})` : ""} with your variable symbol ${p.variableSymbol} – it identifies your payments. With each booked session you'll receive a QR code that fills this in for you, and you'll also find them on your private page:\n${p.messageLink}\n\nCancellations: please give at least 48 hours' notice; otherwise the full session fee is charged.\n\nPrague Integration\n+420 608 573 256\ncontact@pragueintegration.cz\n`,
+  };
+}
+
+/** A private client hasn't been offered the discovery session within 24 hours: reassign them. */
+export function lateDiscoveryOffer(to: string, clientNickname: string, requestId: string, counsellorName: string, crisis: boolean): Mail {
+  return {
+    to,
+    subject: `${crisis ? "URGENT – " : ""}Back in the pool: ${clientNickname} – not contacted in 24 hours`,
+    text: `${clientNickname}${crisis ? " (crisis)" : ""} was assigned to ${counsellorName} more than 24 hours ago and hasn't been offered the free discovery session or contacted. We promise clients another counsellor after 24 hours, so they're back in the pool.\n\nPlease assign another counsellor (Follow-up → Counsellor):\n${appUrl()}/admin/requests/${requestId}\n`,
+  };
+}
+
+/** The second step of signing in. */
+export function loginCodeEmail(to: string, name: string, code: string, minutes: number): Mail {
+  return {
+    to,
+    subject: `Your sign-in code: ${code}`,
+    text: `Hi ${name},\n\nYour Prague Integration sign-in code is:\n\n${code}\n\nIt works for ${minutes} minutes. If you didn't just try to sign in, someone may know your password: please change it (Forgot your password? on the sign-in page) and tell Amanda.\n`,
+  };
+}
+
+/** Told to the client when they go on the waiting list. */
+export function waitingListEmail(to: string, firstName: string): Mail {
+  return {
+    to,
+    subject: "You're on our waiting list – Prague Integration",
+    text: `Hi ${firstName},\n\nThank you for contacting Prague Integration. All our counsellors who fit what you asked for are fully booked right now, so we've put you on our waiting list. We'll contact you as soon as a place opens.\n\nIf you need help urgently, please don't wait: call 112 (emergency, English spoken) or the crisis line 116 123 (free, 24/7).\n\nPrague Integration\n+420 608 573 256\ncontact@pragueintegration.cz\n`,
+  };
+}
+
+/** A counsellor became available and waiting clients match them. */
+export function waitingListMatches(to: string, counsellorName: string, clients: { id: string; first_name: string; language: string; service: string }[]): Mail {
+  return {
+    to,
+    subject: `${counsellorName} is taking new clients: ${clients.length} on the waiting list match`,
+    text: `${counsellorName} has started taking new clients again. These clients on the waiting list match their languages and the clients they take:\n\n${clients
+      .map((c) => `- ${c.first_name} (${c.service || "support"}, ${c.language}): ${appUrl()}/admin/requests/${c.id}`)
+      .join("\n")}\n\nAssign them under Follow-up → Counsellor.\n`,
   };
 }
