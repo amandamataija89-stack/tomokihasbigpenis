@@ -101,6 +101,34 @@ counsellor can read, and a **Payment QR** for each unpaid private session (also 
 carrying the client's variable symbol. A bank payment of one session's price with that symbol marks that
 session paid.
 
+## Safety and access
+
+- **Two-step sign-in:** after the password, staff get a 6-digit code by email (10 minutes, 5 tries).
+  "Remember this device" skips the code on that browser for 30 days.
+- **Access log:** opening a client's record, downloading their consent form or an invoice, and emergency
+  access to counsellor notes are logged. Coordinators and admins see "Who opened this record" on the case.
+- **Counsellors see only the clients assigned to them.** The pool (clients waiting for a counsellor) is
+  for coordinators and admins. A private client not contacted within 24 hours of being assigned goes back
+  to the pool and the coordinators are emailed.
+- **Crisis protocol:** a crisis case shows the protocol as tick boxes (essentials, risk assessment and level,
+  stabilization or high-risk actions, after-crisis steps, a 24-hour report), with the client's phone,
+  address, emergency contact and the emergency numbers. Every save is written in the team notes.
+
+## Waiting list, reminders and calendar
+
+- Coordinators can put an unassigned client on the **waiting list** (and email them). When a counsellor
+  who matches (languages, client types) starts taking clients again, coordinators are emailed.
+- Clients get session reminders **48 and 24 hours** before. Session emails attach a **calendar invitation**
+  (.ics); a counsellor's Zoom / Google Meet link from My availability goes into online sessions.
+
+## Payouts and dashboard
+
+- **Payouts:** each counsellor's share (Team page, admins: % of private fees without VAT, default 70 %,
+  and a fixed fee per EAP session) of the sessions they held in the month. Admins see everyone's and can
+  export them to Excel; counsellors see their own under "My earnings".
+- **Dashboard** (admins): the month's sessions, new clients, money, payouts, crisis cases, waiting list,
+  unpaid and overdue invoices, and each counsellor, compared with the month before.
+
 ## Informed consent form
 
 Private (Prague Integration) clients sign the informed consent form online before their first full session.

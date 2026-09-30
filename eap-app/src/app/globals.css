@@ -314,3 +314,9 @@ table.attendance td.att-cell .small-btn { margin-left: 6px; }
 .crisis-numbers { display: flex; flex-wrap: wrap; gap: 8px 18px; background: #fbeeee; border-radius: 8px; padding: 10px 14px; font-size: 15px; }
 .crisis-step { border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px 12px; display: grid; gap: 6px; }
 .crisis-step.high { border-color: #e0a7a2; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+.tile { display: grid; gap: 4px; align-content: start; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; color: inherit; text-decoration: none; }
+a.tile:hover { border-color: var(--green); }
+.tile .big-num { font-size: 24px; }
+.trend-up { color: var(--green-strong); }
+.trend-down { color: #b3261e; }

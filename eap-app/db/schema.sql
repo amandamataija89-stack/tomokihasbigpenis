@@ -470,3 +470,8 @@ ALTER TABLE staff ADD COLUMN IF NOT EXISTS meeting_link text NOT NULL DEFAULT ''
 -- Waiting list: when no suitable counsellor is free, the coordinator puts the client on it. Cleared
 -- when they're assigned.
 ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS waitlisted_at timestamptz;
+
+-- Counsellor payouts: their share (%) of their private sessions' fees without VAT, and a fixed fee per
+-- EAP session held. Set by an admin on the Team page.
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS payout_percent integer NOT NULL DEFAULT 70 CHECK (payout_percent BETWEEN 0 AND 100);
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS eap_session_fee integer NOT NULL DEFAULT 0 CHECK (eap_session_fee >= 0);

@@ -316,6 +316,13 @@ export async function updateStaff(staffId: string, formData: FormData) {
        away_until = $5, role = $6, is_admin = ($6 = 'admin'), accepts = $7 WHERE id = $1`,
     [staffId, f.takesClients, f.capacity, f.languages, f.awayUntil, newRole, f.accepts],
   );
+  // Payout terms are for admins only.
+  if (me.role === "admin") {
+    const pct = Number(formData.get("payoutPercent"));
+    const fee = Number(formData.get("eapFee"));
+    if (Number.isInteger(pct) && pct >= 0 && pct <= 100 && Number.isInteger(fee) && fee >= 0)
+      await pool.query("UPDATE staff SET payout_percent = $2, eap_session_fee = $3 WHERE id = $1", [staffId, pct, fee]);
+  }
   await assignWaitingAndNotify();
   revalidatePath("/admin/team");
   redirect("/admin/team?saved=1");

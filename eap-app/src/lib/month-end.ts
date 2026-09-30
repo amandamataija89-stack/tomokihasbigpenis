@@ -15,6 +15,13 @@ const prague = (now: Date) => {
   const month = Number(p.month);
   return { year, month, day: Number(p.day), daysInMonth: new Date(Date.UTC(year, month, 0)).getUTCDate(), ym: `${p.year}-${p.month}` };
 };
+/** "2026-09", +1 → "2026-10". */
+export const shiftMonth = (m: string, by: number) => {
+  const d = new Date(`${m}-01T00:00:00Z`);
+  d.setUTCMonth(d.getUTCMonth() + by);
+  return d.toISOString().slice(0, 7);
+};
+
 export const monthLabel = (ym: string) =>
   new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${ym}-01T00:00:00Z`));
 

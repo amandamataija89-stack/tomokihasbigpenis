@@ -13,6 +13,8 @@ export function StaffNav({ role }: { role: Role }) {
     { href: "/admin/clients", label: "Clients by month", show: true },
     { href: "/admin/groups", label: manager ? "Groups" : "My groups", show: true },
     { href: "/admin/availability", label: "My availability", show: true },
+    { href: "/admin/dashboard", label: "Dashboard", show: role === "admin" },
+    { href: "/admin/payouts", label: role === "admin" ? "Payouts" : "My earnings", show: true },
     { href: "/admin/team", label: "Team", show: manager },
     { href: "/admin/companies", label: "Companies", show: manager },
     { href: "/admin/billing", label: "Monthly billing", show: manager },
