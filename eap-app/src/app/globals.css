@@ -320,3 +320,4 @@ a.tile:hover { border-color: var(--green); }
 .tile .big-num { font-size: 24px; }
 .trend-up { color: var(--green-strong); }
 .trend-down { color: #b3261e; }
+.warnings.suspended { border-left: 4px solid #b3261e; }

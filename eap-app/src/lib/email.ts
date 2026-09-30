@@ -493,3 +493,38 @@ export function waitingListMatches(to: string, counsellorName: string, clients: 
       .join("\n")}\n\nAssign them under Follow-up → Counsellor.\n`,
   };
 }
+
+/** A counsellor's sessions still not marked done 24 hours after they started. */
+export function unmarkedSessionsReminder(to: string, name: string, sessions: { client: string; when: string; requestId: string }[]): Mail {
+  return {
+    to,
+    subject: `Please mark ${sessions.length === 1 ? "a session" : `${sessions.length} sessions`} as done or cancelled`,
+    text: `Hi ${name},\n\n${sessions.length === 1 ? "This session has" : "These sessions have"} passed and ${sessions.length === 1 ? "isn't" : "aren't"} marked in the app yet:\n\n${sessions
+      .map((s) => `- ${s.client}, ${s.when}: ${appUrl()}/admin/requests/${s.requestId}#sessions`)
+      .join("\n")}\n\nPlease mark each one Done, Late cancellation, or Remove it if it didn't happen, so invoices and payouts are right. Sessions left unmarked can lead to a formal warning.\n`,
+  };
+}
+
+/** A formal warning to a counsellor. */
+export function counsellorWarning(to: string, name: string, reason: string, count: number, limit: number): Mail {
+  return {
+    to,
+    subject: `Formal warning ${count} of ${limit} – Prague Integration`,
+    text: `Hi ${name},\n\nThis is formal warning ${count} of ${limit}:\n\n${reason}\n\n${
+      count >= limit
+        ? "This is your third warning, so you're suspended from new clients until the management lifts it. Your current clients aren't affected."
+        : `After ${limit} warnings you'll be suspended from new clients.`
+    }\n\nPlease put it right in the app: ${appUrl()}/admin\n\nPrague Integration\n`,
+  };
+}
+
+/** A counsellor was suspended from new clients after three warnings. */
+export function counsellorSuspended(to: string, counsellorName: string, isCounsellor: boolean): Mail {
+  return {
+    to,
+    subject: `${isCounsellor ? "You are" : `${counsellorName} is`} suspended from new clients`,
+    text: isCounsellor
+      ? `Hi ${counsellorName},\n\nAfter three formal warnings you're suspended from new clients. You keep working with your current clients. The management will lift the suspension once things are back in order.\n`
+      : `${counsellorName} has had three formal warnings and is now suspended from new clients (not offered or assigned any). Their current clients aren't affected.\n\nLift the suspension on their profile when it's resolved: ${appUrl()}/admin/team\n`,
+  };
+}
