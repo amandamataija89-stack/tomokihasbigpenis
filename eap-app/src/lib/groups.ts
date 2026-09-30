@@ -25,6 +25,8 @@ export type Member = {
   surname: string;
   email: string;
   consent_signed_on: string | null; // YYYY-MM-DD
+  consent_sent_at: Date | null; // when the online form was last emailed
+  signed_online: boolean; // signed the form online (PDF available)
   attended: number;
 };
 
@@ -53,7 +55,8 @@ export async function getGroup(id: string, staff: Staff): Promise<Group | null> 
 
 export async function groupMembers(groupId: string): Promise<Member[]> {
   const { rows } = await pool.query<Member>(
-    `SELECT m.id, m.first_name, m.surname, m.email, to_char(m.consent_signed_on, 'YYYY-MM-DD') AS consent_signed_on,
+    `SELECT m.id, m.first_name, m.surname, m.email, to_char(m.consent_signed_on, 'YYYY-MM-DD') AS consent_signed_on, m.consent_sent_at,
+       EXISTS (SELECT 1 FROM group_consent_forms f WHERE f.member_id = m.id) AS signed_online,
        (SELECT count(*)::int FROM group_attendance a WHERE a.member_id = m.id) AS attended
      FROM group_members m WHERE m.group_id = $1 ORDER BY m.surname, m.first_name`,
     [groupId],

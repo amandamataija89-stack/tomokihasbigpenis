@@ -107,8 +107,11 @@ export async function latestConsent(requestId: string): Promise<SignedConsent | 
      FROM consent_forms WHERE request_id = $1 ORDER BY signed_at DESC LIMIT 1`,
     [requestId],
   );
-  const r = rows[0];
-  if (!r) return null;
+  return rows[0] ? signedFromRow(rows[0]) : null;
+}
+
+/** A consent_forms (or group_consent_forms) row as a signed form. */
+export function signedFromRow(r: any): SignedConsent {
   return {
     id: r.id, version: r.version, signed_at: r.signed_at, ip: r.ip, fullName: r.full_name, homeAddress: r.home_address,
     localAddress: r.local_address, phone: r.phone, email: r.email, emergencyName: r.emergency_name,

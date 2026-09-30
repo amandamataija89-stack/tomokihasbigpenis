@@ -506,3 +506,33 @@ ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS invoice_per_session boolea
 -- the client is reminded if it isn't signed within 72 hours.
 ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS consent_requested_at timestamptz;
 ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS consent_reminded_at timestamptz;
+
+-- Group members sign the same informed consent form online (plus group confidentiality).
+CREATE TABLE IF NOT EXISTS group_consent_links (
+  token_hash text PRIMARY KEY,
+  member_id  uuid NOT NULL REFERENCES group_members(id) ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS group_consent_forms (
+  id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  member_id         uuid NOT NULL REFERENCES group_members(id) ON DELETE CASCADE,
+  version           text NOT NULL,
+  text_sha256       text NOT NULL,
+  full_name         text NOT NULL,
+  home_address      text NOT NULL DEFAULT '',
+  local_address     text NOT NULL DEFAULT '',
+  phone             text NOT NULL,
+  email             text NOT NULL,
+  emergency_name    text NOT NULL,
+  emergency_contact text NOT NULL,
+  other_info        text NOT NULL DEFAULT '',
+  for_minor         boolean NOT NULL DEFAULT false,
+  guardian_name     text NOT NULL DEFAULT '',
+  signed_name       text NOT NULL,
+  signature_png     text NOT NULL,
+  signed_at         timestamptz NOT NULL DEFAULT now(),
+  ip                text NOT NULL DEFAULT '',
+  user_agent        text NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS group_consent_forms_member_idx ON group_consent_forms (member_id, signed_at DESC);
+ALTER TABLE group_members ADD COLUMN IF NOT EXISTS consent_sent_at timestamptz;

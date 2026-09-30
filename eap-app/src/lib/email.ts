@@ -616,3 +616,21 @@ export function consentReminderEmail(to: string, firstName: string, link: string
     text: `Hi ${firstName},\n\nA friendly reminder to read and sign our informed consent form. We need it before your first counselling session (about 5 minutes):\n\n${link}\n\n(Keep this link to yourself.)\n\nThank you,\nPrague Integration\n+420 608 573 256\ncontact@pragueintegration.cz\n`,
   };
 }
+
+/** A group member is asked to sign the consent form. */
+export function groupConsentRequestEmail(to: string, firstName: string, groupName: string, link: string): Mail {
+  return {
+    to,
+    subject: `Please sign your consent form for ${groupName} – Prague Integration`,
+    text: `Hi ${firstName},\n\nBefore you join ${groupName}, please read and sign our informed consent form online. It takes about 5 minutes: you'll add your contact details and an emergency contact, and sign with your finger or mouse.\n\n${link}\n\n(Keep this link to yourself.) If the participant is under 18, a parent or guardian signs on their behalf.\n\nThank you,\nPrague Integration\n+420 608 573 256\ncontact@pragueintegration.cz\n`,
+  };
+}
+
+/** To the group's leader: a member signed the consent form. */
+export function groupConsentSignedStaffEmail(to: string, memberName: string, groupName: string, groupId: string): Mail {
+  return {
+    to,
+    subject: `${memberName} signed the consent form (${groupName})`,
+    text: `${memberName} has signed the informed consent form for ${groupName}.\n\n${appUrl()}/admin/groups/${groupId}#members\n`,
+  };
+}
