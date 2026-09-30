@@ -50,7 +50,7 @@ export async function currentStaff(): Promise<Staff | null> {
   const token = (await cookies()).get(COOKIE)?.value;
   if (!token) return null;
   const { rows } = await pool.query<Staff>(
-    `SELECT s.id, s.email, s.name, s.role, s.is_owner AS owner FROM staff_sessions ss JOIN staff s ON s.id = ss.staff_id
+    `SELECT s.id, s.email, s.name, CASE WHEN s.is_owner THEN 'admin' ELSE s.role END AS role, s.is_owner AS owner FROM staff_sessions ss JOIN staff s ON s.id = ss.staff_id
      WHERE ss.token_hash = $1 AND ss.expires_at > now()`,
     [sha256(token)],
   );

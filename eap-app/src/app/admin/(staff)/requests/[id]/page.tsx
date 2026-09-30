@@ -431,14 +431,23 @@ export default async function RequestPage({
               <h2 style={{ fontSize: 18 }}>Delete client profile</h2>
               <p className="small">
                 Use this when the person asks for their data to be erased, or when it&apos;s no longer needed. This
-                permanently removes the profile, notes, messages, forms and sessions. If the client has invoices, those
-                are kept (the law requires 10 years) with only the name, address and sessions they show.
+                permanently removes the profile, notes, messages, forms, sessions and draft invoices. If the client has issued
+                invoices or payments, those are kept (the law requires 10 years) with only the name, address and sessions they show.
               </p>
               {sp.confirmDelete && <p className="err">Tick the box to confirm.</p>}
               <label className="consent">
                 <input type="checkbox" name="confirm" value="yes" />
                 <span>Delete {r.first_name}&apos;s profile permanently</span>
               </label>
+              {isOwner(me) && (
+                <label className="consent">
+                  <input type="checkbox" name="test" value="yes" />
+                  <span>
+                    <b>This is a test client</b>: delete everything, including its invoices (only for test data, never a
+                    real client)
+                  </span>
+                </label>
+              )}
               <div className="actions"><button type="submit" className="danger">Delete</button></div>
             </form>
           )}

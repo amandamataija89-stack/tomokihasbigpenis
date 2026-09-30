@@ -2,6 +2,7 @@ import { sessionLimit, type ClientKind, type ClientSession } from "@/lib/data";
 import { LATE_CANCEL_HOURS } from "@/lib/deadlines";
 import {
   addSession,
+  emailSessionPaymentAction,
   moveSession,
   removeSession,
   setSessionOutcome,
@@ -53,11 +54,21 @@ function Payment({ s, requestId }: { s: ClientSession; requestId: string }) {
           <button formAction={takeOffInvoiceAction.bind(null, requestId, s.id)} className="ghost small-btn">
             Take off invoice
           </button>
+          {s.price_czk ? (
+            <button formAction={emailSessionPaymentAction.bind(null, s.id)} className="ghost small-btn" title="Only if the client asks for it">
+              Email payment details
+            </button>
+          ) : null}
         </>
       ) : (
         <>
           <button formAction={setSessionPaid.bind(null, s.id, true)} className="small-btn">Mark paid</button>
           <QrLink s={s} />
+          {s.price_czk ? (
+            <button formAction={emailSessionPaymentAction.bind(null, s.id)} className="ghost small-btn" title="Only if the client asks for it">
+              Email payment details
+            </button>
+          ) : null}
         </>
       )}
     </span>
@@ -136,6 +147,9 @@ export function Sessions({
       {error === "email" && <p className="err" role="alert">Enter an email address like name@example.com.</p>}
       {error === "emailsaved" && <p className="flash" role="status">Client email saved.</p>}
       {error === "date" && <p className="err" role="alert">Choose a date and time for the session.</p>}
+      {error === "paysent" && <p className="flash" role="status">Payment details and QR code emailed to the client.</p>}
+      {error === "nopay" && <p className="err" role="alert">This session has nothing to pay (no price, already paid, free, or on an issued invoice).</p>}
+      {error === "payfail" && <p className="err" role="alert">The email couldn&apos;t be sent. Please try again.</p>}
       {error === "noconsent" && (
         <p className="err" role="alert">The client hasn&apos;t signed the consent form yet, so this session can&apos;t be started or marked done.</p>
       )}
