@@ -55,7 +55,7 @@ export default async function ClientMessages({
           {convo.counsellorName
             ? `A private conversation between you (${convo.nickname}) and ${convo.counsellorName} at Prague Integration.`
             : `A private conversation between you (${convo.nickname}) and Prague Integration.`}{" "}
-          Your employer can&apos;t see it.
+          {convo.eap ? "Your employer can't see it." : "Only you and our team can see it."}
         </p>
       </section>
 

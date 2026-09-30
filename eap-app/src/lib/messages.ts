@@ -20,18 +20,21 @@ export type Conversation = {
   requestId: string;
   nickname: string;
   counsellorName: string | null;
+  eap?: boolean; // EAP client: their employer paid, and can't see anything
 };
 
 /** The case a private link belongs to, while the link is still valid. */
 export async function conversationFor(token: string): Promise<Conversation | null> {
-  const { rows } = await pool.query<{ id: string; first_name: string; counsellor: string | null }>(
-    `SELECT r.id, r.first_name, s.name AS counsellor
+  const { rows } = await pool.query<{ id: string; first_name: string; counsellor: string | null; kind: string }>(
+    `SELECT r.id, r.first_name, r.kind, s.name AS counsellor
      FROM message_links l JOIN support_requests r ON r.id = l.request_id LEFT JOIN staff s ON s.id = r.assigned_to
      WHERE l.token_hash = $1
        AND (r.status NOT IN ('completed', 'closed') OR r.updated_at > now() - make_interval(days => $2))`,
     [sha256(token), LINK_DAYS_AFTER_CASE_ENDS],
   );
-  return rows[0] ? { requestId: rows[0].id, nickname: rows[0].first_name, counsellorName: rows[0].counsellor } : null;
+  return rows[0]
+    ? { requestId: rows[0].id, nickname: rows[0].first_name, counsellorName: rows[0].counsellor, eap: rows[0].kind === "eap" }
+    : null;
 }
 
 export type Message = {
