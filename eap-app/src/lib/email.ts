@@ -494,14 +494,43 @@ export function waitingListMatches(to: string, counsellorName: string, clients: 
   };
 }
 
-/** A counsellor's sessions still not marked done 24 hours after they started. */
-export function unmarkedSessionsReminder(to: string, name: string, sessions: { client: string; when: string; requestId: string }[]): Mail {
+/** Reminder 1 (24 h) or 2 (48 h) about sessions not marked after they happened. */
+export function unmarkedSessionsReminder(
+  to: string,
+  name: string,
+  sessions: { client: string; when: string; requestId: string }[],
+  n: 1 | 2 = 1,
+): Mail {
   return {
     to,
-    subject: `Please mark ${sessions.length === 1 ? "a session" : `${sessions.length} sessions`} as done or cancelled`,
+    subject: `${n === 2 ? "Second reminder" : "Reminder"}: please mark ${sessions.length === 1 ? "a session" : `${sessions.length} sessions`} in the app`,
     text: `Hi ${name},\n\n${sessions.length === 1 ? "This session has" : "These sessions have"} passed and ${sessions.length === 1 ? "isn't" : "aren't"} marked in the app yet:\n\n${sessions
       .map((s) => `- ${s.client}, ${s.when}: ${appUrl()}/admin/requests/${s.requestId}#sessions`)
-      .join("\n")}\n\nPlease mark each one Done, Late cancellation, or Remove it if it didn't happen, so invoices and payouts are right. Sessions left unmarked can lead to a formal warning.\n`,
+      .join("\n")}\n\nPlease mark each one Done, Late cancellation, or Remove it if it didn't happen, so invoices and payouts are right.${
+      n === 2
+        ? "\n\nThis is the second reminder. If they're still not marked 3 days after the session, you'll get a formal warning and the management will be told (3 warnings mean suspension from new clients)."
+        : ""
+    }\n`,
+  };
+}
+
+/** To the owner: a counsellor ignored two reminders, so they got an automatic formal warning. */
+export function unmarkedEscalation(
+  to: string,
+  counsellorName: string,
+  staffId: string,
+  sessions: { client: string; when: string }[],
+  warnings: number,
+  suspended: boolean,
+): Mail {
+  return {
+    to,
+    subject: `${counsellorName}: sessions still not marked after 2 reminders – warning ${warnings} of 3`,
+    text: `${counsellorName} still hasn't marked ${sessions.length === 1 ? "this session" : "these sessions"} 3 days after ${sessions.length === 1 ? "it" : "they"} happened, despite 2 reminders:\n\n${sessions
+      .map((s) => `- ${s.client}, ${s.when}`)
+      .join("\n")}\n\nThey've been sent an automatic formal warning (${warnings} of 3).${
+      suspended ? ` They're now suspended from new clients.` : ""
+    }\n\nTheir profile: ${appUrl()}/admin/team/${staffId}\n`,
   };
 }
 

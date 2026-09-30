@@ -165,7 +165,7 @@ export default async function CounsellorProfile({
           <ul className="small">
             {warnings.map((w) => (
               <li key={w.id} style={{ opacity: w.cleared_at ? 0.55 : 1 }}>
-                {formatDate(w.created_at)}{w.issued_by_name ? ` by ${w.issued_by_name}` : ""}{w.cleared_at ? " (cleared)" : ""}:{" "}
+                {formatDate(w.created_at)}{w.issued_by_name ? ` by ${w.issued_by_name}` : " (automatic)"}{w.cleared_at ? " (cleared)" : ""}:{" "}
                 <span style={{ whiteSpace: "pre-wrap" }}>{w.reason}</span>
               </li>
             ))}

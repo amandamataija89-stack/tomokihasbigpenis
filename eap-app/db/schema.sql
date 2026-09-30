@@ -493,3 +493,7 @@ CREATE INDEX IF NOT EXISTS staff_warnings_staff_idx ON staff_warnings (staff_id,
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS suspended_at timestamptz;
 -- A session not marked done 24 hours after it: the counsellor was reminded (once).
 ALTER TABLE client_sessions ADD COLUMN IF NOT EXISTS unmarked_reminded_at timestamptz;
+-- How many reminders a counsellor has had about this unmarked session (1 at 24 h, 2 at 48 h; at 72 h
+-- the owner is told and the counsellor gets a formal warning).
+ALTER TABLE client_sessions ADD COLUMN IF NOT EXISTS unmarked_reminders integer NOT NULL DEFAULT 0;
+UPDATE client_sessions SET unmarked_reminders = 1 WHERE unmarked_reminded_at IS NOT NULL AND unmarked_reminders = 0;
