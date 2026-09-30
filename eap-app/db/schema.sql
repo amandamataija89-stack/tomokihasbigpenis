@@ -501,3 +501,8 @@ UPDATE client_sessions SET unmarked_reminders = 1 WHERE unmarked_reminded_at IS 
 -- A private client can be invoiced for each session separately (issued when it's marked done) instead of
 -- one monthly invoice.
 ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS invoice_per_session boolean NOT NULL DEFAULT false;
+
+-- Consent form process: the counsellor asks the coordinator, who sends the form and payment details;
+-- the client is reminded if it isn't signed within 72 hours.
+ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS consent_requested_at timestamptz;
+ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS consent_reminded_at timestamptz;

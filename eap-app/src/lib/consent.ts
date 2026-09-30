@@ -86,6 +86,15 @@ export async function saveConsent(requestId: string, c: ConsentInput, ip: string
     requestId,
     `Informed consent form signed online by ${c.signedName}${c.forMinor ? " (parent/guardian of a minor)" : ""}.`,
   ]);
+  // The counsellor (and the coordinators) are told straight away: sessions can start now.
+  const { rows: who } = await pool.query<{ email: string | null; first_name: string }>(
+    "SELECT s.email, r.first_name FROM support_requests r LEFT JOIN staff s ON s.id = r.assigned_to WHERE r.id = $1",
+    [requestId],
+  );
+  const { coordinatorEmails } = await import("./offers");
+  const { consentSignedStaffEmail } = await import("./email");
+  const to = [...new Set([...(who[0]?.email ? [who[0].email] : []), ...(await coordinatorEmails())])];
+  await Promise.allSettled(to.map((t) => sendEmail(consentSignedStaffEmail(t, who[0]?.first_name ?? "The client", requestId))));
   return rows[0].id;
 }
 
@@ -299,4 +308,33 @@ export async function startCounselling(requestId: string, staffId: string | null
     "First full session booked: consent form and payment information emailed to the client.",
   ]);
   return true;
+}
+
+/** Hourly: a consent form sent 72 hours ago and not signed yet: the client is reminded once, the counsellor told. */
+export async function remindUnsignedConsents(now = new Date()): Promise<number> {
+  const { rows } = await pool.query<{ id: string; email: string; first_name: string; counsellor_email: string | null }>(
+    `SELECT r.id, r.email, r.first_name, s.email AS counsellor_email
+     FROM support_requests r LEFT JOIN staff s ON s.id = r.assigned_to
+     WHERE r.kind = 'private' AND r.status NOT IN ('completed', 'closed') AND r.consent_reminded_at IS NULL
+       AND r.consent_form_sent_at < $1::timestamptz - interval '72 hours'
+       AND NOT EXISTS (SELECT 1 FROM consent_forms WHERE request_id = r.id)`,
+    [now],
+  );
+  const { consentReminderEmail, consentUnsignedStaffEmail } = await import("./email");
+  let sent = 0;
+  for (const r of rows) {
+    try {
+      await sendEmail(consentReminderEmail(r.email, r.first_name, await consentLink(r.id)));
+      await pool.query("UPDATE support_requests SET consent_reminded_at = now() WHERE id = $1", [r.id]);
+      await pool.query("INSERT INTO request_notes (request_id, body) VALUES ($1, $2)", [
+        r.id,
+        "Consent form not signed within 72 hours: the client was sent a reminder.",
+      ]);
+      if (r.counsellor_email) await sendEmail(consentUnsignedStaffEmail(r.counsellor_email, r.first_name, r.id)).catch(() => undefined);
+      sent++;
+    } catch (err) {
+      console.error("EAP consent reminder failed:", err);
+    }
+  }
+  return sent;
 }

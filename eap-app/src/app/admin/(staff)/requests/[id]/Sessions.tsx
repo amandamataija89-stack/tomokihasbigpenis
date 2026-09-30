@@ -83,6 +83,7 @@ export function Sessions({
   defaultPrice = null,
   manager = false,
   error,
+  consentMissing = false,
 }: {
   requestId: string;
   kind: ClientKind;
@@ -91,6 +92,7 @@ export function Sessions({
   sessions: ClientSession[];
   clientEmail: string;
   error?: string;
+  consentMissing?: boolean; // a private client who hasn't signed the consent form: sessions can't start
 }) {
   const limit = sessionLimit(kind);
   const paying = kind === "private";
@@ -134,6 +136,15 @@ export function Sessions({
       {error === "email" && <p className="err" role="alert">Enter an email address like name@example.com.</p>}
       {error === "emailsaved" && <p className="flash" role="status">Client email saved.</p>}
       {error === "date" && <p className="err" role="alert">Choose a date and time for the session.</p>}
+      {error === "noconsent" && (
+        <p className="err" role="alert">The client hasn&apos;t signed the consent form yet, so this session can&apos;t be started or marked done.</p>
+      )}
+      {consentMissing && sessions.some((x) => !x.is_discovery && !x.done_at) && (
+        <p className="notice small">
+          <b>Consent form not signed yet.</b> Don&apos;t start a counselling session until the client has signed it (the free
+          discovery session is fine).
+        </p>
+      )}
       {error === "full" && limit && (
         <p className="err" role="alert">This client already has {limit} sessions booked.</p>
       )}

@@ -75,6 +75,7 @@ export type RequestRow = {
   invoice_per_session: boolean; // a separate invoice for each session instead of a monthly one // STUDENT_DISCOUNT_PERCENT off
   variable_symbol: string | null; // private clients: on all their invoices
   address: string; // private clients: residential address from the sign-up form
+  consent_requested_at: Date | null;
   consent_form_sent_at: Date | null; // when the client was last emailed the link to sign the consent form
   discovery_offered_at: Date | null; // steps with a private client (see Steps on the case page)
   intake_sent_at: Date | null;

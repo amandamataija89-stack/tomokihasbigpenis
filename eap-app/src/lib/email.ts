@@ -580,3 +580,39 @@ export function paymentAfterSession(
     attachments: [{ filename: `qr-platba-${p.variableSymbol}.png`, content: p.qrPngBase64 }],
   };
 }
+
+/** To the coordinator: the counsellor asks for the consent form and payment details to be sent. */
+export function consentToSendAlert(to: string, clientNickname: string, counsellorName: string, requestId: string): Mail {
+  return {
+    to,
+    subject: `Please send the onboarding details: ${clientNickname}`,
+    text: `${counsellorName} says ${clientNickname} would like to start counselling. Please send them the onboarding details, the consent form and payment details (Steps with this client → "Send onboarding details"):\n${appUrl()}/admin/requests/${requestId}#steps\n`,
+  };
+}
+
+/** To the counsellor (and coordinators): the client signed the consent form. */
+export function consentSignedStaffEmail(to: string, clientNickname: string, requestId: string): Mail {
+  return {
+    to,
+    subject: `${clientNickname} signed the consent form`,
+    text: `${clientNickname} has signed the informed consent form. You can start their counselling sessions now.\n\n${appUrl()}/admin/requests/${requestId}#consent\n`,
+  };
+}
+
+/** To the counsellor: the client hasn't signed within 72 hours; they were reminded. */
+export function consentUnsignedStaffEmail(to: string, clientNickname: string, requestId: string): Mail {
+  return {
+    to,
+    subject: `${clientNickname} hasn't signed the consent form yet`,
+    text: `${clientNickname} hasn't signed the consent form 72 hours after it was sent. We've emailed them a reminder. Please don't start a counselling session until it's signed.\n\n${appUrl()}/admin/requests/${requestId}#consent\n`,
+  };
+}
+
+/** To the client: a reminder to sign the consent form. */
+export function consentReminderEmail(to: string, firstName: string, link: string): Mail {
+  return {
+    to,
+    subject: "Reminder: please sign your consent form – Prague Integration",
+    text: `Hi ${firstName},\n\nA friendly reminder to read and sign our informed consent form. We need it before your first counselling session (about 5 minutes):\n\n${link}\n\n(Keep this link to yourself.)\n\nThank you,\nPrague Integration\n+420 608 573 256\ncontact@pragueintegration.cz\n`,
+  };
+}

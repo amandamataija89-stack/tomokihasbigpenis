@@ -612,12 +612,6 @@ export async function addSession(requestId: string, formData: FormData) {
     `Session booked for ${pragueLabel(startsAt)}.${fromPackage ? " Paid from the client's package." : ""}${emailed}`,
   );
   await syncStatusWithSessions(requestId, staff.id);
-  // The first booking asks the client to sign the informed consent form (once).
-  // The first full (paid) session of a private client: the consent form and how payment works.
-  if (rows[0].kind === "private") {
-    const { startCounselling } = await import("@/lib/consent");
-    await startCounselling(requestId, staff.id).catch((err) => console.error("EAP consent email failed:", err));
-  }
   redirect(`/admin/requests/${requestId}#sessions`);
 }
 
@@ -670,7 +664,7 @@ export async function sendIntakeAction(requestId: string) {
 
 /** Emails the client the link to sign the informed consent form (again). */
 export async function sendConsentAction(requestId: string) {
-  const { staff } = await requireCase(requestId);
+  const staff = await requireManager(); // the coordinator sends the consent form
   const { sendConsentRequest } = await import("@/lib/consent");
   try {
     await sendConsentRequest(requestId, staff.id);
@@ -698,6 +692,16 @@ export async function moveSession(sessionId: string, formData: FormData) {
 export async function setSessionOutcome(sessionId: string, outcome: "done" | "late" | "undo") {
   const requestId = await sessionRequest(sessionId);
   const { staff } = await requireCase(requestId);
+  // A private client's counselling sessions can't start before the consent form is signed.
+  if (outcome !== "undo") {
+    const { rows: gate } = await pool.query<{ blocked: boolean }>(
+      `SELECT r.kind = 'private' AND NOT cs.is_discovery
+         AND NOT EXISTS (SELECT 1 FROM consent_forms WHERE request_id = r.id) AS blocked
+       FROM client_sessions cs JOIN support_requests r ON r.id = cs.request_id WHERE cs.id = $1`,
+      [sessionId],
+    );
+    if (gate[0]?.blocked) redirect(`/admin/requests/${requestId}?session=noconsent#sessions`);
+  }
   // Only acts on a real change, so a double click can't count a session twice.
   const { rowCount } = await pool.query(
     outcome === "undo"
@@ -970,4 +974,32 @@ export async function liftSuspensionAction(staffId: string) {
   const { liftSuspension } = await import("@/lib/warnings");
   await liftSuspension(staffId);
   redirect(`/admin/team/${staffId}?warning=lifted#warnings`);
+}
+
+/** The counsellor asks the coordinator to send the consent form and payment details. */
+export async function requestConsentFromCoordinatorAction(requestId: string) {
+  const { staff } = await requireCase(requestId);
+  const { rows } = await pool.query<{ first_name: string }>(
+    "UPDATE support_requests SET consent_requested_at = now(), updated_at = now() WHERE id = $1 RETURNING first_name",
+    [requestId],
+  );
+  const { coordinatorEmails } = await import("@/lib/offers");
+  const { consentToSendAlert } = await import("@/lib/email");
+  await Promise.allSettled((await coordinatorEmails()).map((to) => sendEmail(consentToSendAlert(to, rows[0].first_name, staff.name, requestId))));
+  await note(requestId, staff.id, "Informed the coordinator to send the onboarding details (consent form + payment details).");
+  redirect(`/admin/requests/${requestId}?consent=requested#steps`);
+}
+
+/** The coordinator (or an admin) sends the consent form and the payment details. */
+export async function sendConsentAndPaymentAction(requestId: string) {
+  const staff = await requireManager();
+  const { startCounselling, sendConsentRequest } = await import("@/lib/consent");
+  try {
+    // The first time: consent form + payment details; afterwards the consent form link again.
+    if (!(await startCounselling(requestId, staff.id))) await sendConsentRequest(requestId, staff.id);
+    await pool.query("UPDATE support_requests SET consent_reminded_at = NULL WHERE id = $1", [requestId]);
+  } catch (err) {
+    console.error("EAP consent email failed:", err);
+  }
+  redirect(`/admin/requests/${requestId}?consent=sent#steps`);
 }
