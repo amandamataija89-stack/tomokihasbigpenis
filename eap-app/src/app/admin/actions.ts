@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { discoveryOffer } from "@/lib/discovery-offer";
+import { DISCOVERY_MINUTES, SESSION_MINUTES, sessionIcs } from "@/lib/ics";
 import { endSession, isManager, requireManager, requireOwner, requireStaff, ROLES, startSession, type Role, type Staff } from "@/lib/auth";
 import { inviteFeedback } from "@/lib/feedback";
 import { assignWaitingAndNotify, CLIENT_TYPES, DEFAULT_MONTHLY_CAPACITY, offerToNext } from "@/lib/assign";
@@ -329,9 +330,18 @@ export async function updateMyAvailability(formData: FormData) {
   const f = availabilityFields(formData, Math.max(DEFAULT_MONTHLY_CAPACITY, rows[0]?.monthly_capacity ?? 0));
   await pool.query(
     `UPDATE staff SET takes_clients = $2, monthly_capacity = COALESCE($3, monthly_capacity), languages = $4, away_until = $5,
-       availability_note = $6, accepts = $7
+       availability_note = $6, accepts = $7, meeting_link = $8
      WHERE id = $1`,
-    [me.id, f.takesClients, f.capacity, f.languages, f.awayUntil, String(formData.get("availabilityNote") ?? "").trim().slice(0, 500), f.accepts],
+    [
+      me.id,
+      f.takesClients,
+      f.capacity,
+      f.languages,
+      f.awayUntil,
+      String(formData.get("availabilityNote") ?? "").trim().slice(0, 500),
+      f.accepts,
+      /^https:\/\/\S+$/.test(String(formData.get("meetingLink") ?? "").trim()) ? String(formData.get("meetingLink")).trim().slice(0, 300) : "",
+    ],
   );
   await assignWaitingAndNotify();
   redirect("/admin/availability?saved=1");
@@ -478,8 +488,9 @@ async function emailClient(
     number: number;
     kind: ClientKind;
     is_discovery: boolean;
+    meeting_link: string | null;
   }>(
-    `SELECT r.id AS request_id, r.email, r.first_name, r.format, r.kind, s.name AS therapist, cs.starts_at, cs.is_discovery,
+    `SELECT r.id AS request_id, r.email, r.first_name, r.format, r.kind, s.name AS therapist, s.meeting_link, cs.starts_at, cs.is_discovery,
        (SELECT count(*)::int FROM client_sessions o
         WHERE o.request_id = r.id AND o.starts_at <= cs.starts_at AND NOT o.is_discovery) AS number
      FROM client_sessions cs
@@ -494,6 +505,17 @@ async function emailClient(
   const { sessionPayment } = await import("@/lib/session-qr");
   const pay = kind !== "cancelled" && !r.is_discovery ? await sessionPayment(sessionId) : null;
   const { qrPng } = pay ? await import("@/lib/invoice-pdf") : { qrPng: null };
+  const online = r.is_discovery || r.format === "Online";
+  const calendar = sessionIcs({
+    id: sessionId,
+    start: r.starts_at,
+    minutes: r.is_discovery ? DISCOVERY_MINUTES : SESSION_MINUTES,
+    summary: `${r.is_discovery ? "Free discovery session" : "Counselling session"}${r.therapist ? ` with ${r.therapist}` : ""} – Prague Integration`,
+    location: online ? r.meeting_link || "Online" : r.format === "In person in Prague" ? "Prague Integration, Mezibranská 4, 110 00 Prague 1" : "",
+    description: `${online && r.meeting_link ? `Join online: ${r.meeting_link}\n` : ""}To change the time, reply to our email or call +420 608 573 256.`,
+    url: online && r.meeting_link ? r.meeting_link : undefined,
+    cancelled: kind === "cancelled",
+  });
   try {
     await sendEmail(
       sessionConfirmation({
@@ -510,6 +532,8 @@ async function emailClient(
         lateCancelHours: kind === "booked" && r.number === 1 && !r.is_discovery ? LATE_CANCEL_HOURS : undefined,
         discovery: r.is_discovery,
         intakeLink: extra.intakeLink,
+        meetingLink: r.meeting_link || undefined,
+        calendar: Buffer.from(calendar).toString("base64"),
         payment:
           pay && qrPng
             ? {

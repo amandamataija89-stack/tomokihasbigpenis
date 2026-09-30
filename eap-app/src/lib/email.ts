@@ -189,6 +189,8 @@ export type SessionEmail = {
   payment?: { amount: number; variableSymbol: string; account: string; iban: string; qrPngBase64: string };
   discovery?: boolean; // the free discovery session
   intakeLink?: string; // sent with the discovery session invitation
+  meetingLink?: string; // the counsellor's online room, for online sessions
+  calendar?: string; // the session as a calendar invitation (.ics), base64
 };
 
 // What a late cancellation costs: one of the EAP sessions, or the full fee for a private client.
@@ -200,15 +202,16 @@ export const lateCancellationPolicy = (hours: number, total: number | null) =>
   `Cancellation policy: if you need to cancel or move a session, please tell us at least ${hours} hours before it starts. A session cancelled with less notice ${lateCancelCost(total)}.`;
 
 /** Where the session happens. The free discovery session is always online; other sessions follow the client's choice. */
-export function whereText(format: string, discovery?: boolean): string {
-  if (discovery || format === "Online") return "Where: online. Your therapist will send you the details for joining.";
+export function whereText(format: string, discovery?: boolean, meetingLink?: string): string {
+  if (discovery || format === "Online")
+    return meetingLink ? `Where: online. Join here: ${meetingLink}` : "Where: online. Your therapist will send you the details for joining.";
   if (format === "In person in Prague") return "Where: Prague Integration, Mezibranská 4, 110 00 Prague 1";
   return "";
 }
 
 // Contains only practical details, nothing about why the person is coming.
 export function sessionConfirmation(s: SessionEmail): Mail {
-  const where = whereText(s.format, s.discovery) || "Your therapist will let you know whether you'll meet online or in person.";
+  const where = whereText(s.format, s.discovery, s.meetingLink) || "Your therapist will let you know whether you'll meet online or in person.";
   const withWhom = s.therapistName ? ` with ${s.therapistName}` : "";
   const subject = {
     booked: s.discovery ? `Your free discovery session: ${s.when}` : `Your session is booked: ${s.when}`,
@@ -230,9 +233,14 @@ export function sessionConfirmation(s: SessionEmail): Mail {
   const body =
     s.kind === "cancelled"
       ? `\n\nWe'll be in touch to find a new time.`
-      : `\n${s.discovery ? "Free of charge" : sessionOf(s.number, s.total)}\n${where}${policy}${intake}${pay}`;
+      : `\n${s.discovery ? "Free of charge" : sessionOf(s.number, s.total)}\n${where}${policy}${intake}${pay}${
+          s.calendar ? "\n\nTo add it to your calendar, open the attached session.ics." : ""
+        }`;
   return {
-    attachments: s.payment && s.kind !== "cancelled" ? [{ filename: "qr-platba.png", content: s.payment.qrPngBase64 }] : undefined,
+    attachments: [
+      ...(s.payment && s.kind !== "cancelled" ? [{ filename: "qr-platba.png", content: s.payment.qrPngBase64 }] : []),
+      ...(s.calendar ? [{ filename: s.kind === "cancelled" ? "cancelled-session.ics" : "session.ics", content: s.calendar }] : []),
+    ],
     to: s.to,
     subject: `${subject} – Prague Integration`,
     text: `Hi ${s.firstName},\n\n${lead[0].toUpperCase()}${lead.slice(1)}\n\n${s.when} (Prague time)${body}\n\nIf you need to change the time, ${s.messageLink ? `message us on your private page (${s.messageLink})` : "reply to this email"} or call +420 608 573 256.\n\nPrague Integration\ncontact@pragueintegration.cz\n`,
@@ -273,7 +281,7 @@ export function feedbackInvitation(to: string, firstName: string, token: string)
 }
 
 export function sessionReminder(s: Omit<SessionEmail, "kind"> & { cancelBy: string; lateCancelHours: number; final?: boolean }): Mail {
-  const where = whereText(s.format, s.discovery);
+  const where = whereText(s.format, s.discovery, s.meetingLink);
   const contact = `${s.messageLink ? `message us on your private page (${s.messageLink})` : "reply to this email"} or call +420 608 573 256`;
   const session = s.discovery ? "free discovery session" : "session";
   return {

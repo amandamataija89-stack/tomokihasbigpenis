@@ -463,3 +463,6 @@ CREATE TABLE IF NOT EXISTS access_log (
   at         timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS access_log_request_idx ON access_log (request_id, at DESC);
+
+-- The counsellor's own online meeting room (Zoom / Google Meet link), sent with online sessions.
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS meeting_link text NOT NULL DEFAULT '';

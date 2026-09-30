@@ -9,8 +9,8 @@ export default async function AvailabilityPage({ searchParams }: { searchParams:
   const sp = await searchParams;
   const [loads, { rows }] = await Promise.all([
     therapistLoads(pool, false),
-    pool.query<{ takes_clients: boolean; away_until: string | null; availability_note: string }>(
-      "SELECT takes_clients, to_char(away_until, 'YYYY-MM-DD') AS away_until, availability_note FROM staff WHERE id = $1",
+    pool.query<{ takes_clients: boolean; away_until: string | null; availability_note: string; meeting_link: string }>(
+      "SELECT takes_clients, to_char(away_until, 'YYYY-MM-DD') AS away_until, availability_note, meeting_link FROM staff WHERE id = $1",
       [me.id],
     ),
   ]);
@@ -67,6 +67,11 @@ export default async function AvailabilityPage({ searchParams }: { searchParams:
             placeholder="e.g. Mon–Wed 9:00–17:00, Thu evenings online"
           />
           <span className="small">Shown to the coordinator and admins when they assign clients.</span>
+        </div>
+        <div className="field">
+          <label htmlFor="meetingLink">My online meeting link<span className="opt">optional</span></label>
+          <input id="meetingLink" name="meetingLink" type="url" defaultValue={rows[0].meeting_link} placeholder="e.g. https://zoom.us/j/1234567890 or https://meet.google.com/abc-defg-hij" />
+          <span className="small">Your personal Zoom or Google Meet room. It&apos;s sent to clients with online sessions and in their calendar invitation.</span>
         </div>
         <AvailabilityFields
           idPrefix="me"

@@ -36,8 +36,9 @@ async function remind(now: Date, hours: number, column: "reminder_sent_at" | "re
     number: number;
     kind: ClientKind;
     is_discovery: boolean;
+    meeting_link: string;
   }>(
-    `SELECT cs.id, cs.request_id, cs.starts_at, cs.is_discovery, r.email, r.first_name, r.format, r.kind, s.name AS therapist,
+    `SELECT cs.id, cs.request_id, cs.starts_at, cs.is_discovery, r.email, r.first_name, r.format, r.kind, s.name AS therapist, s.meeting_link,
        (SELECT count(*)::int FROM client_sessions o WHERE o.request_id = r.id AND NOT o.is_discovery AND o.starts_at <= cs.starts_at) AS number
      FROM client_sessions cs
      JOIN support_requests r ON r.id = cs.request_id
@@ -61,6 +62,7 @@ async function remind(now: Date, hours: number, column: "reminder_sent_at" | "re
           format: r.format,
           therapistName: r.therapist,
           discovery: r.is_discovery,
+          meetingLink: r.meeting_link || undefined,
           final,
           lateCancelHours: LATE_CANCEL_HOURS,
           messageLink: await clientMessageLink(r.request_id),
