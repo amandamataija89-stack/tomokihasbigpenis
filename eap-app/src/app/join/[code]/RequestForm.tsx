@@ -128,21 +128,6 @@ export function RequestForm({ code }: { code: string | null }) {
             </span>
             {err("fullName")}
           </div>
-          {code === null && (
-            <div className="field">
-              <label htmlFor="address">Residential address</label>
-              <textarea
-                id="address"
-                name="address"
-                rows={3}
-                autoComplete="street-address"
-                defaultValue={v.address}
-                placeholder={"Street and number\nPostcode and town"}
-                {...invalid("address")}
-              />
-              {err("address")}
-            </div>
-          )}
         </div>
         <div className="row">{select("ageRange", "Age", AGE_RANGES)}</div>
         <div className="row">

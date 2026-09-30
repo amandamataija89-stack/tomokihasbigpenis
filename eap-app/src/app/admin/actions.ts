@@ -332,10 +332,14 @@ export async function updateStaff(staffId: string, formData: FormData) {
 
 export async function updateMyAvailability(formData: FormData) {
   const me = await requireStaff();
-  const { rows: was } = await pool.query<{ takes_clients: boolean }>("SELECT takes_clients FROM staff WHERE id = $1", [me.id]);
+  const { rows: was } = await pool.query<{ takes_clients: boolean; suspended: boolean }>(
+    "SELECT takes_clients, suspended_at IS NOT NULL AS suspended FROM staff WHERE id = $1",
+    [me.id],
+  );
   const { rows } = await pool.query<{ monthly_capacity: number }>("SELECT monthly_capacity FROM staff WHERE id = $1", [me.id]);
   // Counsellors can go down, or up to the usual 5; a higher limit is for a coordinator to set.
   const f = availabilityFields(formData, Math.max(DEFAULT_MONTHLY_CAPACITY, rows[0]?.monthly_capacity ?? 0));
+  if (was[0]?.suspended) f.takesClients = false; // suspended: no new clients until an admin lifts it
   await pool.query(
     `UPDATE staff SET takes_clients = $2, monthly_capacity = COALESCE($3, monthly_capacity), languages = $4, away_until = $5,
        availability_note = $6, accepts = $7, meeting_link = $8
@@ -362,6 +366,8 @@ export async function updateMyAvailability(formData: FormData) {
 /** The big button on My availability: pause new clients, or start taking them again (clears "away until"). */
 export async function setTakingClientsAction(taking: boolean) {
   const me = await requireStaff();
+  const { rows: susp } = await pool.query("SELECT 1 FROM staff WHERE id = $1 AND suspended_at IS NOT NULL", [me.id]);
+  if (taking && susp.length) redirect("/admin/availability?saved=suspended");
   await pool.query(
     `UPDATE staff SET takes_clients = $2, away_until = CASE WHEN $2 THEN NULL ELSE away_until END WHERE id = $1`,
     [me.id, taking],
@@ -916,4 +922,23 @@ export async function setWaitingListAction(requestId: string, on: boolean, formD
   }
   await note(requestId, staff.id, on ? `Put on the waiting list.${told ? " The client was told by email." : ""}` : "Taken off the waiting list.");
   redirect(`/admin/requests/${requestId}?waiting=${on ? "on" : "off"}`);
+}
+
+/** A coordinator or admin sends a counsellor a formal warning; the third suspends them from new clients. */
+export async function sendWarningAction(staffId: string, formData: FormData) {
+  const me = await requireManager();
+  const reason = String(formData.get("reason") ?? "").trim().slice(0, 2000);
+  if (!reason) redirect(`/admin/team/${staffId}?warning=empty#warnings`);
+  const { issueWarning } = await import("@/lib/warnings");
+  const r = await issueWarning(staffId, me.id, reason);
+  redirect(`/admin/team/${staffId}?warning=${r.suspended ? "suspended" : r.count}#warnings`);
+}
+
+/** Admins lift a suspension (earlier warnings stop counting). */
+export async function liftSuspensionAction(staffId: string) {
+  const me = await requireManager();
+  if (me.role !== "admin") redirect(`/admin/team/${staffId}`);
+  const { liftSuspension } = await import("@/lib/warnings");
+  await liftSuspension(staffId);
+  redirect(`/admin/team/${staffId}?warning=lifted#warnings`);
 }

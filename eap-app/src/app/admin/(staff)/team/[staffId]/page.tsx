@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { requireManager, ROLE_LABELS, type Role } from "@/lib/auth";
 import { FINISHED, listRequests, sessionLimit, STATUS_LABELS, type Filter } from "@/lib/data";
 import { pool } from "@/lib/db";
+import { warningsFor, WARNINGS_BEFORE_SUSPENSION } from "@/lib/warnings";
+import { liftSuspensionAction, sendWarningAction } from "../../../actions";
 import { adminDeadline, counsellorMonth, currentMonth, monthLabel, openAdmin } from "@/lib/month-end";
 import { formatDate } from "../../../format";
 
@@ -14,7 +16,7 @@ export default async function CounsellorProfile({
   searchParams,
 }: {
   params: Promise<{ staffId: string }>;
-  searchParams: Promise<{ show?: string; month?: string }>;
+  searchParams: Promise<{ show?: string; month?: string; warning?: string }>;
 }) {
   const me = await requireManager();
   const { staffId } = await params;
@@ -30,8 +32,9 @@ export default async function CounsellorProfile({
     monthly_capacity: number;
     languages: string[];
     away_until: string | null;
+    suspended_at: Date | null;
   }>(
-    `SELECT name, email, role, takes_clients, availability_note, accepts, monthly_capacity, languages, to_char(away_until, 'YYYY-MM-DD') AS away_until
+    `SELECT name, email, role, takes_clients, suspended_at, availability_note, accepts, monthly_capacity, languages, to_char(away_until, 'YYYY-MM-DD') AS away_until
      FROM staff WHERE id = $1`,
     [staffId],
   );
@@ -39,6 +42,8 @@ export default async function CounsellorProfile({
   if (!s) notFound();
   const filter: Filter = sp.show === "all" ? "all" : "open";
   const sessionMonth = /^\d{4}-\d{2}$/.test(sp.month ?? "") ? sp.month! : currentMonth();
+  const warnings = await warningsFor(staffId);
+  const activeWarnings = warnings.filter((w) => !w.cleared_at).length;
   const [clients, month, open, { rows: sessions }] = await Promise.all([
     listRequests(filter, staffId),
     counsellorMonth(staffId, sessionMonth),
@@ -117,6 +122,54 @@ export default async function CounsellorProfile({
             ))}
             </ul>
           </div>
+        )}
+      </section>
+
+      <section className={`card stack warnings${s.suspended_at ? " suspended" : ""}`} id="warnings">
+        <h2>Warnings: {activeWarnings} of {WARNINGS_BEFORE_SUSPENSION}</h2>
+        {sp.warning === "lifted" && <p className="flash" role="status">Suspension lifted. Earlier warnings no longer count.</p>}
+        {sp.warning === "suspended" && <p className="err" role="alert">Warning sent. That was the third: {s.name} is now suspended from new clients.</p>}
+        {sp.warning && /^\d+$/.test(sp.warning) && <p className="flash" role="status">Warning {sp.warning} of {WARNINGS_BEFORE_SUSPENSION} sent to {s.name}.</p>}
+        {sp.warning === "empty" && <p className="err" role="alert">Write the reason for the warning.</p>}
+        {s.suspended_at && (
+          <div className="notice stack" style={{ gap: 8 }}>
+            <span><b>Suspended from new clients</b> since {formatDate(s.suspended_at)}. Their current clients aren&apos;t affected.</span>
+            {me.role === "admin" && (
+              <form action={liftSuspensionAction.bind(null, staffId)}>
+                <button type="submit" className="small-btn">Lift suspension</button>
+              </form>
+            )}
+          </div>
+        )}
+        {!s.suspended_at && (
+          <form action={sendWarningAction.bind(null, staffId)} className="stack" style={{ gap: 8 }}>
+            <label htmlFor="reason" className="small">
+              Reason (emailed to {s.name}). After {WARNINGS_BEFORE_SUSPENSION} warnings they&apos;re automatically suspended from new clients.
+            </label>
+            <textarea
+              id="reason"
+              name="reason"
+              rows={4}
+              defaultValue={
+                open.pastUnmarked.length
+                  ? `Sessions not marked in the app after they happened:\n${open.pastUnmarked.map((p) => `- ${p.firstName}, ${formatDate(p.startsAt)}`).join("\n")}`
+                  : ""
+              }
+            />
+            <div className="actions">
+              <button type="submit" className="danger">Send warning {activeWarnings + 1} of {WARNINGS_BEFORE_SUSPENSION}</button>
+            </div>
+          </form>
+        )}
+        {warnings.length > 0 && (
+          <ul className="small">
+            {warnings.map((w) => (
+              <li key={w.id} style={{ opacity: w.cleared_at ? 0.55 : 1 }}>
+                {formatDate(w.created_at)}{w.issued_by_name ? ` by ${w.issued_by_name}` : " (automatic)"}{w.cleared_at ? " (cleared)" : ""}:{" "}
+                <span style={{ whiteSpace: "pre-wrap" }}>{w.reason}</span>
+              </li>
+            ))}
+          </ul>
         )}
       </section>
 

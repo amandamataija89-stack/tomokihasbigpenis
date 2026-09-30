@@ -16,6 +16,7 @@ type Member = {
   invited: boolean;
   availability_note: string;
   payout_percent: number;
+  suspended: boolean;
   eap_session_fee: number;
 };
 
@@ -29,7 +30,7 @@ export default async function TeamPage({
   const [loads, { rows: members }] = await Promise.all([
     therapistLoads(pool, false),
     pool.query<Member>(
-      `SELECT id, role, takes_clients, to_char(away_until, 'YYYY-MM-DD') AS away_until, password_hash = '!' AS invited, availability_note, payout_percent, eap_session_fee
+      `SELECT id, role, takes_clients, to_char(away_until, 'YYYY-MM-DD') AS away_until, password_hash = '!' AS invited, availability_note, payout_percent, eap_session_fee, suspended_at IS NOT NULL AS suspended
        FROM staff`,
     ),
   ]);
@@ -100,7 +101,9 @@ export default async function TeamPage({
                   <span className="small">{t.email}</span>
                 </div>
                 <span className={`pill ${!available(t.id) ? "pill-closed" : full ? "pill-new" : "pill-scheduled"}`}>
-                  {!available(t.id)
+                  {m.suspended
+                    ? "Suspended"
+                    : !available(t.id)
                     ? m.invited
                       ? "Not signed up yet"
                       : m.away_until && m.away_until >= today ? `Away until ${m.away_until}` : "Not taking clients"

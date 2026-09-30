@@ -9,8 +9,8 @@ export default async function AvailabilityPage({ searchParams }: { searchParams:
   const sp = await searchParams;
   const [loads, { rows }] = await Promise.all([
     therapistLoads(pool, false),
-    pool.query<{ takes_clients: boolean; away_until: string | null; availability_note: string; meeting_link: string }>(
-      "SELECT takes_clients, to_char(away_until, 'YYYY-MM-DD') AS away_until, availability_note, meeting_link FROM staff WHERE id = $1",
+    pool.query<{ takes_clients: boolean; away_until: string | null; availability_note: string; meeting_link: string; suspended: boolean }>(
+      "SELECT suspended_at IS NOT NULL AS suspended, takes_clients, to_char(away_until, 'YYYY-MM-DD') AS away_until, availability_note, meeting_link FROM staff WHERE id = $1",
       [me.id],
     ),
   ]);
@@ -32,8 +32,14 @@ export default async function AvailabilityPage({ searchParams }: { searchParams:
       {sp.saved === "on" && <p className="flash" role="status">You&apos;re taking new clients again.</p>}
       {sp.saved === "1" && <p className="flash" role="status">Saved. New clients will be offered to you accordingly.</p>}
 
-      <section className={`card stack taking-status ${taking && !away ? "on" : "off"}`}>
-        {taking ? (
+      {sp.saved === "suspended" && <p className="err" role="alert">You&apos;re suspended from new clients, so this can&apos;t be switched on.</p>}
+      <section className={`card stack taking-status ${taking && !away && !rows[0].suspended ? "on" : "off"}`}>
+        {rows[0].suspended ? (
+          <p>
+            <b>You&apos;re suspended from new clients</b> after three formal warnings. You keep working with your current
+            clients. The management will lift it once things are in order.
+          </p>
+        ) : taking ? (
           <>
             <p>
               <b>{away ? `You're away until ${away}.` : "You're taking new clients."}</b> Your current clients aren&apos;t affected

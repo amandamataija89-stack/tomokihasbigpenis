@@ -68,7 +68,6 @@ export function AddClientForm({
         {text("email", "Email", { type: "email" })}
         {text("phone", "Phone", { type: "tel", optional: true })}
       </div>
-      {kind === "private" && text("address", "Residential address (for invoices)", { area: true, optional: true })}
       {kind === "private" && select("service", "Type of counselling", SERVICES)}
       <div className="row">
         {select("language", "Language", LANGUAGES)}

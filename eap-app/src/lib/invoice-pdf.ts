@@ -124,8 +124,10 @@ export async function loadInvoice(paymentId: string, preview = false): Promise<I
   );
   // Name, email and address come from the signed consent form; billing details set on the client's
   // profile (e.g. a company paying) take precedence, with the client still named on the invoice.
+  // The invoice address: their permanent address if they gave one, else their address in Prague.
   const { rows: consent } = await pool.query<{ full_name: string; home_address: string; email: string }>(
-    "SELECT full_name, home_address, email FROM consent_forms WHERE request_id = $1 ORDER BY signed_at DESC LIMIT 1",
+    `SELECT full_name, COALESCE(NULLIF(home_address, ''), local_address) AS home_address, email
+     FROM consent_forms WHERE request_id = $1 ORDER BY signed_at DESC LIMIT 1`,
     [p.request_id],
   );
   const c = consent[0];
@@ -267,22 +269,23 @@ export async function renderInvoice(d: InvoiceData): Promise<Uint8Array> {
 
   // Payment box: how and when it was paid, or how to pay it (with a QR Platba code).
   const unpaid = d.paidOn === null;
-  const boxH = unpaid && d.qr ? 104 : 66;
-  y -= 14;
-  page.drawRectangle({ x: L, y: y - boxH + 8, width: R - L, height: boxH, color: rgb(0.95, 0.97, 0.96) });
   const pay: [string, string][] = (
     [
       unpaid
         ? ["Způsob úhrady / Payment", "Bankovní převod / Bank transfer"]
         : ["Způsob úhrady / Payment", `${METHOD_CS[d.method] ?? d.method} / ${d.method}`],
       unpaid
-        ? ["Datum splatnosti / Due date", d.dueOn ? isoDay(d.dueOn) : "—"]
+        ? ["Datum splatnosti / Due date", d.dueOn ? isoDay(d.dueOn) : d.draft ? `${s.dueDays} dní po vystavení / ${s.dueDays} days after issue` : "—"]
         : ["Uhrazeno dne / Paid on", isoDay(d.paidOn!)],
       ["Variabilní symbol", d.variableSymbol],
       s.bankAccount ? ["Účet / Account", s.bankAccount] : null,
       s.iban ? ["IBAN", s.iban] : null,
     ] as ([string, string] | null)[]
   ).filter((x): x is [string, string] => !!x);
+  // Tall enough for every line, and for the QR code when there is one.
+  const boxH = Math.max(pay.length * 18 + 14, unpaid && d.qr ? 104 : 0);
+  y -= 14;
+  page.drawRectangle({ x: L, y: y - boxH + 8, width: R - L, height: boxH, color: rgb(0.95, 0.97, 0.96) });
   pay.forEach(([k, v], i) => {
     const yy = y - 6 - i * 18;
     text(page, k, L + 10, yy, { size: 8, color: muted });

@@ -81,7 +81,7 @@ export function validateRequest(form: FormData, isPrivate = false): ValidationRe
     gender: text(form, "gender", 40),
     location: text(form, "location", 120),
     service: askService ? text(form, "service", 60) : "",
-    address: isPrivate ? text(form, "address", 300) : "",
+    address: "", // asked for in the consent form, not when signing up
   };
   const errors: FieldErrors = {};
 
@@ -89,8 +89,6 @@ export function validateRequest(form: FormData, isPrivate = false): ValidationRe
     errors.service = "Choose the kind of support you need.";
   if (isPrivate && values.fullName.split(/\s+/).filter(Boolean).length < 2)
     errors.fullName = "Enter your first name and surname, as they should appear on your invoices.";
-  if (isPrivate && values.address.length < 8)
-    errors.address = "Enter your residential address: street and number, postcode and town.";
   if (!values.firstName) errors.firstName = "Enter a nickname: any name you'd like us to call you.";
   if (!EMAIL_RE.test(values.email)) errors.email = "Enter an email address like name@example.com.";
   if (!(CONTACT_METHODS as readonly string[]).includes(values.contactMethod))

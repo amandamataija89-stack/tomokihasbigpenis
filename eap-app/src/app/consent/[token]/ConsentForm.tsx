@@ -34,8 +34,8 @@ export function ConsentForm({ token, email, fullName, address }: { token: string
       <section className="form-section">
         <h2>Client contact information</h2>
         {text("fullName", "Client's name and surname", fullName)}
-        {text("homeAddress", "Permanent home address", address, { area: true })}
-        {text("localAddress", "Local address (if different)", "", { optional: true, area: true })}
+        {text("localAddress", "Residential address in Prague", address, { area: true })}
+        {text("homeAddress", "Permanent address, if different (e.g. abroad)", "", { optional: true, area: true })}
         <div className="row">
           {text("phone", "Contact telephone number", "", { type: "tel" })}
           {text("email", "Email address", email, { type: "email" })}
@@ -44,6 +44,7 @@ export function ConsentForm({ token, email, fullName, address }: { token: string
 
       <section className="form-section">
         <h2>Emergency contact</h2>
+        <p className="small">Required: someone we may contact if we have serious concerns for your safety. Please let them know.</p>
         {text("emergencyName", "Name of contact")}
         {text("emergencyContact", "Relationship, email / telephone")}
         {text("otherInfo", "Any other relevant information", "", { optional: true, area: true })}

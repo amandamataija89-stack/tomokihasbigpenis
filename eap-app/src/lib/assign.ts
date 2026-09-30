@@ -101,7 +101,7 @@ export async function therapistLoads(db: Queryable = pool, onlyTakingClients = t
     accepts: string[];
   }>(
     `SELECT s.id, s.name, s.email, s.monthly_capacity, s.languages, s.accepts,
-       (s.takes_clients AND s.password_hash <> '!'
+       (s.takes_clients AND s.suspended_at IS NULL AND s.password_hash <> '!'
          AND (s.away_until IS NULL OR s.away_until < (now() AT TIME ZONE 'Europe/Prague')::date)) AS available,
        count(r.id) FILTER (WHERE r.assigned_at >= ${MONTH_START_SQL} AND r.kind = 'eap')::int AS assigned,
        max(r.assigned_at) FILTER (WHERE r.kind = 'eap') AS last_assigned_at
@@ -109,7 +109,7 @@ export async function therapistLoads(db: Queryable = pool, onlyTakingClients = t
      ${
        onlyTakingClients
          ? // Available: taking clients, not away, and has set a password (so can sign in to accept).
-           `WHERE s.takes_clients AND s.password_hash <> '!'
+           `WHERE s.takes_clients AND s.suspended_at IS NULL AND s.password_hash <> '!'
               AND (s.away_until IS NULL OR s.away_until < (now() AT TIME ZONE 'Europe/Prague')::date)`
          : ""
      }

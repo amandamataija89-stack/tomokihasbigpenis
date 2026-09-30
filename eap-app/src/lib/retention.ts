@@ -82,7 +82,7 @@ export async function eraseClient(id: string): Promise<"deleted" | "reduced"> {
   // Invoices take the name and address from the consent form: keep them on the client before it goes.
   await pool.query(
     `UPDATE support_requests r SET full_name = COALESCE(NULLIF(c.full_name, ''), r.full_name), address = COALESCE(NULLIF(c.home_address, ''), r.address)
-     FROM (SELECT full_name, home_address FROM consent_forms WHERE request_id = $1 ORDER BY signed_at DESC LIMIT 1) c
+     FROM (SELECT full_name, COALESCE(NULLIF(home_address, ''), local_address) AS home_address FROM consent_forms WHERE request_id = $1 ORDER BY signed_at DESC LIMIT 1) c
      WHERE r.id = $1`,
     [id],
   );

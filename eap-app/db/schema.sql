@@ -478,3 +478,22 @@ ALTER TABLE staff ADD COLUMN IF NOT EXISTS eap_session_fee integer NOT NULL DEFA
 
 -- Invoices stay in the app; they're emailed only to clients who asked for them by email.
 ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS email_invoices boolean NOT NULL DEFAULT false;
+
+-- Counsellor warnings: formal warnings (e.g. sessions not marked done after they happened). At 3
+-- active warnings the counsellor is suspended from new clients until an admin lifts it.
+CREATE TABLE IF NOT EXISTS staff_warnings (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  staff_id   uuid NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+  reason     text NOT NULL,
+  issued_by  uuid REFERENCES staff(id) ON DELETE SET NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  cleared_at timestamptz -- when a suspension was lifted (warnings no longer count)
+);
+CREATE INDEX IF NOT EXISTS staff_warnings_staff_idx ON staff_warnings (staff_id, created_at DESC);
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS suspended_at timestamptz;
+-- A session not marked done 24 hours after it: the counsellor was reminded (once).
+ALTER TABLE client_sessions ADD COLUMN IF NOT EXISTS unmarked_reminded_at timestamptz;
+-- How many reminders a counsellor has had about this unmarked session (1 at 24 h, 2 at 48 h; at 72 h
+-- the owner is told and the counsellor gets a formal warning).
+ALTER TABLE client_sessions ADD COLUMN IF NOT EXISTS unmarked_reminders integer NOT NULL DEFAULT 0;
+UPDATE client_sessions SET unmarked_reminders = 1 WHERE unmarked_reminded_at IS NOT NULL AND unmarked_reminders = 0;

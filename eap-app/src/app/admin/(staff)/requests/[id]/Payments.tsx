@@ -74,6 +74,7 @@ export function Payments({
   pdf,
   manager,
   emailInvoices = false,
+  admin = false,
 }: {
   requestId: string;
   sessions: ClientSession[];
@@ -84,6 +85,7 @@ export function Payments({
   pdf?: string; // an invoice just created, to offer for download
   manager: boolean; // counsellors see the amounts only, not invoices
   emailInvoices?: boolean; // the client asked for invoices by email
+  admin?: boolean; // only admins export (download) invoices
 }) {
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Prague" }).format(new Date());
   const number = new Map(sessions.map((s, i) => [s.id, i + 1]));
@@ -136,7 +138,7 @@ export function Payments({
         <div className="flash actions" role="status" style={{ justifyContent: "space-between", gap: 8 }}>
           <span>Invoice created (not emailed).</span>
           <span className="actions" style={{ gap: 8 }}>
-            <a className="button small-btn" href={`/admin/invoices/${pdf}?download=1`} download>Download invoice PDF</a>
+            {admin && <a className="button small-btn" href={`/admin/invoices/${pdf}?download=1`} download>Export invoice (PDF)</a>}
             <a className="button ghost small-btn" href={`/admin/invoices/${pdf}`} target="_blank" rel="noopener">Open</a>
           </span>
         </div>
@@ -186,11 +188,13 @@ export function Payments({
               </label>
               <div className="actions" style={{ gap: 8 }}>
                 <button formAction={createInvoiceAction.bind(null, requestId)}>Create invoice to pay (due in 14 days)</button>
-                <button formAction={createInvoiceAndDownloadAction.bind(null, requestId)} className="ghost">
-                  Create invoice and download PDF
-                </button>
+                {admin && (
+                  <button formAction={createInvoiceAndDownloadAction.bind(null, requestId)} className="ghost">
+                    Create invoice and export PDF
+                  </button>
+                )}
               </div>
-              <span className="small">&quot;Download&quot; opens the PDF to save or print, without emailing it.</span>
+              {admin && <span className="small">&quot;Export&quot; gives you the PDF to save or print, without emailing it.</span>}
             </div>
             <div className="pay-choice">
               <h3>Already paid</h3>
@@ -313,9 +317,9 @@ export function Payments({
                 <a className="button ghost small-btn" href={`/admin/invoices/${p.id}`} target="_blank" rel="noopener">
                   {p.invoice_number ? "Open invoice" : p.paid_on ? "Create invoice PDF" : "Preview PDF"}
                 </a>
-                {p.invoice_number && (
+                {admin && (
                   <a className="button ghost small-btn" href={`/admin/invoices/${p.id}?download=1`} download>
-                    Download invoice
+                    {p.invoice_number ? "Export invoice (PDF)" : p.period ? "Export monthly invoice (PDF)" : "Export PDF"}
                   </a>
                 )}
                 {(p.invoice_number || p.paid_on) && (
