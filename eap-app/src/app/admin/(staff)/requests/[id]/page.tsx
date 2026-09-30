@@ -301,7 +301,7 @@ export default async function RequestPage({
               pdf={sp.pdf}
               manager={manager}
               emailInvoices={r.email_invoices}
-              admin={me.role === "admin"}
+              admin={isOwner(me)}
             />
           )}
         </div>
@@ -338,7 +338,7 @@ export default async function RequestPage({
           </form>
 
           {isPrivate && settings && (
-            <BillingProfile r={r} range={priceRange} vatPayer={settings.vatPayer} vatRate={settings.vatRate} manager={manager} flash={sp.billing} consent={signedConsent} admin={me.role === "admin"} />
+            <BillingProfile r={r} range={priceRange} vatPayer={settings.vatPayer} vatRate={settings.vatRate} manager={manager} flash={sp.billing} consent={signedConsent} admin={isOwner(me)} />
           )}
 
           <section className="card stack counsellor-notes" id="counsellor-notes">

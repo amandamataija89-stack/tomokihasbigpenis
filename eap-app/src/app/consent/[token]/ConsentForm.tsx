@@ -67,6 +67,9 @@ export function ConsentForm({ token, email, fullName, address }: { token: string
           </label>
           {err("agree")}
         </div>
+        <p className="small">
+          How we look after your data: our <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a>.
+        </p>
         {text("signedName", minor ? "Type the parent's or guardian's full name" : "Type your full name")}
         <div className="field">
           <label>Signature</label>

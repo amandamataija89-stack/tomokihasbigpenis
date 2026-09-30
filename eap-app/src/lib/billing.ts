@@ -650,6 +650,19 @@ export async function addToMonthlyInvoice(sessionId: string): Promise<string | n
   );
   const s = rows[0];
   if (!s || s.kind !== "private" || s.price_czk === null) return null;
+  // Invoiced per session: this session gets its own invoice, issued now (emailed only if the client asked).
+  const { rows: mode } = await pool.query<{ per_session: boolean; email: boolean }>(
+    "SELECT invoice_per_session AS per_session, email_invoices AS email FROM support_requests WHERE id = $1",
+    [s.request_id],
+  );
+  if (mode[0]?.per_session) {
+    const id = await createInvoiceToPay({ requestId: s.request_id, sessionIds: [sessionId], amount: null, staffId: null });
+    if (id && mode[0].email) {
+      const { sendInvoice } = await import("./invoice-mail");
+      await sendInvoice(id).catch((err) => console.error("EAP session invoice email failed:", err));
+    }
+    return id;
+  }
   const period = monthOfSession(s.starts_at);
   const id = await inTransaction(async (c) => {
     // One running invoice per client and month.

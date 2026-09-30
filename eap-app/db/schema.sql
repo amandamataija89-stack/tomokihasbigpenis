@@ -497,3 +497,7 @@ ALTER TABLE client_sessions ADD COLUMN IF NOT EXISTS unmarked_reminded_at timest
 -- the owner is told and the counsellor gets a formal warning).
 ALTER TABLE client_sessions ADD COLUMN IF NOT EXISTS unmarked_reminders integer NOT NULL DEFAULT 0;
 UPDATE client_sessions SET unmarked_reminders = 1 WHERE unmarked_reminded_at IS NOT NULL AND unmarked_reminders = 0;
+
+-- A private client can be invoiced for each session separately (issued when it's marked done) instead of
+-- one monthly invoice.
+ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS invoice_per_session boolean NOT NULL DEFAULT false;

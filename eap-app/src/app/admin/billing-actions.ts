@@ -164,8 +164,8 @@ export async function saveClientBilling(requestId: string, formData: FormData) {
   if (b.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(b.email)) back(requestId, "email");
   await pool.query(
     `UPDATE support_requests SET billing_name = $2, billing_address = $3, billing_ico = $4,
-       billing_dic = $5, billing_email = $6, email_invoices = $7, updated_at = now() WHERE id = $1`,
-    [requestId, b.name, b.address, b.ico, b.dic, b.email, formData.get("emailInvoices") === "yes"],
+       billing_dic = $5, billing_email = $6, email_invoices = $7, invoice_per_session = $8, updated_at = now() WHERE id = $1`,
+    [requestId, b.name, b.address, b.ico, b.dic, b.email, formData.get("emailInvoices") === "yes", formData.get("invoicing") === "session"],
   );
   await note(requestId, staff.id, "Billing details updated.");
   back(requestId, "saved");
