@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { discoveryOffer } from "@/lib/discovery-offer";
 import { DISCOVERY_MINUTES, SESSION_MINUTES, sessionIcs } from "@/lib/ics";
-import { endSession, isManager, isOwner, requireManager, requireOwner, requireStaff, ROLES, startSession, type Role, type Staff } from "@/lib/auth";
+import { endSession, isManager, isOwner, requireAdmin, requireManager, requireOwner, requireStaff, ROLES, startSession, type Role, type Staff } from "@/lib/auth";
 import { inviteFeedback } from "@/lib/feedback";
 import { assignWaitingAndNotify, CLIENT_TYPES, DEFAULT_MONTHLY_CAPACITY, offerToNext } from "@/lib/assign";
 import { generateCompanyCode } from "@/lib/codes";
@@ -145,8 +145,8 @@ export async function updateRequest(requestId: string, formData: FormData) {
       staff.id,
       `Status changed from ${STATUS_LABELS[rows[0].status]} to ${STATUS_LABELS[status]}.`,
     ]);
-    // Private clients have no session limit, so staff complete their case by hand.
-    if (status === "completed" && rows[0].kind === "private") await sendFeedbackOnce(requestId, staff.id);
+    // Completing a case by hand (any client) emails the anonymous feedback link, once per case.
+    if (status === "completed") await sendFeedbackOnce(requestId, staff.id);
   }
   revalidatePath(`/admin/requests/${requestId}`);
   redirect(`/admin/requests/${requestId}?saved=1`);
@@ -205,7 +205,7 @@ export async function addNote(requestId: string, formData: FormData) {
 }
 
 export async function deleteRequest(requestId: string, formData: FormData) {
-  const me = await requireManager();
+  const me = await requireAdmin(); // only admins delete client profiles
   if (formData.get("confirm") !== "yes") redirect(`/admin/requests/${requestId}?confirmDelete=1`);
   const { eraseClient } = await import("@/lib/retention");
   const result = await eraseClient(requestId, { test: isOwner(me) && formData.get("test") === "yes" });
