@@ -26,7 +26,7 @@ export default async function RequestsPage({
   const manager = isManager(me);
   const filters: Filter[] = manager
     ? ["open", "crisis", "pool", "awaiting", "private", ...STATUSES, "all"]
-    : ["open", "crisis", "awaiting", "private", ...STATUSES.filter((s) => s !== "scheduled"), "all", "pool"];
+    : ["open", "crisis", "awaiting", "private", ...STATUSES.filter((s) => s !== "scheduled"), "all"];
   const labels: Record<Filter, string> = {
     open: "Open",
     pool: manager ? "To assign" : "Pool: clients anyone can take",
@@ -74,7 +74,7 @@ export default async function RequestsPage({
         </div>
         <p className="lede">
           {summary.length ? `${summary.join(" · ")}.` : manager ? "Nothing waiting to be assigned." : "No new clients waiting for your answer."}
-          {!manager && " You only see your own clients, and the pool."}
+          {!manager && " You only see the clients assigned to you."}
         </p>
       </div>
       {sp.deleted && (

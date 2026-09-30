@@ -346,6 +346,7 @@ export async function declineCase(requestId: string, formData: FormData) {
 
 export async function takeCase(requestId: string) {
   const staff = await requireStaff();
+  if (!isManager(staff)) redirect("/admin"); // the pool is for coordinators and admins only
   const ok = await takeFromPool(requestId, staff.id);
   redirect(ok ? `/admin/requests/${requestId}?taken=1` : "/admin?status=pool&gone=1");
 }

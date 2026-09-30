@@ -136,8 +136,8 @@ export async function listRequests(filter: Filter, onlyFor?: string): Promise<Re
   if (filter === "open" || filter === "pool" || filter === "awaiting" || filter === "private" || filter === "crisis")
     where.push(FILTER_SQL[filter]);
   else if (filter !== "all") where.push(`r.status = $${params.push(filter)}`);
-  if (onlyFor && filter !== "pool") where.push(`r.assigned_to = $${params.push(onlyFor)}`);
-  if (onlyFor && filter === "pool") where.push("r.kind = 'eap'");
+  // Counsellors only ever see the clients assigned to them (the pool is for coordinators and admins).
+  if (onlyFor) where.push(`r.assigned_to = $${params.push(onlyFor)}`);
   const { rows } = await pool.query<RequestRow>(
     `${REQUEST_SELECT} ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
      ORDER BY (r.crisis AND r.status NOT IN ('completed', 'closed')) DESC, (r.status = 'new') DESC, r.created_at DESC

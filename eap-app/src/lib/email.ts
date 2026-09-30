@@ -452,7 +452,7 @@ export function counsellingStartEmail(
 export function lateDiscoveryOffer(to: string, clientNickname: string, requestId: string, counsellorName: string, crisis: boolean): Mail {
   return {
     to,
-    subject: `${crisis ? "URGENT – " : ""}No reply in 24 hours: ${clientNickname} – please reassign`,
-    text: `${clientNickname}${crisis ? " (crisis)" : ""} was assigned to ${counsellorName} more than 24 hours ago, and they haven't been offered the free discovery session or contacted yet.\n\nWe promise clients another counsellor after 24 hours. Please reassign them (Follow-up → Counsellor) or check with ${counsellorName}:\n${appUrl()}/admin/requests/${requestId}\n`,
+    subject: `${crisis ? "URGENT – " : ""}Back in the pool: ${clientNickname} – not contacted in 24 hours`,
+    text: `${clientNickname}${crisis ? " (crisis)" : ""} was assigned to ${counsellorName} more than 24 hours ago and hasn't been offered the free discovery session or contacted. We promise clients another counsellor after 24 hours, so they're back in the pool.\n\nPlease assign another counsellor (Follow-up → Counsellor):\n${appUrl()}/admin/requests/${requestId}\n`,
   };
 }

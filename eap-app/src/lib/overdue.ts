@@ -63,8 +63,8 @@ export async function warnOverdue(now = new Date()): Promise<{ warned: number; m
 
 /**
  * Hourly: a private client whose counsellor hasn't offered the free discovery session (or messaged or
- * booked them) within 24 hours of being assigned. The coordinators are told once, to reassign: the
- * offer message promises another counsellor after 24 hours.
+ * booked them) within 24 hours of being assigned goes back to the pool (only coordinators and admins
+ * see it), and they're told, to assign someone else: we promise another counsellor after 24 hours.
  */
 export async function alertLateDiscoveryOffers(now = new Date()): Promise<number> {
   const { rows } = await pool.query<{ id: string; first_name: string; crisis: boolean; counsellor: string | null; assigned_at: Date }>(
@@ -80,10 +80,15 @@ export async function alertLateDiscoveryOffers(now = new Date()): Promise<number
   const to = await coordinatorEmails();
   for (const r of rows) {
     await Promise.allSettled(to.map((t) => sendEmail(lateDiscoveryOffer(t, r.first_name, r.id, r.counsellor ?? "their counsellor", r.crisis))));
-    await pool.query("UPDATE support_requests SET offer_late_alerted_at = now() WHERE id = $1", [r.id]);
+    await pool.query(
+      `UPDATE support_requests SET offer_late_alerted_at = now(), assigned_to = NULL, assigned_at = NULL, accepted_at = NULL,
+         respond_by = NULL, status = 'new', updated_at = now()
+       WHERE id = $1`,
+      [r.id],
+    );
     await pool.query("INSERT INTO request_notes (request_id, body) VALUES ($1, $2)", [
       r.id,
-      `No discovery session offer within 24 hours of ${r.counsellor ?? "the counsellor"} being assigned: the coordinator has been told, to reassign.`,
+      `Not contacted within 24 hours of ${r.counsellor ?? "the counsellor"} being assigned: back in the pool for the coordinator to assign someone else.`,
     ]);
   }
   return rows.length;
