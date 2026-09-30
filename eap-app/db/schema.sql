@@ -438,3 +438,28 @@ CREATE TABLE IF NOT EXISTS crisis_checklists (
   updated_at      timestamptz NOT NULL DEFAULT now(),
   updated_by      uuid REFERENCES staff(id) ON DELETE SET NULL
 );
+
+-- Two-step sign-in: after the password, a 6-digit code is emailed (valid 10 minutes, 5 tries).
+CREATE TABLE IF NOT EXISTS login_challenges (
+  token_hash text PRIMARY KEY,
+  staff_id   uuid NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+  code_hash  text NOT NULL,
+  attempts   integer NOT NULL DEFAULT 0,
+  expires_at timestamptz NOT NULL
+);
+-- Devices a staff member chose to remember for 30 days (no code needed there).
+CREATE TABLE IF NOT EXISTS trusted_devices (
+  token_hash text PRIMARY KEY,
+  staff_id   uuid NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+  expires_at timestamptz NOT NULL
+);
+
+-- Who opened which client's record, and when (GDPR accountability). Kept as long as the client record.
+CREATE TABLE IF NOT EXISTS access_log (
+  id         bigserial PRIMARY KEY,
+  request_id uuid NOT NULL REFERENCES support_requests(id) ON DELETE CASCADE,
+  staff_id   uuid REFERENCES staff(id) ON DELETE SET NULL,
+  what       text NOT NULL, -- e.g. 'Opened the record', 'Downloaded the consent form'
+  at         timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS access_log_request_idx ON access_log (request_id, at DESC);

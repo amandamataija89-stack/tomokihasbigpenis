@@ -456,3 +456,12 @@ export function lateDiscoveryOffer(to: string, clientNickname: string, requestId
     text: `${clientNickname}${crisis ? " (crisis)" : ""} was assigned to ${counsellorName} more than 24 hours ago and hasn't been offered the free discovery session or contacted. We promise clients another counsellor after 24 hours, so they're back in the pool.\n\nPlease assign another counsellor (Follow-up → Counsellor):\n${appUrl()}/admin/requests/${requestId}\n`,
   };
 }
+
+/** The second step of signing in. */
+export function loginCodeEmail(to: string, name: string, code: string, minutes: number): Mail {
+  return {
+    to,
+    subject: `Your sign-in code: ${code}`,
+    text: `Hi ${name},\n\nYour Prague Integration sign-in code is:\n\n${code}\n\nIt works for ${minutes} minutes. If you didn't just try to sign in, someone may know your password: please change it (Forgot your password? on the sign-in page) and tell Amanda.\n`,
+  };
+}

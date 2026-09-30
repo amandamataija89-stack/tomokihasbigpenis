@@ -15,6 +15,7 @@ import { ConsentCard } from "./ConsentCard";
 import { IntakeCard } from "./IntakeCard";
 import { CrisisProtocol } from "./CrisisProtocol";
 import { crisisChecklist } from "@/lib/crisis";
+import { accessLog, logAccess } from "@/lib/access-log";
 import { Steps } from "./Steps";
 import { latestIntake } from "@/lib/intake";
 import { latestConsent } from "@/lib/consent";
@@ -53,8 +54,14 @@ export default async function RequestPage({
   if (!r || (!manager && r.assigned_to !== me.id)) notFound();
   // The client's messages count as read once whoever looks after them opens the case.
   if (r.assigned_to === me.id || (!r.assigned_to && manager)) await markClientMessagesRead(id);
+  await logAccess(id, me.id, emergencyNotesRequested(sp.notes, me) ? "Opened the counsellor's private notes (emergency)" : "Opened the record");
   const isPrivate = r.kind === "private";
-  const [signedConsent, intake, crisisList] = await Promise.all([latestConsent(id), latestIntake(id), crisisChecklist(id)]);
+  const [signedConsent, intake, crisisList, access] = await Promise.all([
+    latestConsent(id),
+    latestIntake(id),
+    crisisChecklist(id),
+    manager ? accessLog(id) : Promise.resolve([]),
+  ]);
   // Counsellor-only notes: readable only by the client's counsellor; others see just how many there are.
   const isTheirCounsellor = r.assigned_to === me.id;
   // The owner can open them in an emergency; opening them is logged in the team notes.
@@ -376,6 +383,17 @@ export default async function RequestPage({
           </form>
 
           {manager && (
+            <details className="card stack access-log">
+              <summary><b>Who opened this record</b> <span className="small">({access.length ? `last ${access.length}` : "nobody yet"})</span></summary>
+              <ul className="small">
+                {access.map((a, i) => (
+                  <li key={i}>{formatDate(a.at)} · {a.staff ?? "former staff"}{a.role ? ` (${a.role})` : ""} · {a.what}</li>
+                ))}
+              </ul>
+            </details>
+          )}
+
+          {manager && (
             <form action={deleteRequest.bind(null, r.id)} className="card form" style={{ gap: 12 }}>
               <h2 style={{ fontSize: 18 }}>Delete client profile</h2>
               <p className="small">
@@ -396,3 +414,5 @@ export default async function RequestPage({
     </main>
   );
 }
+
+const emergencyNotesRequested = (notes: string | undefined, me: { owner?: boolean }) => notes === "emergency" && me.owner === true;

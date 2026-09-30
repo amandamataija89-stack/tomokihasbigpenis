@@ -1,3 +1,4 @@
+import { logAccess } from "@/lib/access-log";
 import { currentStaff, isManager } from "@/lib/auth";
 import { pool } from "@/lib/db";
 import { invoiceFileName, loadInvoice, renderInvoice } from "@/lib/invoice-pdf";
@@ -11,11 +12,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ paymentI
   if (!isManager(staff)) return new Response("Not found", { status: 404 });
   const { paymentId } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(paymentId)) return new Response("Not found", { status: 404 });
-  const { rows } = await pool.query<{ assigned_to: string | null }>(
-    "SELECT r.assigned_to FROM payments p JOIN support_requests r ON r.id = p.request_id WHERE p.id = $1",
+  const { rows } = await pool.query<{ assigned_to: string | null; id: string }>(
+    "SELECT r.assigned_to, r.id FROM payments p JOIN support_requests r ON r.id = p.request_id WHERE p.id = $1",
     [paymentId],
   );
   if (!rows[0] || (!isManager(staff) && rows[0].assigned_to !== staff.id)) return new Response("Not found", { status: 404 });
+  await logAccess(rows[0].id, staff.id, "Downloaded an invoice");
   // A running monthly invoice (a draft) is shown as a preview; it's numbered when issued.
   const data = await loadInvoice(paymentId, true);
   const pdf = await renderInvoice(data);

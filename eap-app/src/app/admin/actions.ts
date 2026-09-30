@@ -55,14 +55,13 @@ async function acceptIfPending(requestId: string, c: Awaited<ReturnType<typeof r
   if (c.assignedTo === c.staff.id && !c.acceptedAt) await acceptOffer(requestId, c.staff.id);
 }
 
-export async function login(
-  _prev: { error?: string; email?: string },
-  formData: FormData,
-): Promise<{ error?: string; email?: string }> {
+export type LoginState = { error?: string; email?: string; step?: "code"; restart?: boolean; at?: number };
+
+export async function login(_prev: LoginState, formData: FormData): Promise<LoginState> {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
-  const { rows } = await pool.query<{ id: string; password_hash: string }>(
-    "SELECT id, password_hash FROM staff WHERE email = $1",
+  const { rows } = await pool.query<{ id: string; password_hash: string; name: string; email: string }>(
+    "SELECT id, password_hash, name, email FROM staff WHERE email = $1",
     [email],
   );
   if (rows[0]?.password_hash === "!") {
@@ -76,7 +75,26 @@ export async function login(
     await new Promise((r) => setTimeout(r, 400));
     return { error: "That email and password don't match a staff login.", email };
   }
+  // Second step: a code by email, unless this device was remembered.
+  const { sendLoginCode, trustedDevice } = await import("@/lib/two-step");
+  if (!(await trustedDevice(rows[0].id))) {
+    try {
+      await sendLoginCode(rows[0]);
+    } catch (err) {
+      console.error("EAP sign-in code email failed:", err);
+      return { error: "We couldn't email your sign-in code. Please try again in a minute.", email };
+    }
+    return { step: "code", email, at: Date.now() };
+  }
   await startSession(rows[0].id);
+  redirect("/admin");
+}
+
+export async function verifyLoginCode(_prev: LoginState, formData: FormData): Promise<LoginState> {
+  const { checkLoginCode } = await import("@/lib/two-step");
+  const r = await checkLoginCode(String(formData.get("code") ?? ""), formData.get("remember") === "yes");
+  if (!r.ok) return r.restart ? { error: r.error, restart: true, at: Date.now() } : { error: r.error, step: "code" };
+  await startSession(r.staffId);
   redirect("/admin");
 }
 
