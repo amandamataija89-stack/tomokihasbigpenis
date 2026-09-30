@@ -25,7 +25,7 @@ export default async function RequestsPage({
   const me = await requireStaff();
   const manager = isManager(me);
   const filters: Filter[] = manager
-    ? ["open", "crisis", "pool", "awaiting", "private", ...STATUSES, "all"]
+    ? ["open", "crisis", "pool", "waiting", "awaiting", "private", ...STATUSES, "all"]
     : ["open", "crisis", "awaiting", "private", ...STATUSES.filter((s) => s !== "scheduled"), "all"];
   const labels: Record<Filter, string> = {
     open: "Open",
@@ -33,6 +33,7 @@ export default async function RequestsPage({
     awaiting: manager ? "Waiting to accept" : "Waiting for my answer",
     private: manager ? "Private clients" : "My private clients",
     crisis: "Crisis",
+    waiting: "Waiting list",
     ...STATUS_LABELS,
     all: "All",
   };
@@ -184,7 +185,7 @@ function OfferState({ r, manager, now }: { r: RequestRow; manager: boolean; now:
     return FINISHED.includes(r.status) ? (
       <span className="small">—</span>
     ) : (
-      <span className="overdue">{r.kind === "private" ? "Needs assigning" : "In the pool"}</span>
+      <span className="overdue">{r.waitlisted_at ? `Waiting list since ${formatDate(r.waitlisted_at)}` : r.kind === "private" ? "Needs assigning" : "In the pool"}</span>
     );
   const who = manager ? r.assigned_name : "You";
   if (r.accepted_at) return <>{who}{r.status === "new" && <div className="small">accepted</div>}</>;

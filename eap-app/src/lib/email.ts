@@ -473,3 +473,23 @@ export function loginCodeEmail(to: string, name: string, code: string, minutes: 
     text: `Hi ${name},\n\nYour Prague Integration sign-in code is:\n\n${code}\n\nIt works for ${minutes} minutes. If you didn't just try to sign in, someone may know your password: please change it (Forgot your password? on the sign-in page) and tell Amanda.\n`,
   };
 }
+
+/** Told to the client when they go on the waiting list. */
+export function waitingListEmail(to: string, firstName: string): Mail {
+  return {
+    to,
+    subject: "You're on our waiting list – Prague Integration",
+    text: `Hi ${firstName},\n\nThank you for contacting Prague Integration. All our counsellors who fit what you asked for are fully booked right now, so we've put you on our waiting list. We'll contact you as soon as a place opens.\n\nIf you need help urgently, please don't wait: call 112 (emergency, English spoken) or the crisis line 116 123 (free, 24/7).\n\nPrague Integration\n+420 608 573 256\ncontact@pragueintegration.cz\n`,
+  };
+}
+
+/** A counsellor became available and waiting clients match them. */
+export function waitingListMatches(to: string, counsellorName: string, clients: { id: string; first_name: string; language: string; service: string }[]): Mail {
+  return {
+    to,
+    subject: `${counsellorName} is taking new clients: ${clients.length} on the waiting list match`,
+    text: `${counsellorName} has started taking new clients again. These clients on the waiting list match their languages and the clients they take:\n\n${clients
+      .map((c) => `- ${c.first_name} (${c.service || "support"}, ${c.language}): ${appUrl()}/admin/requests/${c.id}`)
+      .join("\n")}\n\nAssign them under Follow-up → Counsellor.\n`,
+  };
+}

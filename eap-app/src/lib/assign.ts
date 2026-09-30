@@ -159,7 +159,7 @@ async function assignOne(
   const deadline = respondBy(new Date(), crisis);
   await client.query(
     `UPDATE support_requests SET assigned_to = $2, assigned_at = now(), accepted_at = NULL, respond_by = $3,
-       in_pool = false, overdue_warned_at = NULL, offer_reminded_at = NULL, updated_at = now() WHERE id = $1`,
+       in_pool = false, overdue_warned_at = NULL, offer_reminded_at = NULL, waitlisted_at = NULL, updated_at = now() WHERE id = $1`,
     [requestId, t.id, deadline],
   );
   const skipped = loads.filter((x) => x.assignedThisMonth >= x.capacity).map((x) => x.name);

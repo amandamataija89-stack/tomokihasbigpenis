@@ -466,3 +466,7 @@ CREATE INDEX IF NOT EXISTS access_log_request_idx ON access_log (request_id, at 
 
 -- The counsellor's own online meeting room (Zoom / Google Meet link), sent with online sessions.
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS meeting_link text NOT NULL DEFAULT '';
+
+-- Waiting list: when no suitable counsellor is free, the coordinator puts the client on it. Cleared
+-- when they're assigned.
+ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS waitlisted_at timestamptz;

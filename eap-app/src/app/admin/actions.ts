@@ -325,6 +325,7 @@ export async function updateStaff(staffId: string, formData: FormData) {
 
 export async function updateMyAvailability(formData: FormData) {
   const me = await requireStaff();
+  const { rows: was } = await pool.query<{ takes_clients: boolean }>("SELECT takes_clients FROM staff WHERE id = $1", [me.id]);
   const { rows } = await pool.query<{ monthly_capacity: number }>("SELECT monthly_capacity FROM staff WHERE id = $1", [me.id]);
   // Counsellors can go down, or up to the usual 5; a higher limit is for a coordinator to set.
   const f = availabilityFields(formData, Math.max(DEFAULT_MONTHLY_CAPACITY, rows[0]?.monthly_capacity ?? 0));
@@ -344,6 +345,10 @@ export async function updateMyAvailability(formData: FormData) {
     ],
   );
   await assignWaitingAndNotify();
+  if (f.takesClients && !was[0]?.takes_clients) {
+    const { notifyWaitingMatches } = await import("@/lib/waiting-list");
+    await notifyWaitingMatches(me.id).catch((err) => console.error("EAP waiting list alert failed:", err));
+  }
   redirect("/admin/availability?saved=1");
 }
 
@@ -354,7 +359,11 @@ export async function setTakingClientsAction(taking: boolean) {
     `UPDATE staff SET takes_clients = $2, away_until = CASE WHEN $2 THEN NULL ELSE away_until END WHERE id = $1`,
     [me.id, taking],
   );
-  if (taking) await assignWaitingAndNotify();
+  if (taking) {
+    await assignWaitingAndNotify();
+    const { notifyWaitingMatches } = await import("@/lib/waiting-list");
+    await notifyWaitingMatches(me.id).catch((err) => console.error("EAP waiting list alert failed:", err));
+  }
   redirect(`/admin/availability?saved=${taking ? "on" : "paused"}`);
 }
 
@@ -879,4 +888,25 @@ export async function saveCrisisChecklistAction(requestId: string, formData: For
   ].filter(Boolean);
   if (changes.length) await note(requestId, staff.id, `Crisis protocol – ${changes.join(". ")}.`);
   redirect(`/admin/requests/${requestId}?crisisSaved=1#crisis-protocol`);
+}
+
+/** Puts an unassigned client on the waiting list (optionally telling them), or takes them off it. */
+export async function setWaitingListAction(requestId: string, on: boolean, formData: FormData) {
+  const staff = await requireManager();
+  const { rows } = await pool.query<{ email: string; first_name: string }>(
+    `UPDATE support_requests SET waitlisted_at = CASE WHEN $2 THEN now() END, updated_at = now()
+     WHERE id = $1 AND ($2 = false OR assigned_to IS NULL) RETURNING email, first_name`,
+    [requestId, on],
+  );
+  if (!rows[0]) redirect(`/admin/requests/${requestId}`);
+  let told = false;
+  if (on && formData.get("tellClient") === "yes" && rows[0].email) {
+    const { waitingListEmail } = await import("@/lib/email");
+    told = await sendEmail(waitingListEmail(rows[0].email, rows[0].first_name)).then(
+      () => true,
+      (err) => (console.error("EAP waiting list email failed:", err), false),
+    );
+  }
+  await note(requestId, staff.id, on ? `Put on the waiting list.${told ? " The client was told by email." : ""}` : "Taken off the waiting list.");
+  redirect(`/admin/requests/${requestId}?waiting=${on ? "on" : "off"}`);
 }

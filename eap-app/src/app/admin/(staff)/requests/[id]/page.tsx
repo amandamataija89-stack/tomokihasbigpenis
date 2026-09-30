@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { speaks, takesType, typesFor } from "@/lib/assign";
 import { isManager, isOwner, requireStaff } from "@/lib/auth";
 import { getRequest, listNotes, listSessions, listStaffWithLoad, STATUSES, STATUS_LABELS } from "@/lib/data";
-import { acceptCase, addCounsellorNote, openCounsellorNotesAction, addNote, setCrisisAction, declineCase, deleteRequest, emailFeedbackLink, updateRequest } from "../../../actions";
+import { acceptCase, setWaitingListAction, addCounsellorNote, openCounsellorNotesAction, addNote, setCrisisAction, declineCase, deleteRequest, emailFeedbackLink, updateRequest } from "../../../actions";
 import { contactDue } from "@/lib/deadlines";
 import { formatDate } from "../../../format";
 import { listMessages, markClientMessagesRead } from "@/lib/messages";
@@ -43,6 +43,7 @@ export default async function RequestPage({
     added?: string;
     notes?: string;
     crisisSaved?: string;
+    waiting?: string;
   }>;
 }) {
   const { id } = await params;
@@ -163,6 +164,31 @@ export default async function RequestPage({
             <textarea id="reason" name="reason" placeholder="e.g. Fully booked until November, or I know this person" />
             <div className="actions"><button type="submit" className="ghost">Decline, pass to another counsellor</button></div>
           </form>
+        </section>
+      )}
+
+      {manager && !r.assigned_to && r.status !== "completed" && r.status !== "closed" && (
+        <section className="card stack waiting-list" id="waiting-list">
+          {sp.waiting === "on" && <p className="flash" role="status">On the waiting list.</p>}
+          {sp.waiting === "off" && <p className="flash" role="status">Taken off the waiting list.</p>}
+          {r.waitlisted_at ? (
+            <form action={setWaitingListAction.bind(null, r.id, false)} className="actions" style={{ gap: 10 }}>
+              <span>
+                <b>On the waiting list</b> since {formatDate(r.waitlisted_at)}. You&apos;ll get an email when a matching counsellor
+                starts taking clients.
+              </span>
+              <button type="submit" className="ghost small-btn">Take off the waiting list</button>
+            </form>
+          ) : (
+            <form action={setWaitingListAction.bind(null, r.id, true)} className="actions" style={{ gap: 10 }}>
+              <span>No suitable counsellor free?</span>
+              <label className="consent small-consent">
+                <input type="checkbox" name="tellClient" value="yes" defaultChecked />
+                <span>Email the client that they&apos;re on the waiting list</span>
+              </label>
+              <button type="submit" className="ghost small-btn">Put on the waiting list</button>
+            </form>
+          )}
         </section>
       )}
 

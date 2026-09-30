@@ -70,7 +70,7 @@ export const declineOffer = (requestId: string, staffId: string, why: string) =>
 export async function takeFromPool(requestId: string, staffId: string): Promise<boolean> {
   const { rowCount } = await pool.query(
     `UPDATE support_requests SET assigned_to = $2, assigned_at = now(), accepted_at = now(), respond_by = NULL,
-       in_pool = false, overdue_warned_at = NULL, updated_at = now()
+       in_pool = false, overdue_warned_at = NULL, waitlisted_at = NULL, updated_at = now()
      WHERE id = $1 AND assigned_to IS NULL AND status = 'new' AND kind = 'eap'`,
     [requestId, staffId],
   );
@@ -89,7 +89,7 @@ export async function offerTo(requestId: string, counsellorId: string, byStaffId
   const deadline = alreadyAgreed ? null : respondBy(new Date(), r.crisis);
   await pool.query(
     `UPDATE support_requests SET assigned_to = $2, assigned_at = now(), in_pool = false, overdue_warned_at = NULL,
-       offer_reminded_at = NULL, offer_late_alerted_at = NULL,
+       offer_reminded_at = NULL, offer_late_alerted_at = NULL, waitlisted_at = NULL,
        accepted_at = CASE WHEN $3::timestamptz IS NULL THEN now() END, respond_by = $3, updated_at = now()
      WHERE id = $1`,
     [requestId, counsellorId, deadline],

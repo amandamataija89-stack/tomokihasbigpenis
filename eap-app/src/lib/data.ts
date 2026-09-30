@@ -89,6 +89,7 @@ export type RequestRow = {
   accepted_at: Date | null;
   respond_by: Date | null;
   in_pool: boolean;
+  waitlisted_at: Date | null;
   declined_by: string[];
   assigned_to: string | null;
   assigned_name: string | null;
@@ -115,10 +116,11 @@ const REQUEST_SELECT = `
   LEFT JOIN companies c ON c.id = r.company_id
   LEFT JOIN staff s ON s.id = r.assigned_to`;
 
-export type Filter = Status | "open" | "all" | "pool" | "awaiting" | "private" | "crisis";
+export type Filter = Status | "open" | "all" | "pool" | "awaiting" | "private" | "crisis" | "waiting";
 
 // SQL condition for each list filter. "pool" is cases waiting for someone to take or assign them.
-const FILTER_SQL: Record<"open" | "pool" | "awaiting" | "private" | "crisis", string> = {
+const FILTER_SQL: Record<"open" | "pool" | "awaiting" | "private" | "crisis" | "waiting", string> = {
+  waiting: "r.waitlisted_at IS NOT NULL AND r.assigned_to IS NULL AND r.status NOT IN ('completed', 'closed')",
   open: "r.status NOT IN ('completed', 'closed')",
   pool: "r.assigned_to IS NULL AND r.status = 'new'",
   awaiting: "r.assigned_to IS NOT NULL AND r.accepted_at IS NULL AND r.status = 'new'",
@@ -133,8 +135,7 @@ const FILTER_SQL: Record<"open" | "pool" | "awaiting" | "private" | "crisis", st
 export async function listRequests(filter: Filter, onlyFor?: string): Promise<RequestRow[]> {
   const params: unknown[] = [];
   const where: string[] = [];
-  if (filter === "open" || filter === "pool" || filter === "awaiting" || filter === "private" || filter === "crisis")
-    where.push(FILTER_SQL[filter]);
+  if (filter in FILTER_SQL) where.push(FILTER_SQL[filter as keyof typeof FILTER_SQL]);
   else if (filter !== "all") where.push(`r.status = $${params.push(filter)}`);
   // Counsellors only ever see the clients assigned to them (the pool is for coordinators and admins).
   if (onlyFor) where.push(`r.assigned_to = $${params.push(onlyFor)}`);
@@ -156,6 +157,7 @@ export async function filterCounts(onlyFor?: string): Promise<Record<Filter, num
        count(*) FILTER (WHERE assigned_to IS NULL AND status = 'new' ${onlyFor ? "AND kind = 'eap'" : ""})::int AS pool,
        count(*) FILTER (WHERE kind = 'private' AND status NOT IN ('completed', 'closed') ${mine})::int AS private,
        count(*) FILTER (WHERE crisis AND status NOT IN ('completed', 'closed') ${mine})::int AS crisis,
+       count(*) FILTER (WHERE waitlisted_at IS NOT NULL AND assigned_to IS NULL AND status NOT IN ('completed', 'closed') ${mine})::int AS waiting,
        count(*) FILTER (WHERE assigned_to IS NOT NULL AND accepted_at IS NULL AND status = 'new' ${mine})::int AS awaiting,
        ${STATUSES.map((s) => `count(*) FILTER (WHERE status = '${s}' ${mine})::int AS ${s}`).join(", ")}
      FROM support_requests`,
