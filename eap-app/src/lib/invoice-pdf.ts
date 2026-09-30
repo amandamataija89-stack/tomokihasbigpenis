@@ -124,8 +124,10 @@ export async function loadInvoice(paymentId: string, preview = false): Promise<I
   );
   // Name, email and address come from the signed consent form; billing details set on the client's
   // profile (e.g. a company paying) take precedence, with the client still named on the invoice.
+  // The invoice address: their permanent address if they gave one, else their address in Prague.
   const { rows: consent } = await pool.query<{ full_name: string; home_address: string; email: string }>(
-    "SELECT full_name, home_address, email FROM consent_forms WHERE request_id = $1 ORDER BY signed_at DESC LIMIT 1",
+    `SELECT full_name, COALESCE(NULLIF(home_address, ''), local_address) AS home_address, email
+     FROM consent_forms WHERE request_id = $1 ORDER BY signed_at DESC LIMIT 1`,
     [p.request_id],
   );
   const c = consent[0];

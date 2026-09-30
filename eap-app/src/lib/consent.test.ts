@@ -9,7 +9,7 @@ const form = (f: Record<string, string>) => {
 };
 const valid = {
   fullName: "Jana Nováková",
-  homeAddress: "Vinohradská 12, 120 00 Praha 2",
+  localAddress: "Vinohradská 12, 120 00 Praha 2",
   phone: "+420 777 123 456",
   email: "jana@example.com",
   emergencyName: "Petr Novák",
@@ -40,5 +40,13 @@ describe("consent form", () => {
     expect(!noGuardian.ok && noGuardian.errors.guardianName).toBeTruthy();
     const ok = validateConsent(form({ ...valid, forMinor: "yes", guardianName: "Eva Nováková", signedName: "Eva Nováková" }));
     expect(ok.ok && ok.data.guardianName).toBe("Eva Nováková");
+  });
+});
+
+describe("consent form addresses", () => {
+  it("requires the residential address in Prague and an emergency contact; the permanent address is optional", () => {
+    const r = validateConsent(form({ ...valid, localAddress: "", emergencyName: "", emergencyContact: "" }));
+    expect(!r.ok && Object.keys(r.errors).sort()).toEqual(["emergencyContact", "emergencyName", "localAddress"]);
+    expect(validateConsent(form({ ...valid, homeAddress: "" })).ok).toBe(true);
   });
 });

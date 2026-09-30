@@ -28,8 +28,8 @@ export function ConsentCard({
             <dt>Emergency contact</dt><dd>{signed.emergencyName}</dd>
             <dt>Relationship, contact</dt><dd>{signed.emergencyContact}</dd>
             <dt>Phone</dt><dd className="mono">{signed.phone}</dd>
-            <dt>Home address</dt><dd style={{ whiteSpace: "pre-line" }}>{signed.homeAddress}</dd>
-            {signed.localAddress && (<><dt>Local address</dt><dd style={{ whiteSpace: "pre-line" }}>{signed.localAddress}</dd></>)}
+            <dt>Address in Prague</dt><dd style={{ whiteSpace: "pre-line" }}>{signed.localAddress || "—"}</dd>
+            {signed.homeAddress && (<><dt>Permanent address</dt><dd style={{ whiteSpace: "pre-line" }}>{signed.homeAddress}</dd></>)}
             {signed.otherInfo && (<><dt>Other information</dt><dd>{signed.otherInfo}</dd></>)}
           </dl>
           <p><a className="button ghost small-btn" href={`/admin/consent/${requestId}`} target="_blank" rel="noopener">Download signed form (PDF)</a></p>

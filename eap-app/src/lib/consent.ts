@@ -45,7 +45,7 @@ export function validateConsent(form: FormData): { ok: true; data: ConsentInput 
   const sig = String(form.get("signature") ?? "");
   const errors: ConsentErrors = {};
   if (values.fullName.split(/\s+/).filter(Boolean).length < 2) errors.fullName = "Enter the client's first name and surname.";
-  if (values.homeAddress.length < 8) errors.homeAddress = "Enter the permanent home address.";
+  if (values.localAddress.length < 8) errors.localAddress = "Enter your residential address in Prague: street and number, postcode.";
   if (!/^\+?[\d\s()-]{6,}$/.test(values.phone)) errors.phone = "Enter a phone number, e.g. +420 777 123 456.";
   if (!EMAIL_RE.test(values.email)) errors.email = "Enter an email address like name@example.com.";
   if (!values.emergencyName) errors.emergencyName = "An emergency contact is required.";
@@ -219,8 +219,8 @@ export async function renderConsentPdf(c: SignedConsent): Promise<Uint8Array> {
   para("Client Contact Information", { font: bold, size: 11 });
   const field = (label: string, value: string) => para(`${label}: ${value || "—"}`, { gap: 2 });
   field("Client's name and surname", c.fullName);
-  field("Permanent home address", c.homeAddress.replace(/\n/g, ", "));
-  field("Local address", c.localAddress.replace(/\n/g, ", "));
+  field("Residential address in Prague", c.localAddress.replace(/\n/g, ", "));
+  field("Permanent address (if different)", c.homeAddress.replace(/\n/g, ", "));
   field("Contact telephone number", c.phone);
   field("Email address", c.email);
   y -= 4;

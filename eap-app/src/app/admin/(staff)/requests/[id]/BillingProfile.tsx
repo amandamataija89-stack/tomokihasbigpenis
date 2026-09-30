@@ -16,7 +16,7 @@ export function BillingProfile({
   consent,
 }: {
   r: RequestRow;
-  consent?: { fullName: string; homeAddress: string; email: string } | null; // from the signed consent form
+  consent?: { fullName: string; homeAddress: string; localAddress: string; email: string } | null; // from the signed consent form
   range: PriceRow | null;
   vatPayer: boolean;
   vatRate: number;
@@ -126,7 +126,7 @@ export function BillingProfile({
         </div>
         <div className="field">
           <label htmlFor="billingAddress">Address</label>
-          <textarea id="billingAddress" name="billingAddress" rows={3} defaultValue={r.billing_address} placeholder={consent?.homeAddress || r.address} />
+          <textarea id="billingAddress" name="billingAddress" rows={3} defaultValue={r.billing_address} placeholder={consent?.homeAddress || consent?.localAddress || r.address} />
           <span className="small">Leave empty to use the name, address and email from their signed consent form (from the sign-up form until it&apos;s signed).</span>
         </div>
         <div className="pay-fields">
