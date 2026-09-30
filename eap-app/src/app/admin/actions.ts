@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { discoveryOffer } from "@/lib/discovery-offer";
 import { DISCOVERY_MINUTES, SESSION_MINUTES, sessionIcs } from "@/lib/ics";
-import { endSession, isManager, requireManager, requireOwner, requireStaff, ROLES, startSession, type Role, type Staff } from "@/lib/auth";
+import { endSession, isManager, isOwner, requireManager, requireOwner, requireStaff, ROLES, startSession, type Role, type Staff } from "@/lib/auth";
 import { inviteFeedback } from "@/lib/feedback";
 import { assignWaitingAndNotify, CLIENT_TYPES, DEFAULT_MONTHLY_CAPACITY, offerToNext } from "@/lib/assign";
 import { generateCompanyCode } from "@/lib/codes";
@@ -205,10 +205,10 @@ export async function addNote(requestId: string, formData: FormData) {
 }
 
 export async function deleteRequest(requestId: string, formData: FormData) {
-  await requireManager();
+  const me = await requireManager();
   if (formData.get("confirm") !== "yes") redirect(`/admin/requests/${requestId}?confirmDelete=1`);
   const { eraseClient } = await import("@/lib/retention");
-  const result = await eraseClient(requestId);
+  const result = await eraseClient(requestId, { test: isOwner(me) && formData.get("test") === "yes" });
   redirect(result === "deleted" ? "/admin?deleted=1" : "/admin?deleted=kept");
 }
 

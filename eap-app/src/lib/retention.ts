@@ -73,8 +73,12 @@ export async function dailyRetention(now = new Date()): Promise<RetentionResult 
  * Invoices must be kept for 10 years, so a client with invoices keeps only what they show (name, address,
  * invoice details, variable symbol and the sessions they cover); everything else goes.
  */
-export async function eraseClient(id: string): Promise<"deleted" | "reduced"> {
-  const { rows } = await pool.query("SELECT 1 FROM payments WHERE request_id = $1 LIMIT 1", [id]);
+export async function eraseClient(id: string, opts: { test?: boolean } = {}): Promise<"deleted" | "reduced"> {
+  // Only issued invoices and received payments must be kept; draft invoices go with the client.
+  // A test client (owner only) goes completely, invoices included.
+  const { rows } = opts.test
+    ? { rows: [] }
+    : await pool.query("SELECT 1 FROM payments WHERE request_id = $1 AND (invoice_number IS NOT NULL OR paid_on IS NOT NULL) LIMIT 1", [id]);
   if (!rows.length) {
     await pool.query("DELETE FROM support_requests WHERE id = $1", [id]);
     return "deleted";
