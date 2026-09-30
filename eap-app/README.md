@@ -64,8 +64,9 @@ Who does what: **counsellors** choose each client's type of counselling and pric
 3. **Month end**: counsellors see "My month" (sessions, amounts, and admin still to do) and get a reminder
    email in the last 3 days of the month if anything's missing.
 4. **Automatically, from the 1st**: last month's invoices are issued (number, due date 14 days later, the
-   client's variable symbol, QR Platba code). **From the 3rd** they're emailed to the clients (PDF + QR),
-   appear on the client's private page, and the admin gets the month's invoices as one PDF and a CSV.
+   client's variable symbol, QR Platba code). They stay in the app and appear on the client's private page;
+   **from the 3rd** they're emailed (PDF + QR) only to clients who asked for invoices by email (a tick box
+   under Invoices on the client's page). The admin gets the month's invoices as one PDF and a CSV.
    Automatic invoicing starts with the month it was switched on.
 5. **Payments**: upload the bank statement (CSV from Raiffeisenbank online banking) on Monthly billing:
    payments with a client's variable symbol and the invoice amount mark invoices paid; uploading twice is

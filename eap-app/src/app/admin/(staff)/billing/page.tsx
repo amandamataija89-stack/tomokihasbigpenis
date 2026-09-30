@@ -53,7 +53,8 @@ export default async function MonthlyBilling({ searchParams }: { searchParams: P
     openInvoices(),
     pool.query<{ n: number; to_invoice: number }>(
       `SELECT
-         (SELECT count(*)::int FROM payments WHERE period = $1 AND paid_on IS NULL AND emailed_at IS NULL AND invoice_number IS NOT NULL) AS n,
+         (SELECT count(*)::int FROM payments p JOIN support_requests r ON r.id = p.request_id
+          WHERE r.email_invoices AND p.period = $1 AND p.paid_on IS NULL AND p.emailed_at IS NULL AND p.invoice_number IS NOT NULL) AS n,
          (SELECT count(DISTINCT cs.request_id)::int FROM client_sessions cs JOIN support_requests r ON r.id = cs.request_id
           WHERE r.kind = 'private' AND cs.done_at IS NOT NULL AND cs.paid_at IS NULL AND cs.payment_id IS NULL
             AND cs.price_czk IS NOT NULL AND to_char(cs.starts_at AT TIME ZONE 'Europe/Prague', 'YYYY-MM') = $1)
@@ -128,8 +129,9 @@ export default async function MonthlyBilling({ searchParams }: { searchParams: P
         <h2>Invoices for {monthName(month)}</h2>
         <ol className="steps">
           <li className="small" style={{ listStyle: "none", marginLeft: -20 }}>
-            <b>Automatic:</b> last month&apos;s invoices are created on the 1st and emailed to clients on the 3rd; you get
-            the PDF and CSV by email then. Use the buttons to do it sooner, or after changes.
+            <b>Automatic:</b> last month&apos;s invoices are created on the 1st and kept here (you also get the PDF and CSV
+            by email). They&apos;re emailed on the 3rd only to clients who asked for invoices by email (tick it on the
+            client&apos;s page, under Invoices). Use the buttons to do it sooner, or after changes.
           </li>
           <li>
             <form action={createMonthlyInvoicesAction} className="actions" style={{ gap: 8 }}>
@@ -145,8 +147,8 @@ export default async function MonthlyBilling({ searchParams }: { searchParams: P
           <li>
             <form action={emailMonthlyInvoicesAction} className="actions" style={{ gap: 8 }}>
               <input type="hidden" name="month" value={month} />
-              <button type="submit" className="ghost" disabled={toEmail[0].n === 0}>Email invoices to clients</button>
-              <span className="small">{toEmail[0].n ? `${toEmail[0].n} not emailed yet.` : "All emailed."}</span>
+              <button type="submit" className="ghost" disabled={toEmail[0].n === 0}>Email invoices to clients who asked</button>
+              <span className="small">{toEmail[0].n ? `${toEmail[0].n} not emailed yet.` : "Nothing to email."}</span>
             </form>
           </li>
           <li className="actions" style={{ gap: 8 }}>

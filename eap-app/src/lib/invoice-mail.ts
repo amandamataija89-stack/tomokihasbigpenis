@@ -136,9 +136,10 @@ export async function autoMonthlyInvoices(now = new Date()): Promise<{ created: 
       `Monthly invoice for ${month} created automatically: ${c.sessions} session${c.sessions === 1 ? "" : "s"}, ${c.amount.toLocaleString("cs-CZ")} CZK.`,
     ]);
   const { rows } = await pool.query<{ id: string }>(
-    `SELECT id FROM payments
-     WHERE period IS NOT NULL AND paid_on IS NULL AND emailed_at IS NULL AND invoice_number IS NOT NULL
-       AND period >= $3 AND (period < $1 OR (period = $1 AND $2))`,
+    // Only clients who asked for invoices by email get them; the rest stay in the app.
+    `SELECT p.id FROM payments p JOIN support_requests r ON r.id = p.request_id
+     WHERE r.email_invoices AND p.period IS NOT NULL AND p.paid_on IS NULL AND p.emailed_at IS NULL AND p.invoice_number IS NOT NULL
+       AND p.period >= $3 AND (p.period < $1 OR (p.period = $1 AND $2))`,
     [month, pragueParts(now).day >= EMAIL_INVOICES_ON_DAY, since[0].value],
   );
   let emailed = 0;

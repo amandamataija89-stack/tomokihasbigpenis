@@ -140,6 +140,10 @@ export function BillingProfile({
           </label>
         </div>
         <div className="field">
+          <label className="consent">
+            <input type="checkbox" name="emailInvoices" value="yes" defaultChecked={r.email_invoices} />
+            <span><b>Client asked for invoices by email</b> (otherwise invoices stay here in the app and on their private page)</span>
+          </label>
           <label htmlFor="billingEmail">Send invoices to</label>
           <input id="billingEmail" name="billingEmail" type="email" defaultValue={r.billing_email} placeholder={consent?.email || r.email} />
           <span className="small">Leave empty to use the email from their signed consent form.</span>

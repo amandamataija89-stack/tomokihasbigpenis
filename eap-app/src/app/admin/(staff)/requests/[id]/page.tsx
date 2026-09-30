@@ -300,6 +300,7 @@ export default async function RequestPage({
               why={sp.why}
               pdf={sp.pdf}
               manager={manager}
+              emailInvoices={r.email_invoices}
             />
           )}
         </div>

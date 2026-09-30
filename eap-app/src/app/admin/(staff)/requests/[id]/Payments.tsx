@@ -73,6 +73,7 @@ export function Payments({
   why,
   pdf,
   manager,
+  emailInvoices = false,
 }: {
   requestId: string;
   sessions: ClientSession[];
@@ -82,6 +83,7 @@ export function Payments({
   why?: string;
   pdf?: string; // an invoice just created, to offer for download
   manager: boolean; // counsellors see the amounts only, not invoices
+  emailInvoices?: boolean; // the client asked for invoices by email
 }) {
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Prague" }).format(new Date());
   const number = new Map(sessions.map((s, i) => [s.id, i + 1]));
@@ -179,7 +181,7 @@ export function Payments({
             <div className="pay-choice">
               <h3>Client pays later</h3>
               <label className="consent small-consent">
-                <input type="checkbox" name="send" value="yes" defaultChecked />
+                <input type="checkbox" name="send" value="yes" defaultChecked={emailInvoices} />
                 <span>Email the invoice with the QR payment code to the client now</span>
               </label>
               <div className="actions" style={{ gap: 8 }}>
@@ -269,7 +271,7 @@ export function Payments({
                 {!p.paid_on && !p.invoice_number && (
                   <form action={issueNowAction.bind(null, requestId, p.id)} className="actions mark-paid" style={{ gap: 8 }}>
                     <label className="consent small-consent">
-                      <input type="checkbox" name="send" value="yes" defaultChecked />
+                      <input type="checkbox" name="send" value="yes" defaultChecked={emailInvoices} />
                       <span>and email it</span>
                     </label>
                     <button type="submit" className="ghost small-btn">Issue now</button>

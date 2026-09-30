@@ -475,3 +475,6 @@ ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS waitlisted_at timestamptz;
 -- EAP session held. Set by an admin on the Team page.
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS payout_percent integer NOT NULL DEFAULT 70 CHECK (payout_percent BETWEEN 0 AND 100);
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS eap_session_fee integer NOT NULL DEFAULT 0 CHECK (eap_session_fee >= 0);
+
+-- Invoices stay in the app; they're emailed only to clients who asked for them by email.
+ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS email_invoices boolean NOT NULL DEFAULT false;
