@@ -54,6 +54,7 @@ export async function insertRequest(companyId: string | null, r: RequestInput): 
 
 export type RequestRow = {
   id: string;
+  consent_on_file: boolean; // signed outside the app (previous system)
   first_name: string; // the nickname the client gave
   full_name: string;
   email: string;

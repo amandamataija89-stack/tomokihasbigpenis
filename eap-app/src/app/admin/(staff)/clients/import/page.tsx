@@ -63,12 +63,13 @@ export default async function ImportClientsPage({
         </div>
         <label className="consent">
           <input type="checkbox" name="confirm" value="yes" />
-          <span>These are our existing clients, who agreed to be contacted and to their details being kept.</span>
+          <span>These are our existing clients, already in progress with us, who signed our consent form in the previous system.</span>
         </label>
         <p className="small">
           They&apos;re added as private clients in progress, with the language English and no type of counselling yet: set these on
-          each client&apos;s page. Clients whose email is already in the app are skipped, so importing the same file twice is safe.
-          Before marking their sessions done, send each one the onboarding details (consent form + payment details) from their page.
+          each client&apos;s page. Their consent form is marked as signed (on file), so their sessions can be marked done
+          straight away and they aren&apos;t asked to sign again. Clients whose email is already in the app are skipped, so
+          importing the same file twice is safe.
         </p>
         <div className="actions"><button type="submit">Import clients</button></div>
       </form>

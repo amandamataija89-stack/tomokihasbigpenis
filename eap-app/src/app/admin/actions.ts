@@ -711,6 +711,15 @@ export async function sendIntakeAction(requestId: string) {
   redirect(`/admin/requests/${requestId}#steps`);
 }
 
+/** Admins and coordinators mark that the client signed a consent form outside the app (or undo it). */
+export async function setConsentOnFileAction(requestId: string, onFile: boolean) {
+  const staff = await requireManager();
+  const { rowCount } = await pool.query("UPDATE support_requests SET consent_on_file = $2 WHERE id = $1 AND consent_on_file <> $2", [requestId, onFile]);
+  if (rowCount)
+    await note(requestId, staff.id, onFile ? "Consent form marked as signed outside the app (on file)." : "Consent form no longer marked as on file.");
+  redirect(`/admin/requests/${requestId}#consent`);
+}
+
 /** Emails the client the link to sign the informed consent form (again). */
 export async function sendConsentAction(requestId: string) {
   const staff = await requireManager(); // the coordinator sends the consent form
@@ -745,7 +754,7 @@ export async function setSessionOutcome(sessionId: string, outcome: "done" | "la
   if (outcome !== "undo") {
     const { rows: gate } = await pool.query<{ blocked: boolean }>(
       `SELECT r.kind = 'private' AND NOT cs.is_discovery
-         AND NOT EXISTS (SELECT 1 FROM consent_forms WHERE request_id = r.id) AS blocked
+         AND NOT r.consent_on_file AND NOT EXISTS (SELECT 1 FROM consent_forms WHERE request_id = r.id) AS blocked
        FROM client_sessions cs JOIN support_requests r ON r.id = cs.request_id WHERE cs.id = $1`,
       [sessionId],
     );

@@ -92,6 +92,13 @@ export function AddClientForm({
         <span>The client agreed to be contacted and to their details being stored and shared with their counsellor (see the Privacy Policy).</span>
       </label>
       <label className="consent">
+        <input type="checkbox" name="existing" value="yes" defaultChecked={v.existing === "yes"} />
+        <span>
+          <b>Already our client</b> (from the previous system): their consent form is signed and on file, so they aren&apos;t asked to
+          sign again and their sessions can be marked done straight away. Untick the email below if they don&apos;t need it.
+        </span>
+      </label>
+      <label className="consent">
         <input type="checkbox" name="welcome" value="yes" defaultChecked />
         <span>Email the client a confirmation with their private page link</span>
       </label>

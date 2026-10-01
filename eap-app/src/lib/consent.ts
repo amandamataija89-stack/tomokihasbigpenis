@@ -151,7 +151,7 @@ export async function requestConsentIfNeeded(requestId: string, staffId: string 
   // Only Prague Integration's own (private) clients sign the form; EAP clients don't.
   const { rows } = await pool.query<{ asked: boolean; signed: boolean; kind: string }>(
     `SELECT consent_form_sent_at IS NOT NULL AS asked, kind,
-       EXISTS (SELECT 1 FROM consent_forms WHERE request_id = $1) AS signed
+       (consent_on_file OR EXISTS (SELECT 1 FROM consent_forms WHERE request_id = $1)) AS signed
      FROM support_requests WHERE id = $1`,
     [requestId],
   );
@@ -324,7 +324,7 @@ export async function remindUnsignedConsents(now = new Date()): Promise<number> 
     `SELECT r.id, r.email, r.first_name, s.email AS counsellor_email
      FROM support_requests r LEFT JOIN staff s ON s.id = r.assigned_to
      WHERE r.kind = 'private' AND r.status NOT IN ('completed', 'closed') AND r.consent_reminded_at IS NULL
-       AND r.consent_form_sent_at < $1::timestamptz - interval '72 hours'
+       AND r.consent_form_sent_at < $1::timestamptz - interval '72 hours' AND NOT r.consent_on_file
        AND NOT EXISTS (SELECT 1 FROM consent_forms WHERE request_id = r.id)`,
     [now],
   );
