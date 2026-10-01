@@ -116,7 +116,7 @@ export default async function TeamPage({
                 </div>
                 <span className={`pill ${!available(t.id) ? "pill-closed" : full ? "pill-new" : "pill-scheduled"}`}>
                   {!m.counsels
-                    ? `${ROLE_LABELS[m.role]} · doesn't see clients`
+                    ? `${m.owner ? "Main admin (owner)" : ROLE_LABELS[m.role]} · doesn't see clients`
                     : m.suspended
                     ? "Suspended"
                     : !available(t.id)

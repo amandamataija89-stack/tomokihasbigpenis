@@ -479,6 +479,22 @@ ALTER TABLE staff ADD COLUMN IF NOT EXISTS counsels boolean NOT NULL DEFAULT tru
 UPDATE staff SET role = 'admin', is_admin = true, counsels = false, takes_clients = false
   WHERE lower(email) = 'barbora.benkova2907@gmail.com' AND NOT EXISTS (SELECT 1 FROM app_state WHERE key = 'barbora_admin_set');
 INSERT INTO app_state (key, value) VALUES ('barbora_admin_set', '1') ON CONFLICT (key) DO NOTHING;
+-- Once: the owner (Amanda Mataija) is the main admin and doesn't see clients.
+UPDATE staff SET counsels = false, takes_clients = false
+  WHERE is_owner AND NOT EXISTS (SELECT 1 FROM app_state WHERE key = 'owner_admin_set');
+INSERT INTO app_state (key, value) VALUES ('owner_admin_set', '1') ON CONFLICT (key) DO NOTHING;
+
+-- A counsellor's own invoice to Prague Integration for a month's payout (due by the 10th of the next
+-- month). Only they and admins can see it.
+CREATE TABLE IF NOT EXISTS counsellor_invoices (
+  staff_id    uuid NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+  period      text NOT NULL, -- 'YYYY-MM': the month the sessions were held
+  filename    text NOT NULL,
+  mime        text NOT NULL,
+  content     bytea NOT NULL,
+  uploaded_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (staff_id, period)
+);
 
 -- Waiting list: when no suitable counsellor is free, the coordinator puts the client on it. Cleared
 -- when they're assigned.

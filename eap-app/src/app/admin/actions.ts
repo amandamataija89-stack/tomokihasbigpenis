@@ -1041,3 +1041,25 @@ export async function emailSessionPaymentAction(sessionId: string) {
   }
   redirect(`/admin/requests/${requestId}?session=paysent#sessions`);
 }
+
+// A counsellor uploads their own invoice for a month's payout (PDF or photo, up to 5 MB); a new upload
+// replaces the old one.
+export async function uploadMyInvoiceAction(month: string, formData: FormData) {
+  const me = await requireStaff();
+  const back = (q: string) => redirect(`/admin/payouts?month=${month}&invoice=${q}#mine`);
+  if (!/^\d{4}-\d{2}$/.test(month)) redirect("/admin/payouts");
+  const { INVOICE_TYPES, MAX_INVOICE_BYTES } = await import("@/lib/counsellor-invoices");
+  const file = formData.get("invoice");
+  if (!(file instanceof File) || file.size === 0) back("missing");
+  const f = file as File;
+  const ext = f.name.split(".").pop()?.toLowerCase() ?? "";
+  if (!INVOICE_TYPES[ext]) back("type");
+  if (f.size > MAX_INVOICE_BYTES) back("size");
+  await pool.query(
+    `INSERT INTO counsellor_invoices (staff_id, period, filename, mime, content) VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (staff_id, period) DO UPDATE SET filename = EXCLUDED.filename, mime = EXCLUDED.mime,
+       content = EXCLUDED.content, uploaded_at = now()`,
+    [me.id, month, f.name.slice(0, 200), INVOICE_TYPES[ext], Buffer.from(await f.arrayBuffer())],
+  );
+  back("uploaded");
+}
