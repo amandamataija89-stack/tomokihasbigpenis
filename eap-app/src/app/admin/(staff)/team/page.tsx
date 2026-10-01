@@ -2,7 +2,7 @@ import Link from "next/link";
 import { therapistLoads } from "@/lib/assign";
 import { requireManager, ROLE_LABELS, ROLES, type Role } from "@/lib/auth";
 import { pool } from "@/lib/db";
-import { resendInvite, updateStaff } from "../../actions";
+import { removeAccessAction, resendInvite, restoreAccessAction, updateStaff } from "../../actions";
 import { AvailabilityFields } from "../AvailabilityFields";
 import { AddStaffForm } from "./AddStaffForm";
 
@@ -18,19 +18,22 @@ type Member = {
   payout_percent: number;
   suspended: boolean;
   eap_session_fee: number;
+  removed: boolean;
+  owner: boolean;
 };
 
 export default async function TeamPage({
   searchParams,
 }: {
-  searchParams: Promise<{ saved?: string; invited?: string; welcome?: string; noemail?: string; emailerror?: string }>;
+  searchParams: Promise<{ saved?: string; invited?: string; welcome?: string; noemail?: string; emailerror?: string; removed?: string; restored?: string; removeerror?: string; confirmRemove?: string }>;
 }) {
   const me = await requireManager();
   const sp = await searchParams;
   const [loads, { rows: members }] = await Promise.all([
-    therapistLoads(pool, false),
+    therapistLoads(pool, false, true),
     pool.query<Member>(
-      `SELECT id, role, takes_clients, to_char(away_until, 'YYYY-MM-DD') AS away_until, password_hash = '!' AS invited, availability_note, payout_percent, eap_session_fee, suspended_at IS NOT NULL AS suspended
+      `SELECT id, role, takes_clients, to_char(away_until, 'YYYY-MM-DD') AS away_until, password_hash = '!' AS invited, availability_note, payout_percent, eap_session_fee, suspended_at IS NOT NULL AS suspended,
+         removed_at IS NOT NULL AS removed, is_owner AS owner
        FROM staff`,
     ),
   ]);
@@ -38,8 +41,10 @@ export default async function TeamPage({
   const today = new Date().toISOString().slice(0, 10);
   const available = (id: string) => {
     const m = info.get(id)!;
-    return m.takes_clients && !m.invited && !(m.away_until && m.away_until >= today);
+    return m.takes_clients && !m.invited && !m.removed && !(m.away_until && m.away_until >= today);
   };
+  const current = loads.filter((t) => !info.get(t.id)?.removed);
+  const removed = loads.filter((t) => info.get(t.id)?.removed);
   const active = loads.filter((t) => available(t.id));
   const places = active.reduce((a, t) => a + t.capacity, 0);
   const used = active.reduce((a, t) => a + Math.min(t.assignedThisMonth, t.capacity), 0);
@@ -63,6 +68,14 @@ export default async function TeamPage({
       )}
       {sp.saved && <p className="flash" role="status">Saved.</p>}
       {sp.invited && <p className="flash" role="status">Invitation emailed.</p>}
+      {sp.removed !== undefined && (
+        <p className="flash" role="status">
+          Access removed: they&apos;re signed out and can&apos;t sign in.
+          {Number(sp.removed) > 0 && <> {sp.removed} open {sp.removed === "1" ? "client needs" : "clients need"} another counsellor (see Overview, &quot;not assigned&quot;).</>}
+        </p>
+      )}
+      {sp.restored && <p className="flash" role="status">Access restored. They&apos;ve been emailed a link to set a new password.</p>}
+      {sp.removeerror && <p className="err" role="alert">You can&apos;t remove your own access or the owner&apos;s.</p>}
       {sp.emailerror && (
         <p className="err" role="alert">
           No invitation was sent. {sp.emailerror.slice(0, 400)}
@@ -90,11 +103,11 @@ export default async function TeamPage({
       <AddStaffForm canAddAdmin={me.role === "admin"} />
 
       <div className="therapists">
-        {loads.map((t) => {
+        {current.map((t) => {
           const m = info.get(t.id)!;
           const full = t.assignedThisMonth >= t.capacity;
           return (
-            <div key={t.id} className="card therapist">
+            <div key={t.id} id={`staff-${t.id}`} className="card therapist">
               <div className="therapist-head">
                 <div>
                   <h2><Link href={`/admin/team/${t.id}`}>{t.name}</Link></h2>
@@ -149,10 +162,45 @@ export default async function TeamPage({
                 />
                 <div className="actions"><button type="submit" className="ghost small-btn">Save</button></div>
               </form>
+              {me.role === "admin" && t.id !== me.id && !m.owner && (
+                <details open={sp.confirmRemove === t.id}>
+                  <summary className="small">Remove access</summary>
+                  <form action={removeAccessAction.bind(null, t.id)} className="stack" style={{ gap: 8 }}>
+                    <p className="small">
+                      {t.name} is signed out everywhere and can&apos;t sign in or reset their password. Their open clients go
+                      back to be reassigned; their past sessions, notes and payouts stay. You can restore access later.
+                    </p>
+                    {sp.confirmRemove === t.id && <p className="err">Tick the box to confirm.</p>}
+                    <label className="consent">
+                      <input type="checkbox" name="confirm" value="yes" />
+                      <span>Remove {t.name}&apos;s access</span>
+                    </label>
+                    <div className="actions"><button type="submit" className="danger small-btn">Remove access</button></div>
+                  </form>
+                </details>
+              )}
             </div>
           );
         })}
       </div>
+
+      {removed.length > 0 && (
+        <section className="card stack">
+          <h2 style={{ fontSize: 18 }}>Access removed</h2>
+          {removed.map((t) => (
+            <div key={t.id} className="actions" style={{ justifyContent: "space-between" }}>
+              <span>
+                <Link href={`/admin/team/${t.id}`}>{t.name}</Link> <span className="small">{t.email}</span>
+              </span>
+              {me.role === "admin" && (
+                <form action={restoreAccessAction.bind(null, t.id)}>
+                  <button type="submit" className="ghost small-btn">Restore access</button>
+                </form>
+              )}
+            </div>
+          ))}
+        </section>
+      )}
     </main>
   );
 }

@@ -470,6 +470,8 @@ CREATE INDEX IF NOT EXISTS access_log_request_idx ON access_log (request_id, at 
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS meeting_link text NOT NULL DEFAULT '';
 -- A counsellor's own office for in-person sessions; empty = our office at Mezibranská 4.
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS office_address text NOT NULL DEFAULT '';
+-- Access removed by an admin: can't sign in or reset a password until it's restored.
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS removed_at timestamptz;
 
 -- Waiting list: when no suitable counsellor is free, the coordinator puts the client on it. Cleared
 -- when they're assigned.

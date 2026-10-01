@@ -25,7 +25,7 @@ export async function sendInvite(staffId: string, invitedBy: string): Promise<vo
 
 /** Emails a reset link if the address has a login. Says nothing either way, so addresses can't be probed. */
 export async function sendPasswordReset(email: string): Promise<void> {
-  const { rows } = await pool.query<{ id: string; name: string }>("SELECT id, name FROM staff WHERE email = $1", [
+  const { rows } = await pool.query<{ id: string; name: string }>("SELECT id, name FROM staff WHERE email = $1 AND removed_at IS NULL", [
     email.trim().toLowerCase(),
   ]);
   if (!rows[0]) return;
@@ -35,7 +35,7 @@ export async function sendPasswordReset(email: string): Promise<void> {
 export async function tokenOwner(token: string): Promise<{ id: string; name: string; email: string } | null> {
   const { rows } = await pool.query<{ id: string; name: string; email: string }>(
     `SELECT s.id, s.name, s.email FROM password_tokens t JOIN staff s ON s.id = t.staff_id
-     WHERE t.token_hash = $1 AND t.expires_at > now()`,
+     WHERE t.token_hash = $1 AND t.expires_at > now() AND s.removed_at IS NULL`,
     [sha256(token)],
   );
   return rows[0] ?? null;

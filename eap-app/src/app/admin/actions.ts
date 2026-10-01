@@ -61,10 +61,14 @@ export type LoginState = { error?: string; email?: string; step?: "code"; restar
 export async function login(_prev: LoginState, formData: FormData): Promise<LoginState> {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
-  const { rows } = await pool.query<{ id: string; password_hash: string; name: string; email: string }>(
-    "SELECT id, password_hash, name, email FROM staff WHERE email = $1",
+  const { rows } = await pool.query<{ id: string; password_hash: string; name: string; email: string; removed: boolean }>(
+    "SELECT id, password_hash, name, email, removed_at IS NOT NULL AS removed FROM staff WHERE email = $1",
     [email],
   );
+  if (rows[0]?.removed) {
+    await new Promise((r) => setTimeout(r, 400));
+    return { error: "That email and password don't match a staff login.", email };
+  }
   if (rows[0]?.password_hash === "!") {
     return {
       error: "You haven't set a password yet. Use the link in your invitation email, or \"Forgot your password?\" below.",
@@ -273,7 +277,7 @@ export async function addStaff(_prev: { error?: string; done?: string }, formDat
      VALUES ($1, $2, '!', $3, $4, $5, $6) ON CONFLICT (email) DO NOTHING RETURNING id`,
     [email, name, role, role === "counsellor" || f.takesClients, f.capacity ?? DEFAULT_MONTHLY_CAPACITY, f.languages],
   );
-  if (!rows[0]) return { error: `${email} already has a login. Use "Resend invitation" on their card instead.` };
+  if (!rows[0]) return { error: `${email} already has a login. Use "Resend invitation" (or "Restore access" if it was removed) on the Team page instead.` };
   const problem = await inviteProblem(rows[0].id, me.name);
   await assignWaitingAndNotify();
   revalidatePath("/admin/team");
@@ -301,6 +305,38 @@ export async function resendInvite(staffId: string) {
   if (!process.env.RESEND_API_KEY) redirect("/admin/team?noemail=1");
   const problem = await inviteProblem(staffId, me.name);
   redirect(problem ? `/admin/team?emailerror=${encodeURIComponent(problem)}` : "/admin/team?invited=1");
+}
+
+// Admins remove a team member's access: signed out everywhere, no sign-in or password reset, no new
+// clients; their open clients go back to the coordinator to reassign. Their history stays.
+export async function removeAccessAction(staffId: string, formData: FormData) {
+  const me = await requireAdmin();
+  if (formData.get("confirm") !== "yes") redirect(`/admin/team?confirmRemove=${staffId}#staff-${staffId}`);
+  const { rows } = await pool.query<{ name: string; owner: boolean }>("SELECT name, is_owner AS owner FROM staff WHERE id = $1", [staffId]);
+  if (!rows[0] || rows[0].owner || staffId === me.id) redirect("/admin/team?removeerror=1");
+  await pool.query(
+    "UPDATE staff SET removed_at = now(), password_hash = '!', takes_clients = false WHERE id = $1 AND removed_at IS NULL",
+    [staffId],
+  );
+  for (const t of ["staff_sessions", "password_tokens", "trusted_devices", "login_challenges"])
+    await pool.query(`DELETE FROM ${t} WHERE staff_id = $1`, [staffId]);
+  const { rows: open } = await pool.query<{ id: string }>(
+    `UPDATE support_requests SET assigned_to = NULL, updated_at = now()
+     WHERE assigned_to = $1 AND status NOT IN ('completed', 'closed') RETURNING id`,
+    [staffId],
+  );
+  for (const r of open) await note(r.id, me.id, `${rows[0].name}'s access was removed. Please assign another counsellor.`);
+  redirect(`/admin/team?removed=${open.length}`);
+}
+
+// Gives access back: they're emailed a link to set a new password.
+export async function restoreAccessAction(staffId: string) {
+  const me = await requireAdmin();
+  const { rowCount } = await pool.query("UPDATE staff SET removed_at = NULL WHERE id = $1 AND removed_at IS NOT NULL", [staffId]);
+  if (!rowCount) redirect("/admin/team");
+  if (!process.env.RESEND_API_KEY) redirect("/admin/team?noemail=1");
+  const problem = await inviteProblem(staffId, me.name);
+  redirect(problem ? `/admin/team?emailerror=${encodeURIComponent(problem)}` : "/admin/team?restored=1");
 }
 
 export async function updateStaff(staffId: string, formData: FormData) {

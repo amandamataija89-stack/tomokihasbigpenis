@@ -88,7 +88,7 @@ export const UNASSIGNED_REASONS: Record<Exclude<Choice, { therapist: TherapistLo
 type Queryable = Pick<PoolClient, "query">;
 
 // The monthly limit is for new EAP clients; private clients are placed by the coordinator and don't count.
-export async function therapistLoads(db: Queryable = pool, onlyTakingClients = true): Promise<TherapistLoad[]> {
+export async function therapistLoads(db: Queryable = pool, onlyTakingClients = true, includeRemoved = false): Promise<TherapistLoad[]> {
   const { rows } = await db.query<{
     id: string;
     name: string;
@@ -111,7 +111,9 @@ export async function therapistLoads(db: Queryable = pool, onlyTakingClients = t
          ? // Available: taking clients, not away, and has set a password (so can sign in to accept).
            `WHERE s.takes_clients AND s.suspended_at IS NULL AND s.password_hash <> '!'
               AND (s.away_until IS NULL OR s.away_until < (now() AT TIME ZONE 'Europe/Prague')::date)`
-         : ""
+         : includeRemoved
+           ? ""
+           : "WHERE s.removed_at IS NULL"
      }
      GROUP BY s.id ORDER BY s.name`,
   );
