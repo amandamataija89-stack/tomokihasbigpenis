@@ -190,6 +190,7 @@ export type SessionEmail = {
   discovery?: boolean; // the free discovery session
   intakeLink?: string; // sent with the discovery session invitation
   meetingLink?: string; // the counsellor's online room, for online sessions
+  office?: string; // the counsellor's own office for in-person sessions (empty: our office)
   calendar?: string; // the session as a calendar invitation (.ics), base64
 };
 
@@ -202,16 +203,18 @@ export const lateCancellationPolicy = (hours: number, total: number | null) =>
   `Cancellation policy: if you need to cancel or move a session, please tell us at least ${hours} hours before it starts. A session cancelled with less notice ${lateCancelCost(total)}.`;
 
 /** Where the session happens. The free discovery session is always online; other sessions follow the client's choice. */
-export function whereText(format: string, discovery?: boolean, meetingLink?: string): string {
+export const OFFICE_ADDRESS = "Prague Integration, Mezibranská 4, 110 00 Prague 1";
+
+export function whereText(format: string, discovery?: boolean, meetingLink?: string, office?: string): string {
   if (discovery || format === "Online")
     return meetingLink ? `Where: online. Join here: ${meetingLink}` : "Where: online. Your therapist will send you the details for joining.";
-  if (format === "In person in Prague") return "Where: Prague Integration, Mezibranská 4, 110 00 Prague 1";
+  if (format === "In person in Prague") return `Where: ${office?.trim() || OFFICE_ADDRESS}`;
   return "";
 }
 
 // Contains only practical details, nothing about why the person is coming.
 export function sessionConfirmation(s: SessionEmail): Mail {
-  const where = whereText(s.format, s.discovery, s.meetingLink) || "Your therapist will let you know whether you'll meet online or in person.";
+  const where = whereText(s.format, s.discovery, s.meetingLink, s.office) || "Your therapist will let you know whether you'll meet online or in person.";
   const withWhom = s.therapistName ? ` with ${s.therapistName}` : "";
   const subject = {
     booked: s.discovery ? `Your free discovery session: ${s.when}` : `Your session is booked: ${s.when}`,
@@ -283,7 +286,7 @@ export function feedbackInvitation(to: string, firstName: string, token: string)
 }
 
 export function sessionReminder(s: Omit<SessionEmail, "kind"> & { cancelBy: string; lateCancelHours: number; final?: boolean }): Mail {
-  const where = whereText(s.format, s.discovery, s.meetingLink);
+  const where = whereText(s.format, s.discovery, s.meetingLink, s.office);
   const contact = `${s.messageLink ? `message us on your private page (${s.messageLink})` : "reply to this email"} or call +420 608 573 256`;
   const session = s.discovery ? "free discovery session" : "session";
   return {

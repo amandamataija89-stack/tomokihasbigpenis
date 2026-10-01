@@ -6,7 +6,7 @@ Discovery session: The initial online session lasts 15–20 minutes and is free 
 
 Payment & insurance: Please note that we do not accept public health insurance, and all sessions are self-paid.
 
-Session format: Sessions can be held online (Zoom/Google Meet) or in person at our office. The discovery session is always online, while all following sessions can be held online or in person, based on your preference and agreement with your counsellor. Our office is at Mezibranská 4, 110 00 Prague.
+Session format: Sessions can be held online (Zoom/Google Meet) or in person. The discovery session is always online, while all following sessions can be held online or in person, based on your preference and agreement with your counsellor. Our office is at Mezibranská 4, 110 00 Prague; some counsellors can also meet you at their own office.
 
 Further steps: If you choose to continue with ongoing sessions, we will send you a consent form to review and sign, along with the payment details.
 

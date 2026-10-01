@@ -11,7 +11,7 @@ import { generateCompanyCode } from "@/lib/codes";
 import { sessionLimit, STATUSES, STATUS_LABELS, type ClientKind, type Status } from "@/lib/data";
 import { pool } from "@/lib/db";
 import { LATE_CANCEL_HOURS } from "@/lib/deadlines";
-import { emailProblem, sendEmail, sessionConfirmation, therapistAlert, type SessionEmail } from "@/lib/email";
+import { emailProblem, OFFICE_ADDRESS, sendEmail, sessionConfirmation, therapistAlert, type SessionEmail } from "@/lib/email";
 import { clientMessageLink, MAX_MESSAGE_LENGTH, sendStaffMessage } from "@/lib/messages";
 import { acceptOffer, declineOffer, offerTo, takeFromPool } from "@/lib/offers";
 import { verifyPassword } from "@/lib/password";
@@ -342,7 +342,7 @@ export async function updateMyAvailability(formData: FormData) {
   if (was[0]?.suspended) f.takesClients = false; // suspended: no new clients until an admin lifts it
   await pool.query(
     `UPDATE staff SET takes_clients = $2, monthly_capacity = COALESCE($3, monthly_capacity), languages = $4, away_until = $5,
-       availability_note = $6, accepts = $7, meeting_link = $8
+       availability_note = $6, accepts = $7, meeting_link = $8, office_address = $9
      WHERE id = $1`,
     [
       me.id,
@@ -353,6 +353,7 @@ export async function updateMyAvailability(formData: FormData) {
       String(formData.get("availabilityNote") ?? "").trim().slice(0, 500),
       f.accepts,
       /^https:\/\/\S+$/.test(String(formData.get("meetingLink") ?? "").trim()) ? String(formData.get("meetingLink")).trim().slice(0, 300) : "",
+      String(formData.get("officeAddress") ?? "").trim().replace(/\s+/g, " ").slice(0, 200),
     ],
   );
   await assignWaitingAndNotify();
@@ -511,8 +512,9 @@ async function emailClient(
     kind: ClientKind;
     is_discovery: boolean;
     meeting_link: string | null;
+    office_address: string | null;
   }>(
-    `SELECT r.id AS request_id, r.email, r.first_name, r.format, r.kind, s.name AS therapist, s.meeting_link, cs.starts_at, cs.is_discovery,
+    `SELECT r.id AS request_id, r.email, r.first_name, r.format, r.kind, s.name AS therapist, s.meeting_link, s.office_address, cs.starts_at, cs.is_discovery,
        (SELECT count(*)::int FROM client_sessions o
         WHERE o.request_id = r.id AND o.starts_at <= cs.starts_at AND NOT o.is_discovery) AS number
      FROM client_sessions cs
@@ -529,7 +531,7 @@ async function emailClient(
     start: r.starts_at,
     minutes: r.is_discovery ? DISCOVERY_MINUTES : SESSION_MINUTES,
     summary: `${r.is_discovery ? "Free discovery session" : "Counselling session"}${r.therapist ? ` with ${r.therapist}` : ""} – Prague Integration`,
-    location: online ? r.meeting_link || "Online" : r.format === "In person in Prague" ? "Prague Integration, Mezibranská 4, 110 00 Prague 1" : "",
+    location: online ? r.meeting_link || "Online" : r.format === "In person in Prague" ? r.office_address || OFFICE_ADDRESS : "",
     description: `${online && r.meeting_link ? `Join online: ${r.meeting_link}\n` : ""}To change the time, reply to our email or call +420 608 573 256.`,
     url: online && r.meeting_link ? r.meeting_link : undefined,
     cancelled: kind === "cancelled",
@@ -551,6 +553,7 @@ async function emailClient(
         discovery: r.is_discovery,
         intakeLink: extra.intakeLink,
         meetingLink: r.meeting_link || undefined,
+        office: r.office_address || undefined,
         calendar: Buffer.from(calendar).toString("base64"),
       }),
     );
