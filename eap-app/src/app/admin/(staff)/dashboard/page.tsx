@@ -72,7 +72,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
          (SELECT count(*) FROM client_sessions cs JOIN support_requests r ON r.id = cs.request_id
            WHERE r.assigned_to = s.id AND cs.done_at IS NOT NULL AND NOT cs.is_discovery AND ${inMonth("cs.starts_at")})::int AS held,
          (SELECT count(*) FROM support_requests r WHERE r.assigned_to = s.id AND ${inMonth("r.assigned_at")})::int AS new_clients
-       FROM staff s WHERE s.password_hash <> '!' ORDER BY s.name`,
+       FROM staff s WHERE s.password_hash <> '!' AND s.counsels ORDER BY s.name`,
       [month],
     ),
   ]);

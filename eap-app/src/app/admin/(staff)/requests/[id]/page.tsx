@@ -426,7 +426,7 @@ export default async function RequestPage({
             </details>
           )}
 
-          {manager && (
+          {me.role === "admin" && (
             <form action={deleteRequest.bind(null, r.id)} className="card form" style={{ gap: 12 }}>
               <h2 style={{ fontSize: 18 }}>Delete client profile</h2>
               <p className="small">

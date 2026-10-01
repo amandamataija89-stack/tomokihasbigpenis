@@ -142,6 +142,12 @@ describe("discovery session", () => {
   it("full sessions in person meet at Mezibranská 4", () => {
     expect(sessionConfirmation({ ...base, kind: "booked", format: "In person in Prague" }).text).toContain("Mezibranská 4, 110 00 Prague 1");
   });
+
+  it("in person at the counsellor's own office when they have one", () => {
+    const m = sessionConfirmation({ ...base, kind: "booked", format: "In person in Prague", office: "Vinohradská 12, 120 00 Prague 2" });
+    expect(m.text).toContain("Where: Vinohradská 12, 120 00 Prague 2");
+    expect(m.text).not.toContain("Mezibranská");
+  });
 });
 
 describe("discovery offer message", () => {
@@ -199,5 +205,17 @@ describe("onboarding email", () => {
     expect(m.text).toContain("Invoices are issued monthly");
     expect(m.text).not.toContain("each booked session");
     expect(m.attachments?.[0].filename).toBe("qr-platba-100101.png");
+  });
+});
+
+describe("feedback after 10 sessions", () => {
+  it("asks how the sessions are going, with stars, confidentially", async () => {
+    const { feedbackInvitation } = await import("./email");
+    const m = feedbackInvitation("a@example.com", "Anna", "tok", true);
+    expect(m.subject).toContain("How are your sessions going");
+    expect(m.text).toContain("10 sessions");
+    expect(m.text).toContain("stars");
+    expect(m.text).toContain("confidential");
+    expect(m.text).toContain("/feedback/tok");
   });
 });

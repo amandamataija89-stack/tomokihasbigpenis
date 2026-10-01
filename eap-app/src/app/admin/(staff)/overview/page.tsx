@@ -75,7 +75,7 @@ export default async function ClientsOverview({
       params,
     ),
     manager
-      ? pool.query<{ id: string; name: string }>("SELECT id, name FROM staff WHERE password_hash <> '!' ORDER BY name")
+      ? pool.query<{ id: string; name: string }>("SELECT id, name FROM staff WHERE password_hash <> '!' AND counsels ORDER BY name")
       : Promise.resolve({ rows: [] as { id: string; name: string }[] }),
   ]);
   const totalHeld = rows.reduce((a, r) => a + r.held, 0);
@@ -86,7 +86,10 @@ export default async function ClientsOverview({
       <div className="stack">
         <h1 style={{ fontSize: 32 }}>{manager ? "All clients" : "All my clients"}</h1>
         <p className="lede">Search by name, email or variable symbol, and filter. Click a client to open their page.</p>
-        <p><Link className="button small-btn" href="/admin/clients/new">+ Add a client</Link></p>
+        <p className="actions" style={{ gap: 8 }}>
+          <Link className="button small-btn" href="/admin/clients/new">+ Add a client</Link>
+          {me.role === "admin" && <Link className="button ghost small-btn" href="/admin/clients/import">Import clients from Excel</Link>}
+        </p>
       </div>
 
       <form className="card filters" method="get">

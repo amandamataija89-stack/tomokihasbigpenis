@@ -157,8 +157,8 @@ the latest signed consent form, unless billing details were set on the client's 
 | Role | Sees | Can |
 | --- | --- | --- |
 | **Counsellor** | Only their own clients, plus the pool (without names or contact details) | Accept or decline offered clients, take clients from the pool, book sessions, keep notes, set their own availability |
-| **Coordinator** | Every case, with billing and invoices | Everything a counsellor can, plus assign clients from the pool, invite staff, manage companies, edit any client's sessions, delete client profiles |
-| **Admin** | Everything except the bank statement and counsellors' private notes | Everything a coordinator can, plus read anonymous client feedback and change roles |
+| **Coordinator** | Every case, with billing and invoices | Everything a counsellor can, plus assign clients from the pool, invite staff, manage companies, edit any client's sessions |
+| **Admin** | Everything except the bank statement and counsellors' private notes | Everything a coordinator can, plus read anonymous client feedback, change roles and delete client profiles |
 | **Owner** (Amanda Mataija, set in `db/schema.sql`) | Everything | Everything an admin can, plus upload and see the bank statement, and open a counsellor's private notes in an emergency (recorded in the case's team notes) |
 
 A counsellor who opens another counsellor's case by its address gets "not

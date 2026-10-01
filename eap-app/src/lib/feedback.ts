@@ -7,7 +7,7 @@ const INVITE_DAYS = 60;
 const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
 
 /** Emails the client a one-use anonymous feedback link. Nothing about the client is stored with it. */
-export async function inviteFeedback(requestId: string): Promise<boolean> {
+export async function inviteFeedback(requestId: string, midway = false): Promise<boolean> {
   const { rows } = await pool.query<{ email: string; first_name: string; assigned_to: string | null }>(
     "SELECT email, first_name, assigned_to FROM support_requests WHERE id = $1",
     [requestId],
@@ -21,7 +21,7 @@ export async function inviteFeedback(requestId: string): Promise<boolean> {
     [sha256(token), r.assigned_to, INVITE_DAYS],
   );
   await pool.query("DELETE FROM feedback_invites WHERE expires_at < now()");
-  await sendEmail(feedbackInvitation(r.email, r.first_name, token));
+  await sendEmail(feedbackInvitation(r.email, r.first_name, token, midway));
   return true;
 }
 

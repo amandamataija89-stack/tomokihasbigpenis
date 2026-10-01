@@ -9,8 +9,8 @@ export default async function AvailabilityPage({ searchParams }: { searchParams:
   const sp = await searchParams;
   const [loads, { rows }] = await Promise.all([
     therapistLoads(pool, false),
-    pool.query<{ takes_clients: boolean; away_until: string | null; availability_note: string; meeting_link: string; suspended: boolean }>(
-      "SELECT suspended_at IS NOT NULL AS suspended, takes_clients, to_char(away_until, 'YYYY-MM-DD') AS away_until, availability_note, meeting_link FROM staff WHERE id = $1",
+    pool.query<{ takes_clients: boolean; away_until: string | null; availability_note: string; meeting_link: string; office_address: string; suspended: boolean }>(
+      "SELECT suspended_at IS NOT NULL AS suspended, takes_clients, to_char(away_until, 'YYYY-MM-DD') AS away_until, availability_note, meeting_link, office_address FROM staff WHERE id = $1",
       [me.id],
     ),
   ]);
@@ -78,6 +78,14 @@ export default async function AvailabilityPage({ searchParams }: { searchParams:
           <label htmlFor="meetingLink">My online meeting link<span className="opt">optional</span></label>
           <input id="meetingLink" name="meetingLink" type="url" defaultValue={rows[0].meeting_link} placeholder="e.g. https://zoom.us/j/1234567890 or https://meet.google.com/abc-defg-hij" />
           <span className="small">Your personal Zoom or Google Meet room. It&apos;s sent to clients with online sessions and in their calendar invitation.</span>
+        </div>
+        <div className="field">
+          <label htmlFor="officeAddress">My own office for in-person sessions<span className="opt">optional</span></label>
+          <input id="officeAddress" name="officeAddress" type="text" defaultValue={rows[0].office_address} placeholder="e.g. Vinohradská 12, 120 00 Prague 2" />
+          <span className="small">
+            Leave empty to meet clients at our office, Mezibranská 4, 110 00 Prague. If you fill it in, your clients&apos; in-person
+            sessions, reminders and calendar invitations give this address instead.
+          </span>
         </div>
         <AvailabilityFields
           idPrefix="me"

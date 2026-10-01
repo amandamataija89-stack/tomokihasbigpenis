@@ -99,7 +99,7 @@ export async function monthEndReminders(now = new Date()): Promise<number> {
   const hour = Number(new Intl.DateTimeFormat("en-GB", { hour: "2-digit", hourCycle: "h23", timeZone: "Europe/Prague" }).format(now));
   if (p.day < p.daysInMonth - 2 || hour < 9) return 0;
   const { rows: staff } = await pool.query<{ id: string; name: string; email: string }>(
-    "SELECT id, name, email FROM staff WHERE password_hash <> '!' AND (takes_clients OR role = 'counsellor')",
+    "SELECT id, name, email FROM staff WHERE password_hash <> '!' AND counsels AND (takes_clients OR role = 'counsellor')",
   );
   let sent = 0;
   for (const s of staff) {

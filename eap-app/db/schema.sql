@@ -468,6 +468,33 @@ CREATE INDEX IF NOT EXISTS access_log_request_idx ON access_log (request_id, at 
 
 -- The counsellor's own online meeting room (Zoom / Google Meet link), sent with online sessions.
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS meeting_link text NOT NULL DEFAULT '';
+-- A counsellor's own office for in-person sessions; empty = our office at Mezibranská 4.
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS office_address text NOT NULL DEFAULT '';
+-- Access removed by an admin: can't sign in or reset a password until it's restored.
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS removed_at timestamptz;
+-- Admins and coordinators who don't see clients themselves: no payout, languages or client types,
+-- and they're left out of counsellor lists. Counsellors always counsel.
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS counsels boolean NOT NULL DEFAULT true;
+-- Once: Barbora Benkova is an admin who doesn't counsel.
+UPDATE staff SET role = 'admin', is_admin = true, counsels = false, takes_clients = false
+  WHERE lower(email) = 'barbora.benkova2907@gmail.com' AND NOT EXISTS (SELECT 1 FROM app_state WHERE key = 'barbora_admin_set');
+INSERT INTO app_state (key, value) VALUES ('barbora_admin_set', '1') ON CONFLICT (key) DO NOTHING;
+-- Once: the owner (Amanda Mataija) is the main admin and doesn't see clients.
+UPDATE staff SET counsels = false, takes_clients = false
+  WHERE is_owner AND NOT EXISTS (SELECT 1 FROM app_state WHERE key = 'owner_admin_set');
+INSERT INTO app_state (key, value) VALUES ('owner_admin_set', '1') ON CONFLICT (key) DO NOTHING;
+
+-- A counsellor's own invoice to Prague Integration for a month's payout (due by the 10th of the next
+-- month). Only they and admins can see it.
+CREATE TABLE IF NOT EXISTS counsellor_invoices (
+  staff_id    uuid NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+  period      text NOT NULL, -- 'YYYY-MM': the month the sessions were held
+  filename    text NOT NULL,
+  mime        text NOT NULL,
+  content     bytea NOT NULL,
+  uploaded_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (staff_id, period)
+);
 
 -- Waiting list: when no suitable counsellor is free, the coordinator puts the client on it. Cleared
 -- when they're assigned.

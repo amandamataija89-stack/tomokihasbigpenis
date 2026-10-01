@@ -4,14 +4,14 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { discoveryOffer } from "@/lib/discovery-offer";
 import { DISCOVERY_MINUTES, SESSION_MINUTES, sessionIcs } from "@/lib/ics";
-import { endSession, isManager, isOwner, requireManager, requireOwner, requireStaff, ROLES, startSession, type Role, type Staff } from "@/lib/auth";
+import { endSession, isManager, isOwner, requireAdmin, requireManager, requireOwner, requireStaff, ROLES, startSession, type Role, type Staff } from "@/lib/auth";
 import { inviteFeedback } from "@/lib/feedback";
 import { assignWaitingAndNotify, CLIENT_TYPES, DEFAULT_MONTHLY_CAPACITY, offerToNext } from "@/lib/assign";
 import { generateCompanyCode } from "@/lib/codes";
 import { sessionLimit, STATUSES, STATUS_LABELS, type ClientKind, type Status } from "@/lib/data";
 import { pool } from "@/lib/db";
 import { LATE_CANCEL_HOURS } from "@/lib/deadlines";
-import { emailProblem, sendEmail, sessionConfirmation, therapistAlert, type SessionEmail } from "@/lib/email";
+import { emailProblem, OFFICE_ADDRESS, sendEmail, sessionConfirmation, therapistAlert, type SessionEmail } from "@/lib/email";
 import { clientMessageLink, MAX_MESSAGE_LENGTH, sendStaffMessage } from "@/lib/messages";
 import { acceptOffer, declineOffer, offerTo, takeFromPool } from "@/lib/offers";
 import { verifyPassword } from "@/lib/password";
@@ -61,10 +61,14 @@ export type LoginState = { error?: string; email?: string; step?: "code"; restar
 export async function login(_prev: LoginState, formData: FormData): Promise<LoginState> {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
-  const { rows } = await pool.query<{ id: string; password_hash: string; name: string; email: string }>(
-    "SELECT id, password_hash, name, email FROM staff WHERE email = $1",
+  const { rows } = await pool.query<{ id: string; password_hash: string; name: string; email: string; removed: boolean }>(
+    "SELECT id, password_hash, name, email, removed_at IS NOT NULL AS removed FROM staff WHERE email = $1",
     [email],
   );
+  if (rows[0]?.removed) {
+    await new Promise((r) => setTimeout(r, 400));
+    return { error: "That email and password don't match a staff login.", email };
+  }
   if (rows[0]?.password_hash === "!") {
     return {
       error: "You haven't set a password yet. Use the link in your invitation email, or \"Forgot your password?\" below.",
@@ -145,8 +149,8 @@ export async function updateRequest(requestId: string, formData: FormData) {
       staff.id,
       `Status changed from ${STATUS_LABELS[rows[0].status]} to ${STATUS_LABELS[status]}.`,
     ]);
-    // Private clients have no session limit, so staff complete their case by hand.
-    if (status === "completed" && rows[0].kind === "private") await sendFeedbackOnce(requestId, staff.id);
+    // Completing a case by hand (any client) emails the anonymous feedback link, once per case.
+    if (status === "completed") await sendFeedbackOnce(requestId, staff.id);
   }
   revalidatePath(`/admin/requests/${requestId}`);
   redirect(`/admin/requests/${requestId}?saved=1`);
@@ -205,7 +209,7 @@ export async function addNote(requestId: string, formData: FormData) {
 }
 
 export async function deleteRequest(requestId: string, formData: FormData) {
-  const me = await requireManager();
+  const me = await requireAdmin(); // only admins delete client profiles
   if (formData.get("confirm") !== "yes") redirect(`/admin/requests/${requestId}?confirmDelete=1`);
   const { eraseClient } = await import("@/lib/retention");
   const result = await eraseClient(requestId, { test: isOwner(me) && formData.get("test") === "yes" });
@@ -273,7 +277,7 @@ export async function addStaff(_prev: { error?: string; done?: string }, formDat
      VALUES ($1, $2, '!', $3, $4, $5, $6) ON CONFLICT (email) DO NOTHING RETURNING id`,
     [email, name, role, role === "counsellor" || f.takesClients, f.capacity ?? DEFAULT_MONTHLY_CAPACITY, f.languages],
   );
-  if (!rows[0]) return { error: `${email} already has a login. Use "Resend invitation" on their card instead.` };
+  if (!rows[0]) return { error: `${email} already has a login. Use "Resend invitation" (or "Restore access" if it was removed) on the Team page instead.` };
   const problem = await inviteProblem(rows[0].id, me.name);
   await assignWaitingAndNotify();
   revalidatePath("/admin/team");
@@ -303,21 +307,59 @@ export async function resendInvite(staffId: string) {
   redirect(problem ? `/admin/team?emailerror=${encodeURIComponent(problem)}` : "/admin/team?invited=1");
 }
 
+// Admins remove a team member's access: signed out everywhere, no sign-in or password reset, no new
+// clients; their open clients go back to the coordinator to reassign. Their history stays.
+export async function removeAccessAction(staffId: string, formData: FormData) {
+  const me = await requireAdmin();
+  if (formData.get("confirm") !== "yes") redirect(`/admin/team?confirmRemove=${staffId}#staff-${staffId}`);
+  const { rows } = await pool.query<{ name: string; owner: boolean }>("SELECT name, is_owner AS owner FROM staff WHERE id = $1", [staffId]);
+  if (!rows[0] || rows[0].owner || staffId === me.id) redirect("/admin/team?removeerror=1");
+  await pool.query(
+    "UPDATE staff SET removed_at = now(), password_hash = '!', takes_clients = false WHERE id = $1 AND removed_at IS NULL",
+    [staffId],
+  );
+  for (const t of ["staff_sessions", "password_tokens", "trusted_devices", "login_challenges"])
+    await pool.query(`DELETE FROM ${t} WHERE staff_id = $1`, [staffId]);
+  const { rows: open } = await pool.query<{ id: string }>(
+    `UPDATE support_requests SET assigned_to = NULL, updated_at = now()
+     WHERE assigned_to = $1 AND status NOT IN ('completed', 'closed') RETURNING id`,
+    [staffId],
+  );
+  for (const r of open) await note(r.id, me.id, `${rows[0].name}'s access was removed. Please assign another counsellor.`);
+  redirect(`/admin/team?removed=${open.length}`);
+}
+
+// Gives access back: they're emailed a link to set a new password.
+export async function restoreAccessAction(staffId: string) {
+  const me = await requireAdmin();
+  const { rowCount } = await pool.query("UPDATE staff SET removed_at = NULL WHERE id = $1 AND removed_at IS NOT NULL", [staffId]);
+  if (!rowCount) redirect("/admin/team");
+  if (!process.env.RESEND_API_KEY) redirect("/admin/team?noemail=1");
+  const problem = await inviteProblem(staffId, me.name);
+  redirect(problem ? `/admin/team?emailerror=${encodeURIComponent(problem)}` : "/admin/team?restored=1");
+}
+
 export async function updateStaff(staffId: string, formData: FormData) {
   const me = await requireManager();
   const f = availabilityFields(formData, 100);
   const role = String(formData.get("role") ?? "") as Role;
-  const { rows } = await pool.query<{ role: Role }>("SELECT role FROM staff WHERE id = $1", [staffId]);
+  const { rows } = await pool.query<{ role: Role; counsels: boolean }>("SELECT role, counsels FROM staff WHERE id = $1", [staffId]);
   if (!rows[0]) redirect("/admin/team");
   // Only admins change roles, and nobody removes their own admin role by accident.
   const newRole = me.role === "admin" && ROLES.includes(role) && !(staffId === me.id && role !== "admin") ? role : rows[0].role;
-  await pool.query(
-    `UPDATE staff SET takes_clients = $2, monthly_capacity = COALESCE($3, monthly_capacity), languages = $4,
-       away_until = $5, role = $6, is_admin = ($6 = 'admin'), accepts = $7 WHERE id = $1`,
-    [staffId, f.takesClients, f.capacity, f.languages, f.awayUntil, newRole, f.accepts],
-  );
+  // Counsellors always see clients; an admin or coordinator may or may not.
+  const counsels = newRole === "counsellor" || (formData.has("counselsShown") ? formData.get("counsels") === "yes" : rows[0].counsels);
+  await pool.query("UPDATE staff SET role = $2, is_admin = ($2 = 'admin'), counsels = $3 WHERE id = $1", [staffId, newRole, counsels]);
+  // Availability and payout only for those who see clients (the fields aren't shown otherwise).
+  if (!counsels) await pool.query("UPDATE staff SET takes_clients = false WHERE id = $1", [staffId]);
+  else if (formData.has("availabilityShown"))
+    await pool.query(
+      `UPDATE staff SET takes_clients = $2, monthly_capacity = COALESCE($3, monthly_capacity), languages = $4,
+         away_until = $5, accepts = $6 WHERE id = $1`,
+      [staffId, f.takesClients, f.capacity, f.languages, f.awayUntil, f.accepts],
+    );
   // Payout terms are for admins only.
-  if (me.role === "admin") {
+  if (me.role === "admin" && counsels && formData.has("payoutPercent")) {
     const pct = Number(formData.get("payoutPercent"));
     const fee = Number(formData.get("eapFee"));
     if (Number.isInteger(pct) && pct >= 0 && pct <= 100 && Number.isInteger(fee) && fee >= 0)
@@ -342,7 +384,7 @@ export async function updateMyAvailability(formData: FormData) {
   if (was[0]?.suspended) f.takesClients = false; // suspended: no new clients until an admin lifts it
   await pool.query(
     `UPDATE staff SET takes_clients = $2, monthly_capacity = COALESCE($3, monthly_capacity), languages = $4, away_until = $5,
-       availability_note = $6, accepts = $7, meeting_link = $8
+       availability_note = $6, accepts = $7, meeting_link = $8, office_address = $9
      WHERE id = $1`,
     [
       me.id,
@@ -353,6 +395,7 @@ export async function updateMyAvailability(formData: FormData) {
       String(formData.get("availabilityNote") ?? "").trim().slice(0, 500),
       f.accepts,
       /^https:\/\/\S+$/.test(String(formData.get("meetingLink") ?? "").trim()) ? String(formData.get("meetingLink")).trim().slice(0, 300) : "",
+      String(formData.get("officeAddress") ?? "").trim().replace(/\s+/g, " ").slice(0, 200),
     ],
   );
   await assignWaitingAndNotify();
@@ -473,6 +516,24 @@ async function syncStatusWithSessions(requestId: string, staffId: string) {
 }
 
 // The automatic feedback email goes once per case, even if it's completed, reopened and completed again.
+// After the 10th session held, the client is asked once, confidentially, how the sessions are going.
+const MIDWAY_FEEDBACK_SESSION = 10;
+async function midwayFeedback(requestId: string, staffId: string) {
+  const { rows } = await pool.query<{ held: number; sent: boolean }>(
+    `SELECT (SELECT count(*)::int FROM client_sessions WHERE request_id = $1 AND done_at IS NOT NULL AND NOT is_discovery) AS held,
+       EXISTS (SELECT 1 FROM request_notes WHERE request_id = $1 AND body LIKE 'Confidential feedback after 10 sessions%') AS sent`,
+    [requestId],
+  );
+  if (!rows[0] || rows[0].sent || rows[0].held < MIDWAY_FEEDBACK_SESSION) return;
+  let ok = false;
+  try {
+    ok = await inviteFeedback(requestId, true);
+  } catch (err) {
+    console.error("EAP midway feedback failed:", err);
+  }
+  if (ok) await note(requestId, staffId, "Confidential feedback after 10 sessions: link emailed to the client (stars and comment, anonymous).");
+}
+
 async function sendFeedbackOnce(requestId: string, staffId: string) {
   const { rows: sent } = await pool.query(
     "SELECT 1 FROM request_notes WHERE request_id = $1 AND body LIKE 'Anonymous feedback link emailed%'",
@@ -511,8 +572,9 @@ async function emailClient(
     kind: ClientKind;
     is_discovery: boolean;
     meeting_link: string | null;
+    office_address: string | null;
   }>(
-    `SELECT r.id AS request_id, r.email, r.first_name, r.format, r.kind, s.name AS therapist, s.meeting_link, cs.starts_at, cs.is_discovery,
+    `SELECT r.id AS request_id, r.email, r.first_name, r.format, r.kind, s.name AS therapist, s.meeting_link, s.office_address, cs.starts_at, cs.is_discovery,
        (SELECT count(*)::int FROM client_sessions o
         WHERE o.request_id = r.id AND o.starts_at <= cs.starts_at AND NOT o.is_discovery) AS number
      FROM client_sessions cs
@@ -529,7 +591,7 @@ async function emailClient(
     start: r.starts_at,
     minutes: r.is_discovery ? DISCOVERY_MINUTES : SESSION_MINUTES,
     summary: `${r.is_discovery ? "Free discovery session" : "Counselling session"}${r.therapist ? ` with ${r.therapist}` : ""} – Prague Integration`,
-    location: online ? r.meeting_link || "Online" : r.format === "In person in Prague" ? "Prague Integration, Mezibranská 4, 110 00 Prague 1" : "",
+    location: online ? r.meeting_link || "Online" : r.format === "In person in Prague" ? r.office_address || OFFICE_ADDRESS : "",
     description: `${online && r.meeting_link ? `Join online: ${r.meeting_link}\n` : ""}To change the time, reply to our email or call +420 608 573 256.`,
     url: online && r.meeting_link ? r.meeting_link : undefined,
     cancelled: kind === "cancelled",
@@ -551,6 +613,7 @@ async function emailClient(
         discovery: r.is_discovery,
         intakeLink: extra.intakeLink,
         meetingLink: r.meeting_link || undefined,
+        office: r.office_address || undefined,
         calendar: Buffer.from(calendar).toString("base64"),
       }),
     );
@@ -707,6 +770,7 @@ export async function setSessionOutcome(sessionId: string, outcome: "done" | "la
   );
   const limit = sessionLimit(rows[0].kind);
   const counted = limit ? `${rows[0].done} of ${limit}` : `${rows[0].done} so far`;
+  if (outcome !== "undo") await midwayFeedback(requestId, staff.id);
   await note(
     requestId,
     staff.id,
@@ -995,4 +1059,26 @@ export async function emailSessionPaymentAction(sessionId: string) {
     redirect(`/admin/requests/${requestId}?session=payfail#sessions`);
   }
   redirect(`/admin/requests/${requestId}?session=paysent#sessions`);
+}
+
+// A counsellor uploads their own invoice for a month's payout (PDF or photo, up to 5 MB); a new upload
+// replaces the old one.
+export async function uploadMyInvoiceAction(month: string, formData: FormData) {
+  const me = await requireStaff();
+  const back = (q: string) => redirect(`/admin/payouts?month=${month}&invoice=${q}#mine`);
+  if (!/^\d{4}-\d{2}$/.test(month)) redirect("/admin/payouts");
+  const { INVOICE_TYPES, MAX_INVOICE_BYTES } = await import("@/lib/counsellor-invoices");
+  const file = formData.get("invoice");
+  if (!(file instanceof File) || file.size === 0) back("missing");
+  const f = file as File;
+  const ext = f.name.split(".").pop()?.toLowerCase() ?? "";
+  if (!INVOICE_TYPES[ext]) back("type");
+  if (f.size > MAX_INVOICE_BYTES) back("size");
+  await pool.query(
+    `INSERT INTO counsellor_invoices (staff_id, period, filename, mime, content) VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (staff_id, period) DO UPDATE SET filename = EXCLUDED.filename, mime = EXCLUDED.mime,
+       content = EXCLUDED.content, uploaded_at = now()`,
+    [me.id, month, f.name.slice(0, 200), INVOICE_TYPES[ext], Buffer.from(await f.arrayBuffer())],
+  );
+  back("uploaded");
 }
