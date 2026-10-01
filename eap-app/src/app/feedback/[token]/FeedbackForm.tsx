@@ -10,13 +10,13 @@ const Scale = ({ name, low, high, picked }: { name: string; low: string; high: s
   <div className="stack" style={{ gap: 6 }}>
     <div className="choices scale">
       {[1, 2, 3, 4, 5].map((n) => (
-        <label className="choice" key={n}>
+        <label className="choice star" key={n}>
           <input type="radio" name={name} value={n} defaultChecked={picked === String(n)} />
-          <span>{n}</span>
+          <span aria-label={`${n} ${n === 1 ? "star" : "stars"}`}>{"★".repeat(n)}</span>
         </label>
       ))}
     </div>
-    <span className="small">1 = {low} · 5 = {high}</span>
+    <span className="small">★ = {low} · ★★★★★ = {high}</span>
   </div>
 );
 

@@ -207,3 +207,15 @@ describe("onboarding email", () => {
     expect(m.attachments?.[0].filename).toBe("qr-platba-100101.png");
   });
 });
+
+describe("feedback after 10 sessions", () => {
+  it("asks how the sessions are going, with stars, confidentially", async () => {
+    const { feedbackInvitation } = await import("./email");
+    const m = feedbackInvitation("a@example.com", "Anna", "tok", true);
+    expect(m.subject).toContain("How are your sessions going");
+    expect(m.text).toContain("10 sessions");
+    expect(m.text).toContain("stars");
+    expect(m.text).toContain("confidential");
+    expect(m.text).toContain("/feedback/tok");
+  });
+});

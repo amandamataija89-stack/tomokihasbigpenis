@@ -516,6 +516,24 @@ async function syncStatusWithSessions(requestId: string, staffId: string) {
 }
 
 // The automatic feedback email goes once per case, even if it's completed, reopened and completed again.
+// After the 10th session held, the client is asked once, confidentially, how the sessions are going.
+const MIDWAY_FEEDBACK_SESSION = 10;
+async function midwayFeedback(requestId: string, staffId: string) {
+  const { rows } = await pool.query<{ held: number; sent: boolean }>(
+    `SELECT (SELECT count(*)::int FROM client_sessions WHERE request_id = $1 AND done_at IS NOT NULL AND NOT is_discovery) AS held,
+       EXISTS (SELECT 1 FROM request_notes WHERE request_id = $1 AND body LIKE 'Confidential feedback after 10 sessions%') AS sent`,
+    [requestId],
+  );
+  if (!rows[0] || rows[0].sent || rows[0].held < MIDWAY_FEEDBACK_SESSION) return;
+  let ok = false;
+  try {
+    ok = await inviteFeedback(requestId, true);
+  } catch (err) {
+    console.error("EAP midway feedback failed:", err);
+  }
+  if (ok) await note(requestId, staffId, "Confidential feedback after 10 sessions: link emailed to the client (stars and comment, anonymous).");
+}
+
 async function sendFeedbackOnce(requestId: string, staffId: string) {
   const { rows: sent } = await pool.query(
     "SELECT 1 FROM request_notes WHERE request_id = $1 AND body LIKE 'Anonymous feedback link emailed%'",
@@ -752,6 +770,7 @@ export async function setSessionOutcome(sessionId: string, outcome: "done" | "la
   );
   const limit = sessionLimit(rows[0].kind);
   const counted = limit ? `${rows[0].done} of ${limit}` : `${rows[0].done} so far`;
+  if (outcome !== "undo") await midwayFeedback(requestId, staff.id);
   await note(
     requestId,
     staff.id,

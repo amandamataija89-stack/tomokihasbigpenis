@@ -277,7 +277,13 @@ export function contactMissed(to: string, clientNickname: string, requestId: str
   };
 }
 
-export function feedbackInvitation(to: string, firstName: string, token: string): Mail {
+export function feedbackInvitation(to: string, firstName: string, token: string, midway = false): Mail {
+  if (midway)
+    return {
+      to,
+      subject: "How are your sessions going? Confidential feedback – Prague Integration",
+      text: `Hi ${firstName},\n\nYou've now had 10 sessions with us, and we'd love to know how they're going. Please rate them with 1 to 5 stars and add a comment if you like: it takes about two minutes.\n\n${appUrl()}/feedback/${token}\n\nYour answers are confidential and anonymous: we don't store your name or email with them, and your counsellor doesn't see them. The link works once and expires in 60 days.\n\nPrague Integration\n`,
+    };
   return {
     to,
     subject: "How did it go? Anonymous feedback – Prague Integration",
