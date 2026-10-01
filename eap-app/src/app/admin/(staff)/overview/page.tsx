@@ -75,7 +75,7 @@ export default async function ClientsOverview({
       params,
     ),
     manager
-      ? pool.query<{ id: string; name: string }>("SELECT id, name FROM staff WHERE password_hash <> '!' ORDER BY name")
+      ? pool.query<{ id: string; name: string }>("SELECT id, name FROM staff WHERE password_hash <> '!' AND counsels ORDER BY name")
       : Promise.resolve({ rows: [] as { id: string; name: string }[] }),
   ]);
   const totalHeld = rows.reduce((a, r) => a + r.held, 0);

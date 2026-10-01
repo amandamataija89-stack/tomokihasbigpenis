@@ -343,17 +343,23 @@ export async function updateStaff(staffId: string, formData: FormData) {
   const me = await requireManager();
   const f = availabilityFields(formData, 100);
   const role = String(formData.get("role") ?? "") as Role;
-  const { rows } = await pool.query<{ role: Role }>("SELECT role FROM staff WHERE id = $1", [staffId]);
+  const { rows } = await pool.query<{ role: Role; counsels: boolean }>("SELECT role, counsels FROM staff WHERE id = $1", [staffId]);
   if (!rows[0]) redirect("/admin/team");
   // Only admins change roles, and nobody removes their own admin role by accident.
   const newRole = me.role === "admin" && ROLES.includes(role) && !(staffId === me.id && role !== "admin") ? role : rows[0].role;
-  await pool.query(
-    `UPDATE staff SET takes_clients = $2, monthly_capacity = COALESCE($3, monthly_capacity), languages = $4,
-       away_until = $5, role = $6, is_admin = ($6 = 'admin'), accepts = $7 WHERE id = $1`,
-    [staffId, f.takesClients, f.capacity, f.languages, f.awayUntil, newRole, f.accepts],
-  );
+  // Counsellors always see clients; an admin or coordinator may or may not.
+  const counsels = newRole === "counsellor" || (formData.has("counselsShown") ? formData.get("counsels") === "yes" : rows[0].counsels);
+  await pool.query("UPDATE staff SET role = $2, is_admin = ($2 = 'admin'), counsels = $3 WHERE id = $1", [staffId, newRole, counsels]);
+  // Availability and payout only for those who see clients (the fields aren't shown otherwise).
+  if (!counsels) await pool.query("UPDATE staff SET takes_clients = false WHERE id = $1", [staffId]);
+  else if (formData.has("availabilityShown"))
+    await pool.query(
+      `UPDATE staff SET takes_clients = $2, monthly_capacity = COALESCE($3, monthly_capacity), languages = $4,
+         away_until = $5, accepts = $6 WHERE id = $1`,
+      [staffId, f.takesClients, f.capacity, f.languages, f.awayUntil, f.accepts],
+    );
   // Payout terms are for admins only.
-  if (me.role === "admin") {
+  if (me.role === "admin" && counsels && formData.has("payoutPercent")) {
     const pct = Number(formData.get("payoutPercent"));
     const fee = Number(formData.get("eapFee"));
     if (Number.isInteger(pct) && pct >= 0 && pct <= 100 && Number.isInteger(fee) && fee >= 0)

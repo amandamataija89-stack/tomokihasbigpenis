@@ -2,7 +2,7 @@ import { pool } from "@/lib/db";
 
 /** Staff who can have clients, for the counsellor filters. */
 export async function counsellorOptions() {
-  const { rows } = await pool.query<{ id: string; name: string }>("SELECT id, name FROM staff WHERE password_hash <> '!' ORDER BY name");
+  const { rows } = await pool.query<{ id: string; name: string }>("SELECT id, name FROM staff WHERE password_hash <> '!' AND counsels ORDER BY name");
   return rows;
 }
 

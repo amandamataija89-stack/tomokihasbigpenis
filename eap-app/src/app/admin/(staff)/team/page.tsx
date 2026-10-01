@@ -20,6 +20,7 @@ type Member = {
   eap_session_fee: number;
   removed: boolean;
   owner: boolean;
+  counsels: boolean;
 };
 
 export default async function TeamPage({
@@ -33,7 +34,7 @@ export default async function TeamPage({
     therapistLoads(pool, false, true),
     pool.query<Member>(
       `SELECT id, role, takes_clients, to_char(away_until, 'YYYY-MM-DD') AS away_until, password_hash = '!' AS invited, availability_note, payout_percent, eap_session_fee, suspended_at IS NOT NULL AS suspended,
-         removed_at IS NOT NULL AS removed, is_owner AS owner
+         removed_at IS NOT NULL AS removed, is_owner AS owner, counsels
        FROM staff`,
     ),
   ]);
@@ -41,7 +42,7 @@ export default async function TeamPage({
   const today = new Date().toISOString().slice(0, 10);
   const available = (id: string) => {
     const m = info.get(id)!;
-    return m.takes_clients && !m.invited && !m.removed && !(m.away_until && m.away_until >= today);
+    return m.takes_clients && m.counsels && !m.invited && !m.removed && !(m.away_until && m.away_until >= today);
   };
   const current = loads.filter((t) => !info.get(t.id)?.removed);
   const removed = loads.filter((t) => info.get(t.id)?.removed);
@@ -114,7 +115,9 @@ export default async function TeamPage({
                   <span className="small">{t.email}</span>
                 </div>
                 <span className={`pill ${!available(t.id) ? "pill-closed" : full ? "pill-new" : "pill-scheduled"}`}>
-                  {m.suspended
+                  {!m.counsels
+                    ? `${ROLE_LABELS[m.role]} · doesn't see clients`
+                    : m.suspended
                     ? "Suspended"
                     : !available(t.id)
                     ? m.invited
@@ -123,9 +126,13 @@ export default async function TeamPage({
                     : `${t.assignedThisMonth} / ${t.capacity}${full ? " · full" : ""}`}
                 </span>
               </div>
-              <p className="small"><b>Takes:</b> {t.accepts?.length ? t.accepts.join(", ") : "no new client types"}</p>
-              {m.availability_note && <p className="small" style={{ whiteSpace: "pre-wrap" }}><b>Available:</b> {m.availability_note}</p>}
-              <p className="small"><Link href={`/admin/team/${t.id}`}>See their clients and month →</Link></p>
+              {m.counsels && (
+                <>
+                  <p className="small"><b>Takes:</b> {t.accepts?.length ? t.accepts.join(", ") : "no new client types"}</p>
+                  {m.availability_note && <p className="small" style={{ whiteSpace: "pre-wrap" }}><b>Available:</b> {m.availability_note}</p>}
+                  <p className="small"><Link href={`/admin/team/${t.id}`}>See their clients and month →</Link></p>
+                </>
+              )}
               {m.invited && (
                 <form action={resendInvite.bind(null, t.id)} className="actions invite-pending">
                   <span className="small">Hasn&apos;t set a password yet.</span>
@@ -139,7 +146,14 @@ export default async function TeamPage({
                     {ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
                   </select>
                 </div>
-                {me.role === "admin" && (
+                {m.role !== "counsellor" && (
+                  <label className="consent small-consent">
+                    <input type="hidden" name="counselsShown" value="yes" />
+                    <input type="checkbox" name="counsels" value="yes" defaultChecked={m.counsels} />
+                    <span>Also works with clients as a counsellor (payout, languages and client types)</span>
+                  </label>
+                )}
+                {m.counsels && me.role === "admin" && (
                   <div className="actions" style={{ gap: 12 }}>
                     <label className="small">
                       Payout share of private fees (%){" "}
@@ -151,7 +165,8 @@ export default async function TeamPage({
                     </label>
                   </div>
                 )}
-                <AvailabilityFields
+                {m.counsels && <input type="hidden" name="availabilityShown" value="yes" />}
+                {m.counsels && <AvailabilityFields
                   idPrefix={t.id}
                   languages={t.languages}
                   capacity={t.capacity}
@@ -159,7 +174,7 @@ export default async function TeamPage({
                   takesClients={m.takes_clients}
                   awayUntil={m.away_until ?? ""}
                   accepts={t.accepts}
-                />
+                />}
                 <div className="actions"><button type="submit" className="ghost small-btn">Save</button></div>
               </form>
               {me.role === "admin" && t.id !== me.id && !m.owner && (

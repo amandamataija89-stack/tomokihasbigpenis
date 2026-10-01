@@ -472,6 +472,13 @@ ALTER TABLE staff ADD COLUMN IF NOT EXISTS meeting_link text NOT NULL DEFAULT ''
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS office_address text NOT NULL DEFAULT '';
 -- Access removed by an admin: can't sign in or reset a password until it's restored.
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS removed_at timestamptz;
+-- Admins and coordinators who don't see clients themselves: no payout, languages or client types,
+-- and they're left out of counsellor lists. Counsellors always counsel.
+ALTER TABLE staff ADD COLUMN IF NOT EXISTS counsels boolean NOT NULL DEFAULT true;
+-- Once: Barbora Benkova is an admin who doesn't counsel.
+UPDATE staff SET role = 'admin', is_admin = true, counsels = false, takes_clients = false
+  WHERE lower(email) = 'barbora.benkova2907@gmail.com' AND NOT EXISTS (SELECT 1 FROM app_state WHERE key = 'barbora_admin_set');
+INSERT INTO app_state (key, value) VALUES ('barbora_admin_set', '1') ON CONFLICT (key) DO NOTHING;
 
 -- Waiting list: when no suitable counsellor is free, the coordinator puts the client on it. Cleared
 -- when they're assigned.

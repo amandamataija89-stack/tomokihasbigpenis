@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { Role } from "@/lib/auth";
 
-export function StaffNav({ role }: { role: Role }) {
+export function StaffNav({ role, counsels = true }: { role: Role; counsels?: boolean }) {
   const path = usePathname();
   const manager = role === "admin" || role === "coordinator";
   const links = [
@@ -12,7 +12,7 @@ export function StaffNav({ role }: { role: Role }) {
     { href: "/admin/overview", label: manager ? "All clients" : "All my clients", show: true },
     { href: "/admin/clients", label: "Clients by month", show: true },
     { href: "/admin/groups", label: manager ? "Groups" : "My groups", show: true },
-    { href: "/admin/availability", label: "My availability", show: true },
+    { href: "/admin/availability", label: "My availability", show: counsels },
     { href: "/admin/dashboard", label: "Dashboard", show: role === "admin" },
     { href: "/admin/payouts", label: role === "admin" ? "Payouts" : "My earnings", show: true },
     { href: "/admin/team", label: "Team", show: manager },
