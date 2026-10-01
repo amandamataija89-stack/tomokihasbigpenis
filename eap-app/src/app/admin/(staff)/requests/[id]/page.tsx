@@ -258,7 +258,8 @@ export default async function RequestPage({
               </>
             )}
           </section>
-          {isPrivate && (
+          {/* Clients with a consent form on file (e.g. from the previous system) are past these first steps. */}
+          {isPrivate && !r.consent_on_file && (
             <Steps
               requestId={r.id}
               canAct={r.assigned_to === me.id || manager}
@@ -277,12 +278,12 @@ export default async function RequestPage({
                 firstFullSession: sessions.find((x) => !x.is_discovery)?.starts_at ?? null,
                 consentRequested: r.consent_requested_at,
                 consentSent: r.consent_form_sent_at,
-                consentSigned: signedConsent?.signed_at ?? null,
+                consentSigned: signedConsent?.signed_at ?? (r.consent_on_file ? r.created_at : null),
               }}
             />
           )}
           {isPrivate && <IntakeCard requestId={r.id} intake={intake} sentAt={r.intake_sent_at} />}
-          {isPrivate && <ConsentCard requestId={r.id} manager={manager} signed={signedConsent} sentAt={r.consent_form_sent_at} flash={sp.consent} />}
+          {isPrivate && <ConsentCard requestId={r.id} manager={manager} onFile={r.consent_on_file} signed={signedConsent} sentAt={r.consent_form_sent_at} flash={sp.consent} />}
           <Messages requestId={r.id} nickname={r.first_name} messages={messages} flash={sp.msg} />
           <Sessions
             manager={manager}
@@ -292,7 +293,7 @@ export default async function RequestPage({
             clientEmail={r.email}
             defaultPrice={defaultPrice}
             error={sp.session}
-            consentMissing={isPrivate && !signedConsent}
+            consentMissing={isPrivate && !signedConsent && !r.consent_on_file}
           />
           {isPrivate && (
             <Payments

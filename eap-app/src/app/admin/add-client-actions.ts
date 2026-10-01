@@ -29,6 +29,7 @@ export async function addClientAction(_prev: AddClientState, formData: FormData)
     message: t("message", 2000),
     counsellor: t("counsellor", 40),
     crisis: formData.get("crisis") === "yes" ? "yes" : "",
+    existing: formData.get("existing") === "yes" ? "yes" : "",
   };
   const fail = (error: string) => ({ error, values });
   const isPrivate = values.kind !== "eap";
@@ -66,10 +67,17 @@ export async function addClientAction(_prev: AddClientState, formData: FormData)
     ],
   );
   const id = rows[0].id;
+  // An existing client from the previous system: consent on file, already in progress.
+  if (values.existing === "yes")
+    await pool.query(
+      `UPDATE support_requests SET consent_on_file = true, counselling_agreed_at = now(), offer_late_alerted_at = now(),
+         status = 'in_progress', in_pool = false WHERE id = $1`,
+      [id],
+    );
   await pool.query("INSERT INTO request_notes (request_id, staff_id, body) VALUES ($1, $2, $3)", [
     id,
     me.id,
-    `Client added by hand by ${me.name}${counsellor ? "" : ", waiting for a counsellor"}. The client agreed to be contacted and to their details being stored.`,
+    `Client added by hand by ${me.name}${values.existing === "yes" ? " (already a client, consent form on file from the previous system)" : ""}${counsellor ? "" : ", waiting for a counsellor"}. The client agreed to be contacted and to their details being stored.`,
   ]);
   // An EAP client with nobody chosen is offered automatically, as if they'd registered.
   if (!counsellor && !isPrivate) await autoAssign(id, values.language, values.crisis === "yes").catch((err) => console.error(err));

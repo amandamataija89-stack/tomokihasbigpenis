@@ -65,7 +65,7 @@ export default async function ClientsOverview({
          (SELECT min(starts_at) FROM client_sessions WHERE request_id = r.id AND done_at IS NULL AND starts_at > now()) AS next_session,
          (SELECT max(starts_at) FROM client_sessions WHERE request_id = r.id AND done_at IS NOT NULL) AS last_session,
          (SELECT COALESCE(sum(price_czk), 0)::int FROM client_sessions WHERE request_id = r.id AND done_at IS NOT NULL AND paid_at IS NULL) AS unpaid_amount,
-         EXISTS (SELECT 1 FROM consent_forms WHERE request_id = r.id) AS consent_signed
+         (r.consent_on_file OR EXISTS (SELECT 1 FROM consent_forms WHERE request_id = r.id)) AS consent_signed
        FROM support_requests r
        LEFT JOIN companies c ON c.id = r.company_id
        LEFT JOIN staff s ON s.id = r.assigned_to

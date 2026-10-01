@@ -43,17 +43,17 @@ export async function importClientsAction(formData: FormData) {
       `INSERT INTO support_requests
          (kind, variable_symbol, first_name, full_name, email, phone, contact_method, language, format, topics,
           message, crisis, age_range, gender, location, service, address, consent_at, consent_contact_at, status,
-          assigned_to, assigned_at, accepted_at, in_pool, added_by, offer_late_alerted_at)
+          assigned_to, assigned_at, accepted_at, in_pool, added_by, offer_late_alerted_at, consent_on_file, counselling_agreed_at)
        VALUES ('private', nextval('client_vs_seq')::text, $1, $2, $3, '', 'Email', 'English', 'No preference', '{}',
           '', false, '', '', '', '', '', now(), now(), 'in_progress',
-          $4, CASE WHEN $4::uuid IS NOT NULL THEN now() END, CASE WHEN $4::uuid IS NOT NULL THEN now() END, false, $5, now())
+          $4, CASE WHEN $4::uuid IS NOT NULL THEN now() END, CASE WHEN $4::uuid IS NOT NULL THEN now() END, false, $5, now(), true, now())
        RETURNING id`,
       [cl.firstName, `${cl.firstName} ${cl.surname}`.trim(), cl.email, counsellor, me.id],
     );
     await pool.query("INSERT INTO request_notes (request_id, staff_id, body) VALUES ($1, $2, $3)", [
       ins[0].id,
       me.id,
-      `Imported from the previous system (${f.name.slice(0, 100)}, row ${cl.row}) by ${me.name}. Nothing was emailed to the client.`,
+      `Imported from the previous system (${f.name.slice(0, 100)}, row ${cl.row}) by ${me.name}: already a client, consent form signed in the previous system. Nothing was emailed to the client.`,
     ]);
     added++;
   }

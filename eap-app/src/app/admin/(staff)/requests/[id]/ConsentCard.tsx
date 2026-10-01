@@ -1,17 +1,19 @@
 import type { SignedConsent } from "@/lib/consent";
-import { sendConsentAction } from "../../../actions";
+import { sendConsentAction, setConsentOnFileAction } from "../../../actions";
 import { formatDate } from "../../../format";
 
 // The client's informed consent form: whether it's signed, their emergency contact, and sending the link.
 export function ConsentCard({
   requestId,
   manager = false,
+  onFile = false,
   signed,
   sentAt,
   flash,
 }: {
   requestId: string;
   manager?: boolean; // coordinators and admins send the consent form
+  onFile?: boolean; // signed outside the app, e.g. in the previous system
   signed: SignedConsent | null;
   sentAt: Date | null;
   flash?: string;
@@ -36,6 +38,18 @@ export function ConsentCard({
           </dl>
           <p><a className="button ghost small-btn" href={`/admin/consent/${requestId}`} target="_blank" rel="noopener">Download signed form (PDF)</a></p>
         </>
+      ) : onFile ? (
+        <>
+          <p>
+            <span className="pill pill-completed">✓ Signed outside the app</span> (on file, e.g. from our previous system).
+            Sessions can be held and marked done.
+          </p>
+          {manager && (
+            <form action={setConsentOnFileAction.bind(null, requestId, false)}>
+              <button type="submit" className="ghost small-btn">Not on file after all</button>
+            </form>
+          )}
+        </>
       ) : (
         <>
           <p className="notice">
@@ -48,6 +62,11 @@ export function ConsentCard({
           <form action={sendConsentAction.bind(null, requestId)}>
             <button type="submit" className="ghost small-btn">Email the link again</button>
           </form>
+          )}
+          {manager && (
+            <form action={setConsentOnFileAction.bind(null, requestId, true)}>
+              <button type="submit" className="ghost small-btn">They signed a consent form outside the app (on file)</button>
+            </form>
           )}
         </>
       )}

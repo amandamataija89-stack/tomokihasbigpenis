@@ -45,7 +45,7 @@ export async function openAdmin(staffId: string, now = new Date()): Promise<Open
     pool.query<{ id: string; first_name: string; service: string; session_price_czk: number | null; kind: string; unsigned: boolean }>(
       `SELECT r.id, r.first_name, r.service, r.session_price_czk, r.kind,
          EXISTS (SELECT 1 FROM client_sessions WHERE request_id = r.id)
-           AND NOT EXISTS (SELECT 1 FROM consent_forms WHERE request_id = r.id) AS unsigned
+           AND NOT r.consent_on_file AND NOT EXISTS (SELECT 1 FROM consent_forms WHERE request_id = r.id) AS unsigned
        FROM support_requests r
        WHERE r.assigned_to = $1 AND r.status NOT IN ('completed', 'closed') AND r.accepted_at IS NOT NULL`,
       [staffId],
