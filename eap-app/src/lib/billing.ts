@@ -676,6 +676,9 @@ export async function addToMonthlyInvoice(sessionId: string): Promise<string | n
   );
   const s = rows[0];
   if (!s || s.kind !== "private" || s.price_czk === null) return null;
+  // ADHD testing: its own final invoice (the session less the deposit), not the monthly one.
+  const adhd = await (await import("./adhd")).adhdFinalInvoice(sessionId);
+  if (adhd) return adhd;
   // Invoiced per session: this session gets its own invoice, issued now (emailed only if the client asked).
   const { rows: mode } = await pool.query<{ per_session: boolean; email: boolean }>(
     "SELECT invoice_per_session AS per_session, email_invoices AS email FROM support_requests WHERE id = $1",

@@ -474,6 +474,9 @@ ALTER TABLE staff ADD COLUMN IF NOT EXISTS office_address text NOT NULL DEFAULT 
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS removed_at timestamptz;
 -- A client who signed a consent form outside the app (e.g. in the previous system): treated as signed.
 ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS consent_on_file boolean NOT NULL DEFAULT false;
+-- ADHD testing: when the info email and deposit invoice went out, and the deposit invoice itself.
+ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS adhd_info_sent_at timestamptz;
+ALTER TABLE support_requests ADD COLUMN IF NOT EXISTS adhd_deposit_payment_id uuid REFERENCES payments(id) ON DELETE SET NULL;
 -- Admins and coordinators who don't see clients themselves: no payout, languages or client types,
 -- and they're left out of counsellor lists. Counsellors always counsel.
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS counsels boolean NOT NULL DEFAULT true;

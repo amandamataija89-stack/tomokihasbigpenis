@@ -79,6 +79,7 @@ export async function addClientAction(_prev: AddClientState, formData: FormData)
     me.id,
     `Client added by hand by ${me.name}${values.existing === "yes" ? " (already a client, consent form on file from the previous system)" : ""}${counsellor ? "" : ", waiting for a counsellor"}. The client agreed to be contacted and to their details being stored.`,
   ]);
+  if (counsellor) await (await import("@/lib/adhd")).maybeStartAdhdTesting(id).catch((err) => console.error("EAP ADHD info failed:", err));
   // An EAP client with nobody chosen is offered automatically, as if they'd registered.
   if (!counsellor && !isPrivate) await autoAssign(id, values.language, values.crisis === "yes").catch((err) => console.error(err));
   if (formData.get("welcome") === "yes")

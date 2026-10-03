@@ -220,3 +220,21 @@ describe("feedback after 10 sessions", () => {
     expect(m.text).toContain("/feedback/tok");
   });
 });
+
+describe("ADHD testing email", () => {
+  it("gives the fee split, deposit payment details and the QR code", async () => {
+    const { adhdTestingEmail } = await import("./email");
+    const m = adhdTestingEmail("a@example.com", "Jan", {
+      psychologist: "Magdalena", total: 8470, deposit: 3000, student: false, studentPercent: 10,
+      account: "2920502002/5500", iban: "CZ00", variableSymbol: "100900", messageLink: "https://x/m/t", qrPngBase64: "x",
+    });
+    const text = m.text.replace(/\u00a0/g, " "); // Czech number format uses non-breaking spaces
+    expect(text).toContain("Magdalena");
+    expect(text).toContain("8 470 CZK");
+    expect(text).toContain("3 000 CZK");
+    expect(text).toContain("5 470 CZK");
+    expect(m.text).toContain("variable symbol 100900");
+    expect(m.text).toContain("two invoices");
+    expect(m.attachments?.[0].filename).toContain("qr-platba");
+  });
+});
