@@ -27,7 +27,10 @@ export async function acceptOffer(requestId: string, staffId: string): Promise<b
      WHERE id = $1 AND assigned_to = $2 AND accepted_at IS NULL`,
     [requestId, staffId],
   );
-  if (rowCount) await note(requestId, staffId, "Accepted the client.");
+  if (rowCount) {
+    await note(requestId, staffId, "Accepted the client.");
+    await (await import("./adhd")).maybeStartAdhdTesting(requestId).catch((err) => console.error("EAP ADHD info failed:", err));
+  }
   return !!rowCount;
 }
 
@@ -100,6 +103,7 @@ export async function offerTo(requestId: string, counsellorId: string, byStaffId
     alreadyAgreed ? `Assigned to ${r.name} (agreed with them).` : `Offered to ${r.name}, waiting for them to accept.`,
   );
   if (deadline) await sendAll([therapistAlert(r.email, r.name, requestId, r.crisis, deadline)]);
+  else await (await import("./adhd")).maybeStartAdhdTesting(requestId).catch((err) => console.error("EAP ADHD info failed:", err));
 }
 
 /** Halfway to the answer-by time, reminds a counsellor who hasn't answered an offer yet (once per offer). */

@@ -644,3 +644,66 @@ export function groupConsentSignedStaffEmail(to: string, memberName: string, gro
     text: `${memberName} has signed the informed consent form for ${groupName}.\n\n${appUrl()}/admin/groups/${groupId}#members\n`,
   };
 }
+
+/** ADHD testing: sent once the client has their psychologist, with the deposit QR code. */
+export function adhdTestingEmail(
+  to: string,
+  firstName: string,
+  p: {
+    psychologist: string;
+    total: number;
+    deposit: number;
+    student: boolean;
+    studentPercent: number;
+    account: string;
+    iban: string;
+    variableSymbol: string;
+    messageLink: string;
+    qrPngBase64?: string;
+  },
+): Mail {
+  const czk = (n: number) => `${n.toLocaleString("cs-CZ")} CZK`;
+  const rest = p.total - p.deposit;
+  return {
+    to,
+    subject: "Your ADHD testing – Prague Integration",
+    text: `Hi ${firstName},
+
+Thank you for applying for ADHD testing with Prague Integration. Your assessment will be carried out by our psychologist, ${p.psychologist}, who will contact you to arrange the appointment.
+
+How the testing works
+The session lasts 1.5–2 hours and includes:
+- questionnaires based on the diagnostic criteria
+- an interview with the psychologist
+- if needed, a short additional interview with a family member or partner
+
+Before the assessment, you'll be asked to sign a consent form for testing.
+
+Fee: ${czk(p.total)} including 21 % VAT${p.student ? ` (with your ${p.studentPercent} % student discount)` : ` (students with a valid ISIC card get ${p.studentPercent} % off – just let us know)`}
+- Deposit: ${czk(p.deposit)}, to be paid within 48 hours of your appointment being arranged, to confirm your booking
+- The rest: ${czk(rest)}, paid on the day of the appointment, after the assessment
+
+You'll receive two invoices: one for the deposit (attached to a separate email) and one for the rest after your assessment. You'll also find them on your private page:
+${p.messageLink}
+
+How to pay the deposit${p.qrPngBase64 ? "\n- scan the QR code attached to this email in your banking app, or" : ""}
+- bank transfer to account ${p.account}${p.iban ? ` (IBAN ${p.iban})` : ""}, variable symbol ${p.variableSymbol}
+
+Please note
+In the Czech Republic, only a psychiatrist can officially record a diagnosis (ICD code) on your health record and prescribe medication. If medication becomes relevant for you, a visit to a psychiatrist will be needed for that step. Most people don't need medication, and in many cases our clinical psychologist's evaluation is all that's needed – it depends on your situation.
+
+The assessment is valid and recognised in the Czech Republic. We can't guarantee it will be recognised in other countries; if that matters to you, please check the requirements there.
+
+Within two weeks of the testing, you'll receive your results digitally, stamped and signed by our clinical psychologist.
+
+If you have any questions before your appointment, just reply to this email.
+
+Warm regards,
+Amanda
+Prague Integration
++420 608 573 256
+contact@pragueintegration.cz
+`,
+    ...(p.qrPngBase64 ? { attachments: [{ filename: `qr-platba-zaloha-${p.variableSymbol}.png`, content: p.qrPngBase64 }] } : {}),
+  };
+}

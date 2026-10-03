@@ -92,6 +92,7 @@ export async function setClientService(requestId: string, formData: FormData) {
      WHERE id = $1`,
     [requestId, service, fits],
   );
+  await (await import("@/lib/adhd")).maybeStartAdhdTesting(requestId).catch((err) => console.error("EAP ADHD info failed:", err));
   await note(
     requestId,
     staff.id,
