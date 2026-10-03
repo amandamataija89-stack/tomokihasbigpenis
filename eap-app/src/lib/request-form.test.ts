@@ -51,11 +51,10 @@ describe("validateRequest", () => {
     if (!r.ok) expect(Object.keys(r.errors).sort()).toEqual(["format", "language"]);
   });
 
-  it("records a crisis answer and requires one", () => {
+  it("never marks a crisis from the form: counsellors decide that", () => {
     const r = validateRequest(form({ ...valid, crisis: "yes" }));
-    expect(r.ok && r.data.crisis).toBe(true);
-    const missing = validateRequest(form({ ...valid, crisis: "" }));
-    expect(!missing.ok && missing.errors.crisis).toBeTruthy();
+    expect(r.ok && r.data.crisis).toBe(false);
+    expect(validateRequest(form({ ...valid, crisis: "" })).ok).toBe(true);
   });
 
   it("needs a topic or a message", () => {

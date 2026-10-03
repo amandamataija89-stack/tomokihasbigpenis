@@ -1,16 +1,15 @@
 // All deadlines count from when the client submits the form, so they add up to the promise
-// the client is given: contact within 24 working hours (Monday–Friday), or 2 hours if urgent.
+// the client is given: contact within 24 working hours (Monday–Friday). Prague Integration is not an
+// emergency service, so urgent (crisis) requests have the same timings; they're flagged so staff see
+// them first, and clients are told to call 112 or 116 123 in an emergency.
 
 export const CONTACT_WITHIN_HOURS = 24; // working hours
-export const CRISIS_CONTACT_WITHIN_HOURS = 2; // clock hours
 
 // The counsellor gets a reminder this long after the client submitted, if they still haven't made contact.
 export const CONTACT_REMINDER_AFTER_HOURS = 18; // working hours
-export const CRISIS_CONTACT_REMINDER_AFTER_HOURS = 1; // clock hours
 
 // How long a counsellor has to accept or decline an offer before it passes to the next counsellor.
 export const ACCEPT_WITHIN_WORKING_HOURS = 24; // Monday–Friday; reminder halfway
-export const CRISIS_ACCEPT_WITHIN_MINUTES = 30;
 export const OFFICE_OPENS = 8; // 08:00 Prague time
 export const OFFICE_CLOSES = 18; // 18:00 Prague time
 
@@ -53,26 +52,14 @@ export const addOfficeHours = (from: Date, hours: number) =>
     return !p.weekend && p.hour >= OFFICE_OPENS && p.hour < OFFICE_CLOSES;
   });
 
-/** When the client was promised first contact. */
-export const contactDue = (submittedAt: Date, crisis: boolean) =>
-  crisis
-    ? new Date(submittedAt.getTime() + CRISIS_CONTACT_WITHIN_HOURS * 3600_000)
-    : addWorkingHours(submittedAt, CONTACT_WITHIN_HOURS);
+/** When the client was promised first contact. (`_crisis` kept for callers: same promise for everyone.) */
+export const contactDue = (submittedAt: Date, _crisis?: boolean) => addWorkingHours(submittedAt, CONTACT_WITHIN_HOURS);
 
 /** When the counsellor is reminded to make contact. */
-export const contactReminderAt = (submittedAt: Date, crisis: boolean) =>
-  crisis
-    ? new Date(submittedAt.getTime() + CRISIS_CONTACT_REMINDER_AFTER_HOURS * 3600_000)
-    : addWorkingHours(submittedAt, CONTACT_REMINDER_AFTER_HOURS);
+export const contactReminderAt = (submittedAt: Date, _crisis?: boolean) => addWorkingHours(submittedAt, CONTACT_REMINDER_AFTER_HOURS);
 
 /** Answer-by time for an offer made at `offeredAt`. */
-export const respondBy = (offeredAt: Date, crisis: boolean) =>
-  crisis
-    ? new Date(offeredAt.getTime() + CRISIS_ACCEPT_WITHIN_MINUTES * 60_000)
-    : addWorkingHours(offeredAt, ACCEPT_WITHIN_WORKING_HOURS);
+export const respondBy = (offeredAt: Date, _crisis?: boolean) => addWorkingHours(offeredAt, ACCEPT_WITHIN_WORKING_HOURS);
 
 /** When to remind a counsellor who hasn't answered an offer yet: halfway to the answer-by time. */
-export const offerReminderAt = (offeredAt: Date, crisis: boolean) =>
-  crisis
-    ? new Date(offeredAt.getTime() + (CRISIS_ACCEPT_WITHIN_MINUTES / 2) * 60_000)
-    : addWorkingHours(offeredAt, ACCEPT_WITHIN_WORKING_HOURS / 2);
+export const offerReminderAt = (offeredAt: Date, _crisis?: boolean) => addWorkingHours(offeredAt, ACCEPT_WITHIN_WORKING_HOURS / 2);

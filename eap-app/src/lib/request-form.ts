@@ -99,7 +99,6 @@ export function validateRequest(form: FormData, isPrivate = false): ValidationRe
     errors.phone = "Enter a phone number so we can call or text you.";
   if (!(LANGUAGES as readonly string[]).includes(values.language)) errors.language = "Choose a language.";
   if (!(FORMATS as readonly string[]).includes(values.format)) errors.format = "Choose online, in person, or no preference.";
-  if (crisisAnswer !== "yes" && crisisAnswer !== "no") errors.crisis = "Tell us whether you need urgent help.";
   if (values.topics.length === 0 && !values.message)
     errors.topics = "Choose at least one topic, or write a few words about what's going on.";
   if (!(AGE_RANGES as readonly string[]).includes(values.ageRange)) errors.ageRange = "Choose your age range.";
@@ -112,5 +111,5 @@ export function validateRequest(form: FormData, isPrivate = false): ValidationRe
 
   return Object.keys(errors).length
     ? { ok: false, errors, values: { ...values, crisis: crisisAnswer } }
-    : { ok: true, data: { ...values, crisis: crisisAnswer === "yes" } };
+    : { ok: true, data: { ...values, crisis: false } }; // clients no longer self-declare a crisis; counsellors mark it
 }

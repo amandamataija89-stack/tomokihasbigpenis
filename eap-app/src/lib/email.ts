@@ -170,7 +170,7 @@ export function employeeConfirmation(to: string, firstName: string, crisis = fal
   return {
     to,
     subject: "We've received your request – Prague Integration",
-    text: `Hi ${firstName},\n\nThank you for reaching out. We've received your request and someone from our team will contact you ${crisis ? "as soon as possible" : "within 24 working hours (Monday to Friday)"}, in the way you asked.${messageLine(messageLink)}\n\nEverything you share with us is confidential.${isPrivate ? "" : " Your employer is not told who uses the programme."}\n\nIf you need urgent help before we reach you, call 112 (emergency) or the Linka první psychické pomoci on 116 123 (free, 24/7).\n\nPrague Integration\n+420 608 573 256\ncontact@pragueintegration.cz\n`,
+    text: `Hi ${firstName},\n\nThank you for reaching out. We've received your request and someone from our team will contact you within 24 working hours (Monday to Friday), in the way you asked.${messageLine(messageLink)}\n\nEverything you share with us is confidential.${isPrivate ? "" : " Your employer is not told who uses the programme."}\n\nWe are not an emergency service: if you need urgent help before we reach you, call 112 (emergency) or the Linka první psychické pomoci on 116 123 (free, 24/7).\n\nPrague Integration\n+420 608 573 256\ncontact@pragueintegration.cz\n`,
   };
 }
 
@@ -270,8 +270,8 @@ export function overdueWarning(
 export function contactMissed(to: string, clientNickname: string, requestId: string, counsellorName: string | null, crisis: boolean): Mail {
   return {
     to,
-    subject: `${crisis ? "URGENT – " : ""}Contact promise missed: ${clientNickname}`,
-    text: `${clientNickname}${crisis ? " (crisis)" : ""} was promised first contact within ${crisis ? "2 hours" : "24 working hours"} and the case is still New. ${
+    subject: `Contact promise missed: ${clientNickname}${crisis ? " (marked urgent)" : ""}`,
+    text: `${clientNickname}${crisis ? " (marked urgent)" : ""} was promised first contact within 24 working hours and the case is still New. ${
       counsellorName ? `It's with ${counsellorName}.` : "No counsellor has it yet."
     }\n\nPlease check on it now:\n${appUrl()}/admin/requests/${requestId}\n`,
   };

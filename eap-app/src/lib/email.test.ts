@@ -55,9 +55,10 @@ describe("cancellation policy", () => {
 });
 
 describe("employeeConfirmation", () => {
-  it("promises 24 working hours, or as soon as possible for urgent requests", () => {
+  it("promises 24 working hours to everyone, urgent requests too (not an emergency service)", () => {
     expect(employeeConfirmation("a@example.com", "Míša").text).toContain("within 24 working hours (Monday to Friday)");
-    expect(employeeConfirmation("a@example.com", "Míša", true).text).toContain("as soon as possible");
+    expect(employeeConfirmation("a@example.com", "Míša", true).text).toContain("within 24 working hours (Monday to Friday)");
+    expect(employeeConfirmation("a@example.com", "Míša", true).text).toContain("not an emergency service");
   });
 });
 

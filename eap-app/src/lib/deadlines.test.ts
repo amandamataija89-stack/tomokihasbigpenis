@@ -39,10 +39,10 @@ describe("offers and contact, counted from when the client submits", () => {
   it("offered Friday 16:00: accept by Monday 16:00 (weekend skipped)", () => {
     expect(iso(respondBy(new Date("2026-09-25T14:00:00Z"), false))).toBe("2026-09-28T14:00:00.000Z");
   });
-  it("crisis: 30 minutes to accept, contact reminder after 1 hour, due after 2, even at the weekend", () => {
-    const saturday = new Date("2026-09-26T10:00:00Z");
-    expect(iso(respondBy(saturday, true))).toBe("2026-09-26T10:30:00.000Z");
-    expect(iso(contactReminderAt(saturday, true))).toBe("2026-09-26T11:00:00.000Z");
-    expect(iso(contactDue(saturday, true))).toBe("2026-09-26T12:00:00.000Z");
+  it("crisis: the same 24 working hours as everyone (not an emergency service)", () => {
+    const monday10 = new Date("2026-09-28T08:00:00Z");
+    expect(iso(respondBy(monday10, true))).toBe(iso(respondBy(monday10, false)));
+    expect(iso(contactReminderAt(monday10, true))).toBe(iso(contactReminderAt(monday10, false)));
+    expect(iso(contactDue(monday10, true))).toBe(iso(contactDue(monday10, false)));
   });
 });
