@@ -18,7 +18,7 @@ export function age(d: Date, now = Date.now()): string {
   return `${Math.floor(hours / 24)} d`;
 }
 
-// Clients are promised contact within 24 working hours (weekends don't count), or 2 hours if urgent.
+// Clients are promised contact within 24 working hours (weekends don't count) (urgent requests too: we are not an emergency service).
 export const isOverdue = (submittedAt: Date, now = Date.now(), crisis = false) =>
   now > contactDue(submittedAt, crisis).getTime();
 

@@ -61,24 +61,11 @@ export function RequestForm({ code }: { code: string | null }) {
             {err("service")}
           </fieldset>
         )}
-        <fieldset className="urgent-q" {...invalid("crisis")}>
-          <legend>Do you need help urgently?</legend>
-          <div className="choices">
-            <label className="choice">
-              <input type="radio" name="crisis" value="yes" defaultChecked={v.crisis === "yes"} />
-              <span>Yes, I&apos;m struggling to cope right now</span>
-            </label>
-            <label className="choice">
-              <input type="radio" name="crisis" value="no" defaultChecked={v.crisis === "no"} />
-              <span>No, it&apos;s not urgent</span>
-            </label>
-          </div>
-          <p className="small">
-            If you are in danger or thinking about harming yourself, please call <b>112</b> or <b>116 123</b> now
-            rather than waiting for us.
-          </p>
-          {err("crisis")}
-        </fieldset>
+        {/* No "are you in crisis" question: counsellors mark a crisis case themselves when needed. */}
+        <p className="notice small">
+          We contact everyone within 24 working hours; we are not an emergency service. If you are in danger or thinking
+          about harming yourself, please call <b>112</b> or <b>116 123</b> (free, 24/7) now rather than waiting for us.
+        </p>
 
         <fieldset {...invalid("topics")}>
           <legend>

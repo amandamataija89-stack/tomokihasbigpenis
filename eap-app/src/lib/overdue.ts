@@ -17,7 +17,7 @@ type Open = {
 /**
  * Hourly, for clients still marked New, counted from when they submitted the form:
  * - at 18 working hours (1 hour for a crisis) the counsellor who has them is reminded, once per counsellor;
- * - at the promised 24 working hours (2 hours for a crisis) the coordinator and counsellor are told, once.
+ * - at the promised 24 working hours the coordinator and counsellor are told, once.
  */
 export async function warnOverdue(now = new Date()): Promise<{ warned: number; missed: number; failed: number }> {
   const { rows } = await pool.query<Open>(
